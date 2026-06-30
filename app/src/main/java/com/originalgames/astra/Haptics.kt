@@ -1,4 +1,4 @@
-package com.originalgames.flipside
+package com.originalgames.astra
 
 import android.content.Context
 import android.os.Build
@@ -8,8 +8,9 @@ import android.os.VibratorManager
 
 /**
  * Thin, crash-proof wrapper around the device vibrator for tactile feedback.
- * Pulses are deliberately tiny so flips and pickups feel "clicky" rather than
- * buzzy. Honours an enabled flag so it can be toggled with the rest of the FX.
+ * Pulses are deliberately tiny so loosing an arrow or landing a hit feels
+ * "clicky" rather than buzzy. Honours an enabled flag so it can be toggled
+ * with the rest of the FX.
  */
 class Haptics(context: Context, var enabled: Boolean = true) {
 
@@ -27,14 +28,17 @@ class Haptics(context: Context, var enabled: Boolean = true) {
 
     private val available = vibrator?.hasVibrator() == true
 
-    /** A crisp tick for flipping gravity. */
-    fun light() = buzz(12L)
+    /** A crisp tick for loosing an arrow. */
+    fun light() = buzz(10L)
 
-    /** A slightly fuller pop for collecting a gem. */
+    /** A slightly fuller pop for landing a hit on Ravan or grabbing a boon. */
     fun pop() = buzz(18L)
 
-    /** A heavier thud for crashing. */
-    fun crash() = buzz(45L)
+    /** A bright double-ish thump for severing a head / firing an astra. */
+    fun heavy() = buzz(35L)
+
+    /** A heavier thud for taking a hit. */
+    fun crash() = buzz(55L)
 
     private fun buzz(ms: Long) {
         if (!enabled || !available) return

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Fullscreen, no action bar: the game owns the whole surface. -->
-    <style name="Theme.Flipside" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.Astra" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@color/ic_launcher_background</item>

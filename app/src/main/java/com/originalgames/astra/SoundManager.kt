@@ -1,4 +1,4 @@
-package com.originalgames.flipside
+package com.originalgames.astra
 
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -21,17 +21,26 @@ class SoundManager(var enabled: Boolean = true) {
 
     private val sampleRate = 44100
 
-    /** A quick rising "blip" for flipping gravity. */
-    fun flip() = play(startFreq = 520f, endFreq = 760f, durationMs = 90, volume = 0.35f)
+    /** A soft pluck for loosing an arrow from the bow. */
+    fun shoot() = play(startFreq = 700f, endFreq = 430f, durationMs = 70, volume = 0.22f)
 
-    /** A bright sparkle for collecting a gem. */
-    fun gem() = play(startFreq = 880f, endFreq = 1320f, durationMs = 120, volume = 0.40f)
+    /** A bright tick for an arrow striking Ravan. */
+    fun hit() = play(startFreq = 900f, endFreq = 1180f, durationMs = 70, volume = 0.30f)
 
-    /** A low falling tone for crashing. */
-    fun crash() = play(startFreq = 320f, endFreq = 70f, durationMs = 420, volume = 0.55f)
+    /** A heavy descending tone for severing one of Ravan's heads. */
+    fun sever() = play(startFreq = 540f, endFreq = 120f, durationMs = 360, volume = 0.55f)
 
-    /** A soft confirmation tone for starting a run. */
-    fun start() = play(startFreq = 440f, endFreq = 660f, durationMs = 140, volume = 0.30f)
+    /** A rising divine whoosh for unleashing an astra. */
+    fun astra() = play(startFreq = 320f, endFreq = 1400f, durationMs = 320, volume = 0.45f)
+
+    /** A low thud for Ram taking a hit. */
+    fun hurt() = play(startFreq = 300f, endFreq = 70f, durationMs = 300, volume = 0.5f)
+
+    /** A short confirmation for choosing a boon / starting a battle. */
+    fun confirm() = play(startFreq = 480f, endFreq = 720f, durationMs = 130, volume = 0.30f)
+
+    /** A bright triumphant tone for victory over Ravan. */
+    fun victory() = play(startFreq = 660f, endFreq = 990f, durationMs = 480, volume = 0.5f)
 
     private fun play(startFreq: Float, endFreq: Float, durationMs: Int, volume: Float) {
         if (!enabled) return

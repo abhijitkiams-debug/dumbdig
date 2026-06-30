@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Flipside"
+rootProject.name = "Astra"
 include ":app"

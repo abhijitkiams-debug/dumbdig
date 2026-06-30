@@ -1,4 +1,4 @@
-package com.originalgames.flipside
+package com.originalgames.astra
 
 import android.os.Build
 import android.os.Bundle
@@ -9,7 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 
 /**
  * Single-activity host. It does nothing but own the [GameView] and keep the
- * screen immersive while the game runs.
+ * screen immersive while the battle rages.
  */
 class MainActivity : AppCompatActivity() {
 

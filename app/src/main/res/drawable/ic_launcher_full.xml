@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Self-contained launcher icon (background + foreground) for pre-API-26
-     devices that do not support adaptive icons. Original vector art. -->
+     devices that do not support adaptive icons. Original vector art:
+     Ram's golden longbow with a nocked arrow on a deep Lanka-night field. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,14 +9,35 @@
     android:viewportHeight="108">
 
     <path
-        android:fillColor="#0E1116"
+        android:fillColor="#1A0E22"
         android:pathData="M0,0 H108 V108 H0 Z" />
 
+    <!-- Bow arc -->
     <path
-        android:fillColor="#22E0C8"
-        android:pathData="M30,46 L54,30 L78,46 L78,58 L54,42 L30,58 Z" />
-
+        android:strokeColor="#FFD24A"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M40,26 C66,40 66,68 40,82" />
+    <!-- Bowstring -->
     <path
-        android:fillColor="#FF4D7A"
-        android:pathData="M30,62 L54,78 L78,62 L78,50 L54,66 L30,50 Z" />
+        android:strokeColor="#FFE9A8"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M40,26 L40,82" />
+    <!-- Arrow shaft -->
+    <path
+        android:strokeColor="#FF8A1E"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M34,54 L84,54" />
+    <!-- Arrowhead -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M84,54 L74,49 L74,59 Z" />
+    <!-- Fletching -->
+    <path
+        android:fillColor="#FF4D5E"
+        android:pathData="M34,54 L28,49 L30,54 L28,59 Z" />
 </vector>

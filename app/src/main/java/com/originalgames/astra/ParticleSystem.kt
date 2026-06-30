@@ -1,21 +1,22 @@
-package com.originalgames.flipside
+package com.originalgames.astra
 
 import android.graphics.Canvas
 import android.graphics.Paint
 import kotlin.random.Random
 
 /**
- * A lightweight burst particle pool used for gem pickups and crashes. Particles
- * are plain structs updated in place; the system reuses dead slots so it never
- * allocates during steady-state play.
+ * A lightweight burst particle pool used for hits, head-severs, astra blasts
+ * and damage flashes. Particles are plain structs updated in place; the system
+ * reuses dead slots so it never allocates during steady-state play.
  */
-class ParticleSystem(private val capacity: Int = 160) {
+class ParticleSystem(private val capacity: Int = 320) {
 
     private class P {
         var x = 0f; var y = 0f
         var vx = 0f; var vy = 0f
         var life = 0f; var maxLife = 1f
         var size = 0f
+        var gravity = 0.35f
         var color = 0
         var alive = false
     }
@@ -23,7 +24,7 @@ class ParticleSystem(private val capacity: Int = 160) {
     private val pool = Array(capacity) { P() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    fun burst(x: Float, y: Float, color: Int, count: Int, power: Float) {
+    fun burst(x: Float, y: Float, color: Int, count: Int, power: Float, gravity: Float = 0.35f) {
         var spawned = 0
         for (p in pool) {
             if (spawned >= count) break
@@ -33,9 +34,10 @@ class ParticleSystem(private val capacity: Int = 160) {
             p.x = x; p.y = y
             p.vx = kotlin.math.cos(angle) * speed
             p.vy = kotlin.math.sin(angle) * speed
-            p.maxLife = 22f + Random.nextFloat() * 18f
+            p.maxLife = 22f + Random.nextFloat() * 20f
             p.life = p.maxLife
-            p.size = power * (0.18f + Random.nextFloat() * 0.22f)
+            p.size = power * (0.16f + Random.nextFloat() * 0.22f)
+            p.gravity = gravity
             p.color = color
             p.alive = true
             spawned++
@@ -47,7 +49,7 @@ class ParticleSystem(private val capacity: Int = 160) {
             if (!p.alive) continue
             p.x += p.vx
             p.y += p.vy
-            p.vy += 0.35f          // gentle gravity on debris
+            p.vy += p.gravity
             p.vx *= 0.98f
             p.life -= 1f
             if (p.life <= 0f) p.alive = false

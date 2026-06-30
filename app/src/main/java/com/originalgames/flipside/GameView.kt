@@ -32,6 +32,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private val prefs = Prefs(context)
     private val sound = SoundManager(prefs.soundEnabled)
+    private val haptics = Haptics(context, prefs.hapticsEnabled)
     private val particles = ParticleSystem()
 
     private var thread: GameThread? = null
@@ -67,6 +68,19 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var daily = false
     private var rng: Random = Random.Default
     private val dateLabel = todayLabel()
+    private var dailyStreak = 0
+
+    // Per-run tick clock + flip log, used to record and replay the daily ghost.
+    @Volatile private var tickCount = 0
+    private val recordedFlips = ArrayList<Int>()
+
+    // Daily ghost: your best run of the day re-simulated as a translucent racer.
+    private var ghostPlayer: Player? = null
+    private var ghostFlips: IntArray = IntArray(0)
+    private var ghostIndex = 0
+    private var ghostSurvived = 0
+    private var ghostScore = 0
+    private var ghostShowing = false
 
     // --- UI hit regions (computed in surfaceChanged) ---
     private val rectMode = RectF()
@@ -75,6 +89,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private val rectPlay = RectF()
     private val rectRetry = RectF()
     private val rectShare = RectF()
+    private val rectFx = RectF()
 
     // --- Paints (reused; never allocate in the loop) ---
     private val bgPaint = Paint()
@@ -94,6 +109,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     init {
         holder.addCallback(this)
         isFocusable = true
+        dailyStreak = prefs.currentStreak(dateLabel, yesterdayLabel())
     }
 
     // ----------------------------------------------------------------------
@@ -144,10 +160,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         if (state == State.PLAYING) state = State.PAUSED
     }
 
-    fun toggleSound(): Boolean {
-        sound.enabled = !sound.enabled
-        prefs.soundEnabled = sound.enabled
-        return sound.enabled
+    /** Toggles sound + haptics together as one "FX" switch. */
+    private fun toggleFx() {
+        val on = !sound.enabled
+        sound.enabled = on
+        haptics.enabled = on
+        prefs.soundEnabled = on
+        prefs.hapticsEnabled = on
+        if (on) { sound.flip(); haptics.light() }
     }
 
     private fun layoutUi() {
@@ -166,6 +186,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         rectPlay.set(cx - bw / 2f, h * 0.66f, cx + bw / 2f, h * 0.66f + bh)
         rectRetry.set(cx - bw / 2f, h * 0.60f, cx + bw / 2f, h * 0.60f + bh)
         rectShare.set(cx - bw / 2f, h * 0.72f, cx + bw / 2f, h * 0.72f + bh)
+
+        val fw = w * 0.24f
+        val fh = h * 0.045f
+        rectFx.set(w - fw - w * 0.04f, h * 0.045f, w - w * 0.04f, h * 0.045f + fh)
     }
 
     // ----------------------------------------------------------------------
@@ -179,8 +203,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         when (state) {
             State.READY -> handleReadyTap(x, y)
             State.PLAYING -> {
-                player.flip()
+                // Synchronise with the render thread so the flip log stays consistent.
+                synchronized(holder) {
+                    player.flip()
+                    recordedFlips.add(tickCount)
+                }
                 sound.flip()
+                haptics.light()
             }
             State.PAUSED -> state = State.PLAYING
             State.GAME_OVER -> handleGameOverTap(x, y)
@@ -190,6 +219,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun handleReadyTap(x: Float, y: Float) {
         when {
+            rectFx.contains(x, y) -> toggleFx()
             rectMode.contains(x, y) -> {
                 daily = !daily
                 sound.flip()
@@ -203,7 +233,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun handleGameOverTap(x: Float, y: Float) {
         if (rectShare.contains(x, y)) {
-            ShareCard.share(context, score, gemCount, daily, dateLabel, skin)
+            ShareCard.share(context, score, gemCount, daily, dateLabel, skin, dailyStreak)
             return
         }
         // Anywhere else (after a short lockout) restarts.
@@ -242,9 +272,36 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         score = 0
         gemCount = 0
         newRecord = false
+        tickCount = 0
+        recordedFlips.clear()
         // Daily mode uses a date-seeded RNG so the layout is identical for all
         // players that day; endless mode is freshly random each run.
         rng = if (daily) Random(dailySeed()) else Random(Random.nextLong())
+        loadGhost()
+    }
+
+    /** Loads today's saved ghost (daily only) and primes a shadow Player to replay it. */
+    private fun loadGhost() {
+        ghostPlayer = null
+        ghostFlips = IntArray(0)
+        ghostIndex = 0
+        ghostSurvived = 0
+        ghostScore = 0
+        ghostShowing = false
+        if (!daily) return
+        val data = prefs.ghostFor(dateLabel) ?: return
+        ghostScore = prefs.ghostScoreFor(dateLabel)
+        val parts = data.split(";")
+        ghostSurvived = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        ghostFlips = parts.getOrNull(1)
+            ?.split(",")
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toIntArray()
+            ?: IntArray(0)
+        if (ghostSurvived > 0) {
+            ghostPlayer = Player(player.x, floorY - player.radius, player.radius, floorY, ceilingY)
+            ghostShowing = true
+        }
     }
 
     private fun startRun() {
@@ -259,11 +316,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         bgPhase += 1f
         particles.update()
         if (state != State.PLAYING) return
+        tickCount++
 
         // Difficulty curve: speed creeps up with distance, then plateaus.
         speed = min(baseSpeed() * 2.4f, baseSpeed() + distance * 0.0000016f * w)
         distance += speed
         player.update()
+        updateGhost()
 
         // Spawning.
         spawnAccumulator += speed
@@ -300,6 +359,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                     prefs.addLifetimeGems(1)
                     particles.burst(g.x, g.y, Color.parseColor("#FFD25A"), 16, player.radius * 0.9f)
                     sound.gem()
+                    haptics.pop()
                 }
                 if (g.collected || g.isOffScreen()) gems.removeAt(i)
                 i--
@@ -316,6 +376,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
         // Score is distance (in "meters") plus a gem bonus.
         score = (distance / (w * 0.05f)).toInt() + gemCount * 10
+    }
+
+    private fun updateGhost() {
+        if (!daily || !ghostShowing) return
+        val g = ghostPlayer ?: return
+        // Replay recorded flips as the clock reaches each one, then step physics.
+        while (ghostIndex < ghostFlips.size && ghostFlips[ghostIndex] <= tickCount) {
+            g.flip()
+            ghostIndex++
+        }
+        if (tickCount <= ghostSurvived) g.update() else ghostShowing = false
     }
 
     private fun spawnPattern() {
@@ -341,10 +412,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun crash() {
         sound.crash()
+        haptics.crash()
         particles.burst(player.x, player.y, currentPlayerColor(), 40, player.radius * 1.6f)
         // Only endless runs count toward the saved best; daily is for comparing.
         newRecord = if (!daily) prefs.submitScore(score) else false
         bestScore = prefs.bestScore
+        if (daily) {
+            dailyStreak = prefs.registerDailyCompletion(dateLabel, yesterdayLabel())
+            // Persist this run as the ghost if it's the day's best.
+            val data = tickCount.toString() + ";" + recordedFlips.joinToString(",")
+            prefs.saveGhostIfBetter(dateLabel, score, data)
+        }
         state = State.GAME_OVER
         gameOverAt = System.currentTimeMillis()
     }
@@ -370,6 +448,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
         for (o in obstacles) o.draw(canvas, Color.parseColor("#FF6B81"))
         for (g in gems) g.draw(canvas)
+
+        if (state == State.PLAYING && daily && ghostShowing) {
+            ghostPlayer?.let { drawGhost(canvas, it) }
+        }
 
         if (this::player.isInitialized && state != State.GAME_OVER) {
             player.draw(canvas, currentPlayerColor())
@@ -411,6 +493,18 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawText(label, w / 2f, ceilingY + h * 0.11f, textPaint)
     }
 
+    private fun drawGhost(canvas: Canvas, g: Player) {
+        val r = player.radius
+        orbPaint.style = Paint.Style.FILL
+        orbPaint.color = 0x30FFFFFF
+        canvas.drawCircle(g.x, g.y, r * 1.25f, orbPaint)
+        orbPaint.style = Paint.Style.STROKE
+        orbPaint.strokeWidth = r * 0.16f
+        orbPaint.color = 0x99FFFFFF.toInt()
+        canvas.drawCircle(g.x, g.y, r, orbPaint)
+        orbPaint.style = Paint.Style.FILL
+    }
+
     private fun drawButton(canvas: Canvas, r: RectF, label: String, fill: Int, txt: Int, size: Float) {
         barPaint.color = fill
         val radius = r.height() / 2f
@@ -434,9 +528,26 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val modeTxt = if (daily) Color.parseColor("#FFD25A") else 0xCCFFFFFF.toInt()
         val modeLabel = if (daily) "DAILY  •  $dateLabel" else "ENDLESS"
         drawButton(canvas, rectMode, modeLabel, modeFill, modeTxt, h * 0.028f)
-        textPaint.color = 0x66FFFFFF.toInt()
         textPaint.textSize = h * 0.020f
-        canvas.drawText("tap to switch mode", cx, rectMode.bottom + h * 0.035f, textPaint)
+        if (daily) {
+            textPaint.color = 0x99FFFFFF.toInt()
+            val info = if (ghostScore > 0)
+                "streak $dailyStreak   •   race your ghost (best $ghostScore)"
+            else
+                "streak $dailyStreak   •   set today's ghost!"
+            canvas.drawText(info, cx, rectMode.bottom + h * 0.035f, textPaint)
+        } else {
+            textPaint.color = 0x66FFFFFF.toInt()
+            canvas.drawText("tap to switch mode", cx, rectMode.bottom + h * 0.035f, textPaint)
+        }
+
+        // FX (sound + haptics) toggle, top-right.
+        val fxOn = sound.enabled
+        drawButton(
+            canvas, rectFx, if (fxOn) "FX: ON" else "FX: OFF",
+            if (fxOn) Color.parseColor("#1A2230") else Color.parseColor("#2A1A1A"),
+            if (fxOn) 0xCCFFFFFF.toInt() else 0x77FFFFFF.toInt(), h * 0.022f
+        )
 
         // Skin preview orb with chevrons.
         val oy = h * 0.45f
@@ -525,6 +636,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             canvas.drawText(best, cx, h * 0.50f, textPaint)
         }
 
+        if (daily) {
+            textPaint.color = Color.parseColor("#FFD25A")
+            textPaint.textSize = h * 0.024f
+            val tag = if (ghostScore in 1..score) "DAY STREAK $dailyStreak  •  beat your ghost!"
+            else "DAY STREAK $dailyStreak"
+            canvas.drawText(tag, cx, h * 0.545f, textPaint)
+        }
+
         drawButton(canvas, rectRetry, "RETRY", Color.parseColor("#22E0C8"), Color.parseColor("#06231F"), h * 0.038f)
         drawButton(canvas, rectShare, "SHARE", Color.parseColor("#2C3A52"), Color.WHITE, h * 0.036f)
     }
@@ -535,6 +654,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun todayLabel(): String =
         java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+    private fun yesterdayLabel(): String {
+        val cal = java.util.Calendar.getInstance()
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(cal.time)
+    }
 
     private fun dailySeed(): Long =
         java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)

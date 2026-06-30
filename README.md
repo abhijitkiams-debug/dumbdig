@@ -29,8 +29,11 @@ around every one of them:
 | **Smooth juice** | Particle bursts, motion trails, screen-flip colour feedback, synth SFX. |
 | **Share loop** | One-tap **SHARE** generates a branded result card image for the system share sheet. |
 | **Daily challenge** | A date-seeded layout that's identical for everyone — directly comparable scores to send friends. |
+| **Daily streak** | Consecutive days played builds a streak shown on screen and on the share card — a daily-return hook. |
+| **Ghost race** | Your best daily run replays as a translucent racer so you're always chasing yourself. |
 | **Meta-progression** | Collected gems are a lifetime currency that unlocks 6 orb skins. |
-| **Tiny + offline** | ~3 MB, no network, no accounts, no permissions. Installs and runs anywhere. |
+| **Tactile juice** | Subtle haptic ticks on flip/pickup/crash (toggle with the FX switch). |
+| **Tiny + offline** | ~3 MB, no network, no accounts; the only permission is the benign auto-granted `VIBRATE`. |
 
 ## Gameplay
 
@@ -46,6 +49,11 @@ around every one of them:
 - **Daily Challenge** — toggle on the start screen. The layout is seeded from the
   date, so everyone playing that day gets the *same* course. Run it, then tap
   **SHARE** to post a result card and challenge friends to beat it.
+  - **Streak** — finishing the daily on consecutive days builds a day streak,
+    shown on the start screen, the game-over screen, and the share card.
+  - **Ghost race** — your best run of the day is recorded and replayed as a
+    translucent racing shadow on your next attempt, so you can see exactly where
+    you're ahead of or behind your best self.
 - **Orb skins** — every gem you collect counts toward a lifetime total that
   unlocks 6 skins (Classic → Ember → Vapor → Toxic → Solar → Mono). Cycle them
   with the `‹ ›` arrows on the start screen; the current skin recolours the orb
@@ -73,9 +81,10 @@ app/src/main/
 │   ├── Gem.kt               # collectible diamonds
 │   ├── ParticleSystem.kt    # pooled burst particles (no per-frame allocation)
 │   ├── SoundManager.kt      # runtime PCM sound synthesis
+│   ├── Haptics.kt           # crash-proof vibration feedback
 │   ├── Skin.kt              # unlockable orb skins + unlock logic
 │   ├── ShareCard.kt         # renders & shares the result-card image
-│   └── Prefs.kt             # best score, lifetime gems, equipped skin
+│   └── Prefs.kt             # best score, gems, skin, FX, streak, ghost
 └── res/                     # original vector launcher icon, theme, file_paths
 ```
 
@@ -114,7 +123,6 @@ freely.
 
 ## Ideas to push it further
 
-- Haptic tick on flip and gem pickup
 - Google Play Games leaderboard hook
-- Daily-streak counter and a "perfect run" (no-flip-waste) badge
-- Ghost replay of your previous daily attempt
+- A "perfect run" (no-flip-waste) badge
+- Animated reveal when a new skin unlocks

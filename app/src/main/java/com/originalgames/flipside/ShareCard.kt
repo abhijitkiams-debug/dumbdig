@@ -24,7 +24,7 @@ object ShareCard {
 
     private const val SIZE = 1080
 
-    fun render(score: Int, gems: Int, daily: Boolean, dateLabel: String, skin: Skin): Bitmap {
+    fun render(score: Int, gems: Int, daily: Boolean, dateLabel: String, skin: Skin, streak: Int): Bitmap {
         val bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val cx = SIZE / 2f
@@ -50,6 +50,12 @@ object ShareCard {
         text.color = if (daily) Color.parseColor("#FFD25A") else 0x88FFFFFF.toInt()
         text.textSize = SIZE * 0.040f
         c.drawText(if (daily) "DAILY CHALLENGE • $dateLabel" else "ENDLESS RUN", cx, SIZE * 0.27f, text)
+
+        if (daily && streak > 0) {
+            text.color = Color.parseColor("#FF8C42")
+            text.textSize = SIZE * 0.032f
+            c.drawText("DAY STREAK $streak", cx, SIZE * 0.315f, text)
+        }
 
         // The orb, in the player's equipped skin.
         val orbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -92,16 +98,17 @@ object ShareCard {
     }
 
     /** Renders the card and opens the Android share sheet with it attached. */
-    fun share(context: Context, score: Int, gems: Int, daily: Boolean, dateLabel: String, skin: Skin) {
+    fun share(context: Context, score: Int, gems: Int, daily: Boolean, dateLabel: String, skin: Skin, streak: Int) {
         try {
-            val bmp = render(score, gems, daily, dateLabel, skin)
+            val bmp = render(score, gems, daily, dateLabel, skin, streak)
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             val file = File(dir, "flipside_score.png")
             FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
 
             val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
             val caption = if (daily) {
-                "I scored $score on today's Flipside Daily Challenge ($dateLabel). Beat me!"
+                val streakBit = if (streak > 1) " (day streak: $streak)" else ""
+                "I scored $score on today's Flipside Daily Challenge ($dateLabel)$streakBit. Beat me!"
             } else {
                 "I scored $score in Flipside. Can you beat me?"
             }

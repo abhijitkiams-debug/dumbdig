@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback round launcher icon for API < 26 (original vector art). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#0E1116"
+        android:pathData="M54,4 A50,50 0 1 1 53.99,4 Z" />
+
+    <path
+        android:fillColor="#22E0C8"
+        android:pathData="M30,46 L54,30 L78,46 L78,58 L54,42 L30,58 Z" />
+
+    <path
+        android:fillColor="#FF4D7A"
+        android:pathData="M30,62 L54,78 L78,62 L78,50 L54,66 L30,50 Z" />
+</vector>

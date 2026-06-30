@@ -1,0 +1,21 @@
+# Built artifacts
+build/
+app/build/
+.gradle/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Local config (machine-specific SDK path)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+captures/
+
+# Keystore (never commit signing material)
+*.jks
+*.keystore

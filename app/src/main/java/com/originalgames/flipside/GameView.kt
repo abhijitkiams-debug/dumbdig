@@ -19,6 +19,10 @@ import kotlin.random.Random
  * world scrolls left. Tapping flips gravity so the orb falls to the floor or the
  * ceiling; the goal is to thread spikes and grab gems for as long as possible.
  *
+ * Two modes share the same loop: ENDLESS (random layout) and DAILY CHALLENGE (a
+ * date-seeded layout that is identical for everyone, so scores are comparable
+ * and shareable). Collected gems are a lifetime currency that unlocks orb skins.
+ *
  * Everything drawn here is generated from primitive shapes and text — there are
  * no imported images, fonts, or sounds anywhere in the project.
  */
@@ -54,12 +58,29 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var gameOverAt = 0L
     private var bgPhase = 0f
 
+    // --- Meta-progression / modes ---
+    private var lifetimeGems = prefs.lifetimeGems
+    private var selectedSkin =
+        if (Skins.isUnlocked(Skins.clampIndex(prefs.selectedSkin), prefs.lifetimeGems))
+            Skins.clampIndex(prefs.selectedSkin) else 0
+    private var skin = Skins.all[selectedSkin]
+    private var daily = false
+    private var rng: Random = Random.Default
+    private val dateLabel = todayLabel()
+
+    // --- UI hit regions (computed in surfaceChanged) ---
+    private val rectMode = RectF()
+    private val rectSkinLeft = RectF()
+    private val rectSkinRight = RectF()
+    private val rectPlay = RectF()
+    private val rectRetry = RectF()
+    private val rectShare = RectF()
+
     // --- Paints (reused; never allocate in the loop) ---
     private val bgPaint = Paint()
-    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-    }
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val orbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         typeface = android.graphics.Typeface.create(
@@ -100,6 +121,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             floorY = floorY,
             ceilingY = ceilingY
         )
+        layoutUi()
         resetWorld()
     }
 
@@ -128,28 +150,79 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         return sound.enabled
     }
 
+    private fun layoutUi() {
+        val cx = w / 2f
+        val bw = w * 0.5f
+        val bh = h * 0.085f
+        val mw = w * 0.64f
+        val mh = h * 0.06f
+        rectMode.set(cx - mw / 2f, h * 0.255f, cx + mw / 2f, h * 0.255f + mh)
+
+        val cs = w * 0.14f
+        val oy = h * 0.45f
+        rectSkinLeft.set(w * 0.16f - cs, oy - cs, w * 0.16f + cs, oy + cs)
+        rectSkinRight.set(w * 0.84f - cs, oy - cs, w * 0.84f + cs, oy + cs)
+
+        rectPlay.set(cx - bw / 2f, h * 0.66f, cx + bw / 2f, h * 0.66f + bh)
+        rectRetry.set(cx - bw / 2f, h * 0.60f, cx + bw / 2f, h * 0.60f + bh)
+        rectShare.set(cx - bw / 2f, h * 0.72f, cx + bw / 2f, h * 0.72f + bh)
+    }
+
     // ----------------------------------------------------------------------
     // Input
     // ----------------------------------------------------------------------
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action != MotionEvent.ACTION_DOWN) return true
+        val x = event.x
+        val y = event.y
         when (state) {
-            State.READY -> startRun()
+            State.READY -> handleReadyTap(x, y)
             State.PLAYING -> {
                 player.flip()
                 sound.flip()
             }
             State.PAUSED -> state = State.PLAYING
-            State.GAME_OVER -> {
-                // Small lockout so the crash tap doesn't instantly restart.
-                if (System.currentTimeMillis() - gameOverAt > 600) {
-                    state = State.READY
-                    resetWorld()
-                }
-            }
+            State.GAME_OVER -> handleGameOverTap(x, y)
         }
         return true
+    }
+
+    private fun handleReadyTap(x: Float, y: Float) {
+        when {
+            rectMode.contains(x, y) -> {
+                daily = !daily
+                sound.flip()
+                resetWorld()
+            }
+            rectSkinLeft.contains(x, y) -> cycleSkin(-1)
+            rectSkinRight.contains(x, y) -> cycleSkin(+1)
+            rectPlay.contains(x, y) -> startRun()
+        }
+    }
+
+    private fun handleGameOverTap(x: Float, y: Float) {
+        if (rectShare.contains(x, y)) {
+            ShareCard.share(context, score, gemCount, daily, dateLabel, skin)
+            return
+        }
+        // Anywhere else (after a short lockout) restarts.
+        if (System.currentTimeMillis() - gameOverAt > 600) {
+            state = State.READY
+            resetWorld()
+        }
+    }
+
+    private fun cycleSkin(dir: Int) {
+        // Step to the next *unlocked* skin in the chosen direction.
+        var i = selectedSkin
+        do {
+            i = Skins.clampIndex(i + dir)
+        } while (!Skins.isUnlocked(i, lifetimeGems) && i != selectedSkin)
+        selectedSkin = i
+        skin = Skins.all[i]
+        prefs.selectedSkin = i
+        sound.flip()
     }
 
     // ----------------------------------------------------------------------
@@ -169,6 +242,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         score = 0
         gemCount = 0
         newRecord = false
+        // Daily mode uses a date-seeded RNG so the layout is identical for all
+        // players that day; endless mode is freshly random each run.
+        rng = if (daily) Random(dailySeed()) else Random(Random.nextLong())
     }
 
     private fun startRun() {
@@ -220,6 +296,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                 if (g.overlaps(playerBounds)) {
                     g.collected = true
                     gemCount++
+                    lifetimeGems++
+                    prefs.addLifetimeGems(1)
                     particles.burst(g.x, g.y, Color.parseColor("#FFD25A"), 16, player.radius * 0.9f)
                     sound.gem()
                 }
@@ -241,11 +319,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun spawnPattern() {
-        val spikeW = w * (0.085f + Random.nextFloat() * 0.04f)
-        val spikeH = (floorY - ceilingY) * (0.18f + Random.nextFloat() * 0.16f)
+        val spikeW = w * (0.085f + rng.nextFloat() * 0.04f)
+        val spikeH = (floorY - ceilingY) * (0.18f + rng.nextFloat() * 0.16f)
         val spawnX = w + spikeW
 
-        when (Random.nextInt(4)) {
+        when (rng.nextInt(4)) {
             0 -> obstacles.add(Obstacle(spawnX, spikeW, spikeH, true, floorY, ceilingY))
             1 -> obstacles.add(Obstacle(spawnX, spikeW, spikeH, false, floorY, ceilingY))
             2 -> {
@@ -264,7 +342,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private fun crash() {
         sound.crash()
         particles.burst(player.x, player.y, currentPlayerColor(), 40, player.radius * 1.6f)
-        newRecord = prefs.submitScore(score)
+        // Only endless runs count toward the saved best; daily is for comparing.
+        newRecord = if (!daily) prefs.submitScore(score) else false
         bestScore = prefs.bestScore
         state = State.GAME_OVER
         gameOverAt = System.currentTimeMillis()
@@ -275,7 +354,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     // ----------------------------------------------------------------------
 
     private fun currentPlayerColor(): Int =
-        if (player.gravityDir > 0) Color.parseColor("#22E0C8") else Color.parseColor("#FF4D7A")
+        if (player.gravityDir > 0) skin.down else skin.up
 
     private fun drawGame(canvas: Canvas) {
         drawBackground(canvas)
@@ -322,38 +401,96 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun drawHud(canvas: Canvas) {
+        textPaint.textAlign = Paint.Align.CENTER
         textPaint.color = Color.WHITE
         textPaint.textSize = h * 0.06f
         canvas.drawText(score.toString(), w / 2f, ceilingY + h * 0.08f, textPaint)
         textPaint.textSize = h * 0.022f
         textPaint.color = 0x88FFFFFF.toInt()
-        canvas.drawText("BEST $bestScore", w / 2f, ceilingY + h * 0.11f, textPaint)
+        val label = if (daily) "DAILY  •  BEST $bestScore" else "BEST $bestScore"
+        canvas.drawText(label, w / 2f, ceilingY + h * 0.11f, textPaint)
+    }
+
+    private fun drawButton(canvas: Canvas, r: RectF, label: String, fill: Int, txt: Int, size: Float) {
+        barPaint.color = fill
+        val radius = r.height() / 2f
+        canvas.drawRoundRect(r, radius, radius, barPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.color = txt
+        textPaint.textSize = size
+        canvas.drawText(label, r.centerX(), r.centerY() + size * 0.35f, textPaint)
     }
 
     private fun drawReady(canvas: Canvas) {
+        val cx = w / 2f
+        textPaint.textAlign = Paint.Align.CENTER
+
         textPaint.color = Color.parseColor("#22E0C8")
         textPaint.textSize = h * 0.085f
-        canvas.drawText("FLIPSIDE", w / 2f, h * 0.40f, textPaint)
+        canvas.drawText("FLIPSIDE", cx, h * 0.20f, textPaint)
+
+        // Mode toggle pill.
+        val modeFill = if (daily) Color.parseColor("#3A2A12") else Color.parseColor("#1A2230")
+        val modeTxt = if (daily) Color.parseColor("#FFD25A") else 0xCCFFFFFF.toInt()
+        val modeLabel = if (daily) "DAILY  •  $dateLabel" else "ENDLESS"
+        drawButton(canvas, rectMode, modeLabel, modeFill, modeTxt, h * 0.028f)
+        textPaint.color = 0x66FFFFFF.toInt()
+        textPaint.textSize = h * 0.020f
+        canvas.drawText("tap to switch mode", cx, rectMode.bottom + h * 0.035f, textPaint)
+
+        // Skin preview orb with chevrons.
+        val oy = h * 0.45f
+        val r = w * 0.07f
+        orbPaint.color = (0x55 shl 24) or (skin.down and 0x00FFFFFF)
+        canvas.drawCircle(cx, oy, r * 1.6f, orbPaint)
+        orbPaint.color = skin.down
+        canvas.drawCircle(cx, oy, r, orbPaint)
+        orbPaint.color = Color.WHITE
+        canvas.drawCircle(cx, oy + r * 0.35f, r * 0.32f, orbPaint)
 
         textPaint.color = Color.WHITE
-        textPaint.textSize = h * 0.030f
-        canvas.drawText("TAP to flip gravity", w / 2f, h * 0.50f, textPaint)
-        canvas.drawText("Dodge spikes • grab gems", w / 2f, h * 0.545f, textPaint)
+        textPaint.textSize = h * 0.06f
+        canvas.drawText("‹", rectSkinLeft.centerX(), oy + h * 0.022f, textPaint)
+        canvas.drawText("›", rectSkinRight.centerX(), oy + h * 0.022f, textPaint)
 
-        textPaint.color = 0xCCFFFFFF.toInt()
+        // Skin name + unlock progress.
+        textPaint.color = Color.WHITE
+        textPaint.textSize = h * 0.034f
+        canvas.drawText(skin.name, cx, h * 0.56f, textPaint)
+
+        val nextLocked = Skins.all.firstOrNull { it.cost > lifetimeGems }
+        textPaint.textSize = h * 0.022f
+        if (nextLocked != null) {
+            textPaint.color = 0x99FFFFFF.toInt()
+            canvas.drawText(
+                "next: ${nextLocked.name} @ ${nextLocked.cost} gems  (you: $lifetimeGems)",
+                cx, h * 0.595f, textPaint
+            )
+        } else {
+            textPaint.color = Color.parseColor("#B8FF3B")
+            canvas.drawText("all skins unlocked  •  gems: $lifetimeGems", cx, h * 0.595f, textPaint)
+        }
+
+        // Play button (pulsing).
+        val pulse = 0.5f + 0.5f * kotlin.math.sin(bgPhase * 0.08f)
+        val playFill = Color.parseColor("#22E0C8")
+        barPaint.color = playFill
+        barPaint.alpha = (200 + 55 * pulse).toInt()
+        val pr = rectPlay.height() / 2f
+        canvas.drawRoundRect(rectPlay, pr, pr, barPaint)
+        barPaint.alpha = 255
+        textPaint.color = Color.parseColor("#06231F")
         textPaint.textSize = h * 0.040f
-        val pulse = (0.5f + 0.5f * kotlin.math.sin(bgPhase * 0.08f))
-        textPaint.alpha = (120 + 135 * pulse).toInt()
-        canvas.drawText("TAP TO START", w / 2f, h * 0.66f, textPaint)
-        textPaint.alpha = 255
+        canvas.drawText("PLAY", cx, rectPlay.centerY() + h * 0.014f, textPaint)
 
         textPaint.color = 0x88FFFFFF.toInt()
         textPaint.textSize = h * 0.024f
-        canvas.drawText("BEST $bestScore", w / 2f, h * 0.74f, textPaint)
+        canvas.drawText("BEST $bestScore", cx, h * 0.80f, textPaint)
     }
 
     private fun drawPaused(canvas: Canvas) {
         canvas.drawRect(0f, 0f, w, h, dimPaint)
+        textPaint.textAlign = Paint.Align.CENTER
         textPaint.color = Color.WHITE
         textPaint.textSize = h * 0.06f
         canvas.drawText("PAUSED", w / 2f, h * 0.46f, textPaint)
@@ -362,32 +499,46 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun drawGameOver(canvas: Canvas) {
+        val cx = w / 2f
         canvas.drawRect(0f, 0f, w, h, dimPaint)
+        textPaint.textAlign = Paint.Align.CENTER
 
         textPaint.color = Color.parseColor("#FF4D7A")
         textPaint.textSize = h * 0.07f
-        canvas.drawText("GAME OVER", w / 2f, h * 0.36f, textPaint)
+        canvas.drawText("GAME OVER", cx, h * 0.30f, textPaint)
+
+        textPaint.color = if (daily) Color.parseColor("#FFD25A") else 0x88FFFFFF.toInt()
+        textPaint.textSize = h * 0.026f
+        canvas.drawText(if (daily) "DAILY  •  $dateLabel" else "ENDLESS", cx, h * 0.345f, textPaint)
 
         textPaint.color = Color.WHITE
         textPaint.textSize = h * 0.10f
-        canvas.drawText(score.toString(), w / 2f, h * 0.49f, textPaint)
+        canvas.drawText(score.toString(), cx, h * 0.45f, textPaint)
 
-        textPaint.textSize = h * 0.030f
+        textPaint.textSize = h * 0.028f
         if (newRecord) {
             textPaint.color = Color.parseColor("#FFD25A")
-            canvas.drawText("NEW BEST!", w / 2f, h * 0.55f, textPaint)
+            canvas.drawText("NEW BEST!  •  $gemCount gems", cx, h * 0.50f, textPaint)
         } else {
             textPaint.color = 0x99FFFFFF.toInt()
-            canvas.drawText("BEST $bestScore", w / 2f, h * 0.55f, textPaint)
+            val best = if (daily) "$gemCount gems collected" else "BEST $bestScore  •  $gemCount gems"
+            canvas.drawText(best, cx, h * 0.50f, textPaint)
         }
 
-        textPaint.color = 0xCCFFFFFF.toInt()
-        textPaint.textSize = h * 0.038f
-        val pulse = (0.5f + 0.5f * kotlin.math.sin(bgPhase * 0.08f))
-        textPaint.alpha = (120 + 135 * pulse).toInt()
-        canvas.drawText("TAP TO RETRY", w / 2f, h * 0.66f, textPaint)
-        textPaint.alpha = 255
+        drawButton(canvas, rectRetry, "RETRY", Color.parseColor("#22E0C8"), Color.parseColor("#06231F"), h * 0.038f)
+        drawButton(canvas, rectShare, "SHARE", Color.parseColor("#2C3A52"), Color.WHITE, h * 0.036f)
     }
+
+    // ----------------------------------------------------------------------
+    // Date helpers for the daily challenge
+    // ----------------------------------------------------------------------
+
+    private fun todayLabel(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+    private fun dailySeed(): Long =
+        java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+            .format(java.util.Date()).toLong()
 
     // ----------------------------------------------------------------------
     // Render thread

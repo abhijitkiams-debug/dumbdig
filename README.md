@@ -27,6 +27,9 @@ around every one of them:
 | **Readable at a glance** | Bold shapes, two signature colours, no clutter — looks great in a clip. |
 | **Score chasing** | Persistent best score + a "NEW BEST!" moment to brag about. |
 | **Smooth juice** | Particle bursts, motion trails, screen-flip colour feedback, synth SFX. |
+| **Share loop** | One-tap **SHARE** generates a branded result card image for the system share sheet. |
+| **Daily challenge** | A date-seeded layout that's identical for everyone — directly comparable scores to send friends. |
+| **Meta-progression** | Collected gems are a lifetime currency that unlocks 6 orb skins. |
 | **Tiny + offline** | ~3 MB, no network, no accounts, no permissions. Installs and runs anywhere. |
 
 ## Gameplay
@@ -35,7 +38,18 @@ around every one of them:
 - **Avoid** the red spikes jutting from the floor and ceiling.
 - **Collect** gold gems for +10 points each.
 - **Speed ramps** the longer you survive; spacing tightens but always stays fair.
-- **Score** = distance travelled + gem bonus. Your best is saved locally.
+- **Score** = distance travelled + gem bonus. Your best (endless) is saved locally.
+
+### Modes & progression
+
+- **Endless** — a freshly random layout every run. Your best score is saved.
+- **Daily Challenge** — toggle on the start screen. The layout is seeded from the
+  date, so everyone playing that day gets the *same* course. Run it, then tap
+  **SHARE** to post a result card and challenge friends to beat it.
+- **Orb skins** — every gem you collect counts toward a lifetime total that
+  unlocks 6 skins (Classic → Ember → Vapor → Toxic → Solar → Mono). Cycle them
+  with the `‹ ›` arrows on the start screen; the current skin recolours the orb
+  and your share card.
 
 ## Tech at a glance
 
@@ -59,8 +73,10 @@ app/src/main/
 │   ├── Gem.kt               # collectible diamonds
 │   ├── ParticleSystem.kt    # pooled burst particles (no per-frame allocation)
 │   ├── SoundManager.kt      # runtime PCM sound synthesis
-│   └── Prefs.kt             # high-score persistence
-└── res/                     # original vector launcher icon, theme, strings
+│   ├── Skin.kt              # unlockable orb skins + unlock logic
+│   ├── ShareCard.kt         # renders & shares the result-card image
+│   └── Prefs.kt             # best score, lifetime gems, equipped skin
+└── res/                     # original vector launcher icon, theme, file_paths
 ```
 
 ## Build & run
@@ -98,7 +114,7 @@ freely.
 
 ## Ideas to push it further
 
-- Daily challenge seed + shareable result card (the screenshot-to-social loop)
-- Unlockable orb skins earned with collected gems
 - Haptic tick on flip and gem pickup
 - Google Play Games leaderboard hook
+- Daily-streak counter and a "perfect run" (no-flip-waste) badge
+- Ghost replay of your previous daily attempt

@@ -62,6 +62,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var astraMeter = 0f
     private var armedAstra = AstraType.AGNEYA
     private var headsSevered = 0
+    private var clashCount = 0
+    private var shake = 0f
     private var rage = false
     private var damageDealt = 0f
     private var survivalTicks = 0
@@ -247,7 +249,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun handleGameOverTap(x: Float, y: Float) {
         if (rectShare.contains(x, y)) {
-            ShareCard.share(context, score, headsSevered, daily, dateLabel, dailyStreak, rage)
+            ShareCard.share(context, score, headsSevered, clashCount, daily, dateLabel, dailyStreak, rage)
             return
         }
         if (System.currentTimeMillis() - gameOverAt > 500) {
@@ -271,6 +273,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         astraMeter = 0f
         armedAstra = AstraType.AGNEYA
         headsSevered = 0
+        clashCount = 0
+        shake = 0f
         rage = false
         damageDealt = 0f
         survivalTicks = 0
@@ -293,6 +297,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         var i = astras.size - 1
         while (i >= 0) { astras[i].update(); if (!astras[i].alive) astras.removeAt(i); i-- }
         if (hurtFlash > 0f) hurtFlash *= 0.86f
+        if (shake > 0.2f) shake *= 0.80f else shake = 0f
         if (victoryBanner > 0) victoryBanner--
 
         if (state != State.PLAYING) return
@@ -326,7 +331,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                 while (j >= 0) {
                     val ay = aayudhas[j]
                     if ((ay.destructible || a.homing) && ay.overlaps(a.x, a.y, a.length)) {
-                        particles.burst(ay.x, ay.y, ay.let { colorOf(it.type) }, 10, w * 0.02f)
+                        if (ay.type == Aayudha.Type.RBAAN) {
+                            // A true arrow-vs-arrow clash — extra juice + a tally.
+                            clashCount++
+                            shake = w * 0.012f
+                            particles.burst(ay.x, ay.y, Ram.GOLD, 12, w * 0.03f, gravity = 0.1f)
+                            particles.burst(ay.x, ay.y, Aayudha.C_RBAAN, 12, w * 0.03f, gravity = 0.1f)
+                            if (Random.nextFloat() < 0.5f) sound.hit()
+                            haptics.light()
+                        } else {
+                            particles.burst(ay.x, ay.y, colorOf(ay.type), 10, w * 0.02f)
+                        }
                         aayudhas.removeAt(j)
                         if (!a.pierce) { consumed = true; break }
                     }
@@ -615,12 +630,22 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun drawGame(canvas: Canvas) {
         drawBackground(canvas)
+        // Brief screen shake on clashes/hits — applied to the world only, not the HUD.
+        val shaking = shake > 0.2f
+        if (shaking) {
+            canvas.save()
+            canvas.translate(
+                (Math.random().toFloat() - 0.5f) * shake * 2f,
+                (Math.random().toFloat() - 0.5f) * shake * 2f
+            )
+        }
         ravan.draw(canvas, rage)
         for (ay in aayudhas) ay.draw(canvas)
         for (a in arrows) a.draw(canvas)
         for (s in astras) s.draw(canvas, w, h)
         if (this::ram.isInitialized && state != State.GAME_OVER) ram.draw(canvas)
         particles.draw(canvas)
+        if (shaking) canvas.restore()
 
         if (hurtFlash > 0.02f) {
             bgPaint.color = ((0x66 * hurtFlash).toInt().coerceIn(0, 255) shl 24) or 0x00FF3030
@@ -667,6 +692,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.color = if (rage) 0xFFFF6A6A.toInt() else 0xAAFFFFFF.toInt()
         val headsLabel = if (rage) "RAGE OF RAVAN  •  HEADS $headsSevered" else "HEADS $headsSevered / 10"
         canvas.drawText(headsLabel, w / 2f, h * 0.33f, textPaint)
+        if (clashCount > 0) {
+            textPaint.textSize = h * 0.02f
+            textPaint.color = 0xFFFFD24A.toInt()
+            canvas.drawText("ARROWS CLASHED  $clashCount", w / 2f, h * 0.355f, textPaint)
+        }
 
         // Lives (hearts), top-left.
         val s = h * 0.018f

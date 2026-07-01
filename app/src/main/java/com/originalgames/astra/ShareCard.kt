@@ -26,7 +26,7 @@ object ShareCard {
 
     private const val SIZE = 1080
 
-    fun render(score: Int, heads: Int, daily: Boolean, dateLabel: String, streak: Int, slain: Boolean): Bitmap {
+    fun render(score: Int, heads: Int, clashes: Int, daily: Boolean, dateLabel: String, streak: Int, slain: Boolean): Bitmap {
         val bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val cx = SIZE / 2f
@@ -88,10 +88,15 @@ object ShareCard {
         text.textSize = SIZE * 0.16f
         c.drawText(if (heads > 10) "$heads" else "$heads / 10", cx, SIZE * 0.65f, text)
 
-        // Score.
+        // Score + clashes.
         text.color = 0xCCFFFFFF.toInt()
         text.textSize = SIZE * 0.05f
-        c.drawText("SCORE  $score", cx, SIZE * 0.73f, text)
+        c.drawText("SCORE  $score", cx, SIZE * 0.725f, text)
+        if (clashes > 0) {
+            text.color = Ram.GOLD
+            text.textSize = SIZE * 0.032f
+            c.drawText("$clashes arrows clashed mid-air", cx, SIZE * 0.765f, text)
+        }
 
         // A little bow-and-arrow glyph.
         val gp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -120,9 +125,9 @@ object ShareCard {
     }
 
     /** Renders the card and opens the Android share sheet with it attached. */
-    fun share(context: Context, score: Int, heads: Int, daily: Boolean, dateLabel: String, streak: Int, slain: Boolean) {
+    fun share(context: Context, score: Int, heads: Int, clashes: Int, daily: Boolean, dateLabel: String, streak: Int, slain: Boolean) {
         try {
-            val bmp = render(score, heads, daily, dateLabel, streak, slain)
+            val bmp = render(score, heads, clashes, daily, dateLabel, streak, slain)
             val dir = File(context.cacheDir, "share").apply { mkdirs() }
             val file = File(dir, "astra_score.png")
             FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }

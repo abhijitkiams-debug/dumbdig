@@ -58,6 +58,7 @@ every one of those levers:
 | Weapon | Behaviour |
 |--------|-----------|
 | **Baan** (arrow) | Straight & fast — your arrows *can* shoot it down. |
+| **Ravan-baan** (aimed red arrow) | Loosed straight at Ram in a fan — clashes mid-air with your arrows, Pocket-Tanks style. |
 | **Chakra** (war-disc) | Spins and weaves side to side — destructible. |
 | **Gada** (mace) | Heavy, lobbed in an arc — must be dodged. |
 | **Trishul** (trident) | Falls straight and fast — must be dodged. |

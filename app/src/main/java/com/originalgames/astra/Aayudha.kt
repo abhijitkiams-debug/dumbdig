@@ -28,7 +28,7 @@ class Aayudha(
     var vy: Float,
     val size: Float
 ) {
-    enum class Type { BAAN, CHAKRA, GADA, TRISHUL, SHAKTI }
+    enum class Type { BAAN, CHAKRA, GADA, TRISHUL, SHAKTI, RBAAN }
 
     var alive = true
     private var spin = 0f
@@ -38,8 +38,10 @@ class Aayudha(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
-    /** Arrows can only cancel the lighter projectiles; heavy ones must be dodged. */
-    val destructible: Boolean get() = type == Type.BAAN || type == Type.CHAKRA
+    /** Arrows can only cancel the lighter projectiles; heavy ones must be dodged.
+     *  RBAAN is Ravan's own arrow — Ram's arrows clash with it mid-air. */
+    val destructible: Boolean
+        get() = type == Type.BAAN || type == Type.CHAKRA || type == Type.RBAAN
 
     fun update(targetX: Float, targetY: Float, gravityUnit: Float) {
         t += 1f
@@ -90,7 +92,33 @@ class Aayudha(
             Type.GADA -> drawGada(canvas)
             Type.TRISHUL -> drawTrishul(canvas)
             Type.SHAKTI -> drawShakti(canvas)
+            Type.RBAAN -> drawRBaan(canvas)
         }
+    }
+
+    /** Ravan's aimed arrow: drawn pointing along its flight, in demon red. */
+    private fun drawRBaan(canvas: Canvas) {
+        glow(canvas, C_RBAAN, size * 1.3f)
+        val ang = kotlin.math.atan2(vy, vx)
+        val dx = kotlin.math.cos(ang).toFloat(); val dy = kotlin.math.sin(ang).toFloat()
+        val tipX = x + dx * size * 1.7f; val tipY = y + dy * size * 1.7f
+        val tailX = x - dx * size * 1.5f; val tailY = y - dy * size * 1.5f
+        stroke.color = C_RBAAN
+        stroke.strokeWidth = size * 0.34f
+        stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawLine(tailX, tailY, tipX, tipY, stroke)
+        // Arrowhead.
+        paint.color = C_RBAAN
+        val px = -dy; val py = dx   // perpendicular
+        path.reset()
+        path.moveTo(tipX, tipY)
+        path.lineTo(x + dx * size * 0.7f + px * size * 0.55f, y + dy * size * 0.7f + py * size * 0.55f)
+        path.lineTo(x + dx * size * 0.7f - px * size * 0.55f, y + dy * size * 0.7f - py * size * 0.55f)
+        path.close()
+        canvas.drawPath(path, paint)
+        // Fletching.
+        paint.color = 0xFF6A1018.toInt()
+        canvas.drawCircle(tailX, tailY, size * 0.3f, paint)
     }
 
     private fun glow(canvas: Canvas, color: Int, r: Float) {
@@ -196,5 +224,6 @@ class Aayudha(
         val C_GADA = 0xFFB07A3A.toInt()
         val C_TRISHUL = 0xFFB0B7C4.toInt()
         val C_SHAKTI = 0xFFFF6A3D.toInt()
+        val C_RBAAN = 0xFFFF4D5E.toInt()
     }
 }

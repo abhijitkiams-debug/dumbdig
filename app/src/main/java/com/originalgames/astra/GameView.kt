@@ -128,8 +128,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         w = width.toFloat()
         h = height.toFloat()
-        val ramR = min(w, h) * 0.06f
-        val ramY = h * 0.86f
+        val ramR = min(w, h) * 0.085f
+        val ramY = h * 0.84f
         ram = Ram(w / 2f, ramY, ramR, w * 0.10f, w * 0.90f)
         ravan = Ravan(w, h)
         skyPaint.shader = LinearGradient(
@@ -177,8 +177,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         rectShare.set(cx - bw / 2f, h * 0.71f, cx + bw / 2f, h * 0.71f + bh)
         val fw = w * 0.26f; val fh = h * 0.04f
         rectFx.set(w - fw - w * 0.04f, h * 0.035f, w - w * 0.04f, h * 0.035f + fh)
-        val ar = w * 0.11f
-        val acx = w - ar - w * 0.06f; val acy = h * 0.93f
+        // Floating astra button: small, kept clear of Ram's dodging lane so it
+        // never blocks the action.
+        val ar = w * 0.082f
+        val acx = w - ar - w * 0.045f; val acy = h * 0.70f
         rectAstra.set(acx - ar, acy - ar, acx + ar, acy + ar)
         val cw = w * 0.74f; val ch = h * 0.11f
         for (i in 0..2) {
@@ -514,7 +516,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val fall = h * 0.006f + d * h * 0.00018f
         // Pattern pool widens with difficulty.
         val pool = ArrayList<Int>()
-        pool.add(0); pool.add(0); pool.add(1)            // baan, chakra always
+        pool.add(6); pool.add(6); pool.add(0)            // Ravan's aimed arrows (core duel) + baan rain
+        pool.add(1)                                      // chakra
         if (d >= 1) pool.add(2)                          // gada
         if (d >= 2) pool.add(3)                          // trishul
         if (d >= 3) pool.add(4)                          // shakti homing
@@ -551,6 +554,19 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                 spawn(Aayudha.Type.SHAKTI, x, topY,
                     (cos(ang) * sp).toFloat(), (sin(ang) * sp).toFloat(), w * 0.022f)
             }
+            6 -> {
+                // Ravan looses a fan of aimed arrows straight at Ram — these are
+                // destructible, so Ram's auto-arrows clash with them in mid-air.
+                val count = (2 + d / 4).coerceAtMost(5)
+                val ox = ravan.activeHeadX(); val oy = ravan.activeHeadY() + h * 0.02f
+                val sp = fall * 1.45f
+                for (s in 0 until count) {
+                    val baseAng = kotlin.math.atan2(ram.y - oy, ram.x - ox)
+                    val spreadAng = baseAng + (s - (count - 1) / 2f) * 0.10f
+                    spawn(Aayudha.Type.RBAAN, ox, oy,
+                        cos(spreadAng) * sp, sin(spreadAng) * sp, w * 0.016f)
+                }
+            }
             else -> {
                 for (s in 0 until 5) {
                     val x = w * (0.12f + rng.nextFloat() * 0.76f)
@@ -558,8 +574,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                     spawn(t, x, topY, (rng.nextFloat() - 0.5f) * w * 0.003f, fall * 1.2f,
                         if (t == Aayudha.Type.BAAN) w * 0.012f else w * 0.028f)
                 }
-                if (d >= 8) {
-                    spawn(Aayudha.Type.SHAKTI, ravan.activeHeadX(), topY, 0f, fall, w * 0.022f)
+                if (d >= 4) {
+                    // Mix in an aimed arrow during the storm.
+                    val ox = ravan.activeHeadX(); val oy = ravan.activeHeadY() + h * 0.02f
+                    val ang = kotlin.math.atan2(ram.y - oy, ram.x - ox)
+                    spawn(Aayudha.Type.RBAAN, ox, oy, cos(ang) * fall * 1.5f, sin(ang) * fall * 1.5f, w * 0.016f)
                 }
             }
         }
@@ -576,6 +595,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         Aayudha.Type.GADA -> Aayudha.C_GADA
         Aayudha.Type.TRISHUL -> Aayudha.C_TRISHUL
         Aayudha.Type.SHAKTI -> Aayudha.C_SHAKTI
+        Aayudha.Type.RBAAN -> Aayudha.C_RBAAN
     }
 
     private fun gameOver() {
@@ -658,10 +678,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             canvas.drawPath(path, barPaint)
         }
 
-        // Astra button (bottom-right) with charge ring.
+        // Floating astra button with charge ring — translucent while charging so
+        // it never blocks the battle, bright and pulsing once it's ready.
         val full = astraMeter >= 1f
         val cx = rectAstra.centerX(); val cy = rectAstra.centerY(); val r = rectAstra.width() / 2f
-        barPaint.color = if (full) (armedAstra.color and 0x00FFFFFF) or 0x44000000 else 0x55202833
+        barPaint.color = if (full) (armedAstra.color and 0x00FFFFFF) or 0x66000000 else 0x33101820
         canvas.drawCircle(cx, cy, r, barPaint)
         ringPaint.color = 0x33FFFFFF
         ringPaint.strokeWidth = r * 0.16f

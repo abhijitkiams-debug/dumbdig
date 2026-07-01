@@ -39,6 +39,10 @@ class Ram(
         color = GOLD
         strokeCap = Paint.Cap.ROUND
     }
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.WHITE
+    }
     private val path = Path()
     private val bowOval = RectF()
 
@@ -80,12 +84,17 @@ class Ram(
         if (invuln > 0 && (invuln / 4) % 2 == 0) return
         val yb = y + kotlin.math.sin(bob) * radius * 0.05f
 
-        // Divine aura.
-        aura.color = (0x55 shl 24) or (AURA and 0x00FFFFFF)
-        canvas.drawCircle(x, yb, radius * 1.55f, aura)
+        // Bright layered divine aura so Ram pops against the dark battlefield.
+        aura.color = (0x30 shl 24) or (AURA and 0x00FFFFFF)
+        canvas.drawCircle(x, yb, radius * 2.0f, aura)
+        aura.color = (0x66 shl 24) or (AURA and 0x00FFFFFF)
+        canvas.drawCircle(x, yb, radius * 1.45f, aura)
+        // A ground glow disc so he reads as standing, not floating.
+        aura.color = (0x44 shl 24) or (GOLD and 0x00FFFFFF)
+        canvas.drawOval(RectF(x - radius * 1.1f, yb + radius * 0.95f, x + radius * 1.1f, yb + radius * 1.35f), aura)
 
         // Bow: an arc facing up toward Ravan, with a string.
-        bowPaint.strokeWidth = radius * 0.13f
+        bowPaint.strokeWidth = radius * 0.16f
         val br = radius * 1.15f
         bowOval.set(x - br, yb - br, x + br, yb + br)
         canvas.drawArc(bowOval, -150f, 120f, false, bowPaint)
@@ -98,18 +107,19 @@ class Ram(
             bowPaint
         )
 
-        // Body: a saffron rounded capsule.
+        // Body: a saffron rounded capsule with a crisp white outline.
         body.color = SAFFRON
-        val bw = radius * 0.7f
-        canvas.drawRoundRect(
-            x - bw, yb - radius * 0.1f, x + bw, yb + radius * 1.15f,
-            bw, bw, body
-        )
+        val bw = radius * 0.72f
+        bowOval.set(x - bw, yb - radius * 0.1f, x + bw, yb + radius * 1.2f)
+        canvas.drawRoundRect(bowOval, bw, bw, body)
+        outline.strokeWidth = radius * 0.08f
+        canvas.drawRoundRect(bowOval, bw, bw, outline)
 
         // Head.
+        val hy = yb - radius * 0.48f
         body.color = SKIN
-        val hy = yb - radius * 0.45f
-        canvas.drawCircle(x, hy, radius * 0.42f, body)
+        canvas.drawCircle(x, hy, radius * 0.44f, body)
+        canvas.drawCircle(x, hy, radius * 0.44f, outline)
 
         // A small three-point golden crown / tilak halo.
         path.reset()

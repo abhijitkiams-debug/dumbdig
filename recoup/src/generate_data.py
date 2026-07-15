@@ -154,6 +154,7 @@ def generate(n=5000, out_path=None):
     if out_path is None:
         out_path = os.path.join(os.path.dirname(__file__), "..", "data", "accounts.csv")
     out_path = os.path.abspath(out_path)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)  # dir may not exist on a fresh clone
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()

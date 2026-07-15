@@ -38,6 +38,7 @@ MAX_ROWS = 4000         # cap rows returned to the browser to keep the DOM sane
 def bootstrap(n_synth):
     """Generate synthetic data if needed and fit the model once."""
     global MODEL, TRAIN_ROWS
+    os.makedirs(os.path.dirname(DATA), exist_ok=True)  # fresh clone has no data/ dir
     if not os.path.exists(DATA):
         print(f"Generating {n_synth} synthetic accounts …")
         generate_data.generate(n_synth, DATA)

@@ -1,0 +1,547 @@
+<title>Recoup — Collections Decision Copilot</title>
+<style>
+  :root {
+    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
+    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83;
+    --border:#DDE4E0; --border-2:#E9EEEB;
+    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
+    --crit:#B4431D; --crit-soft:#F7E7DF;
+    --warn:#9A6B12; --warn-soft:#F3EBD8;
+    --calm:#64756B; --calm-soft:#EAEEEB;
+    --good:#0E8A6E;
+    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
+      --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
+      --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
+      --crit:#E17A4E; --crit-soft:#2A1A11;
+      --warn:#D6A44C; --warn-soft:#241C10;
+      --calm:#8A9A90; --calm-soft:#1A231E;
+      --good:#35B694;
+      --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
+    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83; --border:#DDE4E0; --border-2:#E9EEEB;
+    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
+    --crit:#B4431D; --crit-soft:#F7E7DF; --warn:#9A6B12; --warn-soft:#F3EBD8;
+    --calm:#64756B; --calm-soft:#EAEEEB; --good:#0E8A6E;
+    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
+    --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
+    --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
+    --crit:#E17A4E; --crit-soft:#2A1A11; --warn:#D6A44C; --warn-soft:#241C10;
+    --calm:#8A9A90; --calm-soft:#1A231E; --good:#35B694;
+    --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--f-sans); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1240px; margin:0 auto; padding:0 20px 72px; }
+  .mono { font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+  .num { font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+  .eyebrow {
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:600;
+  }
+  h2 { font-size:15px; font-weight:650; margin:0; letter-spacing:-.01em; }
+  a { color:var(--accent-ink); }
+
+  /* ---- Header ---- */
+  header {
+    position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .head-inner {
+    max-width:1240px; margin:0 auto; padding:14px 20px;
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .brand { display:flex; align-items:baseline; gap:10px; }
+  .logo {
+    font-family:var(--f-serif); font-size:25px; font-weight:600; letter-spacing:-.02em;
+    color:var(--ink); line-height:1;
+  }
+  .logo .dot { color:var(--accent); }
+  .brand small { color:var(--ink-2); font-size:12.5px; }
+  .badge {
+    margin-left:auto; display:inline-flex; align-items:center; gap:7px;
+    font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+    color:var(--accent-ink); background:var(--accent-soft);
+    border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding:5px 10px; border-radius:999px;
+  }
+  .badge .pulse { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+
+  .lede { padding:26px 0 18px; max-width:70ch; }
+  .lede h1 {
+    font-family:var(--f-serif); font-weight:600; letter-spacing:-.02em;
+    font-size:30px; line-height:1.12; margin:0 0 8px; text-wrap:balance;
+  }
+  .lede p { margin:0; color:var(--ink-2); font-size:15px; }
+
+  /* ---- KPI strip ---- */
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:6px 0 22px; }
+  .kpi {
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .kpi .k-label { font-size:11px; letter-spacing:.04em; color:var(--ink-3); text-transform:uppercase; font-weight:600; }
+  .kpi .k-val { font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:23px; font-weight:600; margin-top:6px; letter-spacing:-.02em; }
+  .kpi .k-sub { font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+  .kpi::after { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.85; }
+  .kpi.crit::after { background:var(--crit); }
+  .kpi.warn::after { background:var(--warn); }
+
+  /* ---- Layout grid ---- */
+  .grid { display:grid; grid-template-columns:1.75fr 1fr; gap:20px; align-items:start; }
+  .card {
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .card-h {
+    display:flex; align-items:center; gap:10px; padding:14px 16px;
+    border-bottom:1px solid var(--border-2);
+  }
+  .card-h .eyebrow { margin-left:auto; }
+  .card-b { padding:14px 16px; }
+  .stack { display:grid; gap:20px; }
+
+  /* ---- Worklist ---- */
+  .filters { display:flex; gap:7px; padding:12px 16px; border-bottom:1px solid var(--border-2); flex-wrap:wrap; align-items:center; }
+  .chip {
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--border); background:var(--panel-2); color:var(--ink-2);
+    display:inline-flex; gap:7px; align-items:center; transition:.14s;
+  }
+  .chip .c-n { font-family:var(--f-mono); color:var(--ink-3); }
+  .chip[aria-pressed="true"] { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .chip[aria-pressed="true"] .c-n { color:var(--bg); opacity:.7; }
+  .chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .filters .spacer { margin-left:auto; font-size:12px; color:var(--ink-3); }
+
+  .wl-scroll { overflow-x:auto; }
+  table.wl { width:100%; border-collapse:collapse; font-size:13px; min-width:720px; }
+  table.wl thead th {
+    text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:600; padding:9px 10px; position:sticky; top:0;
+    background:var(--panel); border-bottom:1px solid var(--border);
+  }
+  table.wl thead th.r { text-align:right; }
+  table.wl tbody tr.row { border-bottom:1px solid var(--border-2); cursor:pointer; transition:background .12s; }
+  table.wl tbody tr.row:hover { background:var(--raise); }
+  table.wl td { padding:9px 10px; vertical-align:middle; }
+  table.wl td.r { text-align:right; }
+  .rank { color:var(--ink-3); font-family:var(--f-mono); font-size:12px; width:26px; }
+  .acct { font-family:var(--f-mono); font-size:12.5px; color:var(--ink); font-weight:600; }
+  .acct .rgn { color:var(--ink-3); font-weight:400; font-size:11px; display:block; }
+
+  .prio { display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:12.5px; }
+  .prio .stripe { width:4px; height:15px; border-radius:2px; background:var(--calm); }
+  .prio.High { color:var(--crit); } .prio.High .stripe { background:var(--crit); }
+  .prio.Medium { color:var(--warn); } .prio.Medium .stripe { background:var(--warn); }
+  .prio.Low { color:var(--calm); } .prio.Low .stripe { background:var(--calm); }
+
+  .seg { font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; white-space:nowrap;
+         background:var(--calm-soft); color:var(--ink-2); border:1px solid var(--border-2); }
+  .seg.self_cured { background:var(--accent-soft); color:var(--accent-ink); }
+  .seg.defaulter { background:var(--crit-soft); color:var(--crit); }
+  .seg.delinquent { background:var(--warn-soft); color:var(--warn); }
+
+  .pbar { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+  .pbar .track { width:44px; height:6px; border-radius:3px; background:var(--border); overflow:hidden; }
+  .pbar .fill { height:100%; background:var(--accent); border-radius:3px; }
+  .pbar .pv { font-family:var(--f-mono); font-size:12px; color:var(--ink-2); width:34px; text-align:right; }
+
+  .money { font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:12.5px; }
+  .money.exp { color:var(--accent-ink); font-weight:600; }
+
+  .action {
+    font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:7px; white-space:nowrap;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--ink);
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .action .ic { width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .action.legal_escalation { color:var(--crit); border-color:color-mix(in srgb,var(--crit) 35%,transparent); }
+  .action.legal_escalation .ic { background:var(--crit); }
+  .action.settlement_offer .ic { background:var(--warn); }
+  .caret { color:var(--ink-3); transition:transform .15s; display:inline-block; font-size:11px; }
+  tr.row.open .caret { transform:rotate(90deg); }
+
+  /* expanded detail */
+  tr.detail td { padding:0; }
+  .detail-box {
+    background:var(--panel-2); border-top:1px dashed var(--border);
+    padding:14px 16px 16px 44px; display:grid; grid-template-columns:1.3fr 1fr; gap:18px;
+  }
+  .detail-box h4 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
+  .why-list { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+  .why-list li { font-size:13px; color:var(--ink); padding-left:16px; position:relative; }
+  .why-list li::before { content:"→"; position:absolute; left:0; color:var(--accent); }
+  .audit { display:grid; gap:5px; font-size:12px; }
+  .audit .kv { display:flex; justify-content:space-between; gap:10px; }
+  .audit .kv span:first-child { color:var(--ink-3); }
+  .audit .kv span:last-child { font-family:var(--f-mono); color:var(--ink-2); }
+  .review-flag { margin-top:8px; font-size:11.5px; font-weight:600; display:inline-flex; gap:6px; align-items:center;
+                 color:var(--crit); background:var(--crit-soft); padding:4px 9px; border-radius:6px; }
+  .review-ok { color:var(--accent-ink); background:var(--accent-soft); }
+
+  /* ---- Routing map ---- */
+  .map-wrap { position:relative; }
+  canvas#map { width:100%; height:auto; display:block; border-radius:10px; }
+  .map-legend { display:flex; flex-wrap:wrap; gap:12px; padding:12px 16px 2px; }
+  .map-legend .lg { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-2); }
+  .map-legend .sw { width:11px; height:11px; border-radius:3px; }
+  .map-stat { display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-top:1px solid var(--border-2); }
+  .map-stat span:first-child { color:var(--ink-3); }
+  .map-stat .mono { color:var(--ink); }
+
+  /* ---- Model perf ---- */
+  .metric { display:grid; gap:8px; padding:4px 0; }
+  .metric + .metric { border-top:1px solid var(--border-2); margin-top:10px; padding-top:12px; }
+  .metric .m-top { display:flex; align-items:baseline; gap:8px; }
+  .metric .m-name { font-weight:600; font-size:13px; }
+  .metric .m-auc { margin-left:auto; font-family:var(--f-mono); font-size:16px; font-weight:600; color:var(--accent-ink); }
+  .metric .m-sub { font-size:11px; color:var(--ink-3); }
+  .gauge { height:7px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .gauge .g-fill { height:100%; background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 55%,transparent), var(--accent)); border-radius:4px; }
+  .mm-row { display:flex; gap:14px; font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+  .mm-row b { color:var(--ink); font-family:var(--f-mono); font-weight:600; }
+
+  /* ---- AHP ---- */
+  .ahp-row { display:grid; grid-template-columns:120px 1fr 42px; align-items:center; gap:10px; padding:5px 0; font-size:12.5px; }
+  .ahp-row .a-name { color:var(--ink); }
+  .ahp-row .a-track { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .ahp-row .a-fill { height:100%; background:var(--calm); border-radius:4px; }
+  .ahp-row.top .a-fill { background:var(--accent); }
+  .ahp-row .a-val { font-family:var(--f-mono); font-size:12px; color:var(--ink-2); text-align:right; }
+  .cr-note { margin-top:12px; font-size:11.5px; color:var(--ink-2); background:var(--panel-2); border:1px solid var(--border-2); padding:8px 10px; border-radius:8px; }
+  .cr-note b { color:var(--accent-ink); }
+
+  /* ---- Compliance ---- */
+  .comp-stat { display:flex; align-items:baseline; gap:8px; }
+  .comp-stat .cs-n { font-family:var(--f-mono); font-size:30px; font-weight:600; color:var(--crit); letter-spacing:-.02em; }
+  .comp-stat .cs-l { font-size:12.5px; color:var(--ink-2); }
+  .comp-list { margin:12px 0 0; padding:0; list-style:none; display:grid; gap:9px; }
+  .comp-list li { display:flex; gap:9px; font-size:12.5px; color:var(--ink-2); }
+  .comp-list .tick { color:var(--accent); font-weight:700; }
+
+  footer { margin-top:30px; padding-top:18px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
+  footer b { color:var(--ink-2); font-weight:600; }
+  .foot-cite { font-style:italic; }
+
+  @media (max-width:920px) {
+    .grid { grid-template-columns:1fr; }
+    .kpis { grid-template-columns:repeat(2,1fr); }
+    .detail-box { grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){ * { transition:none !important; } }
+</style>
+
+<header>
+  <div class="head-inner">
+    <div class="brand">
+      <span class="logo">Recoup<span class="dot">.</span></span>
+      <small>Collections Decision Copilot</small>
+    </div>
+    <span class="badge"><span class="pulse"></span>Synthetic portfolio</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="lede">
+    <h1>Every account gets a ranked action — and a reason you can defend.</h1>
+    <p>Recoup scores each debtor for promise-to-pay and actual payment, turns those
+      into a human-readable priority, picks the next best action inside a compliance
+      playbook, and routes field visits by recoverable value. Below is a live run over
+      a synthetic book of <span class="mono" id="acct-inline"></span> accounts.</p>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="grid">
+    <!-- Worklist -->
+    <section class="card" aria-label="Account worklist">
+      <div class="card-h">
+        <h2>Prioritized worklist</h2>
+        <span class="eyebrow">TOPSIS-ranked</span>
+      </div>
+      <div class="filters" id="filters">
+        <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
+        <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
+        <button class="chip" data-f="Medium" aria-pressed="false">Medium <span class="c-n" id="f-med"></span></button>
+        <button class="chip" data-f="Low" aria-pressed="false">Low <span class="c-n" id="f-low"></span></button>
+        <span class="spacer">click a row for the reasoning &amp; audit trail</span>
+      </div>
+      <div class="wl-scroll">
+        <table class="wl">
+          <thead>
+            <tr>
+              <th></th><th>Account</th><th>Segment</th><th>Priority</th>
+              <th class="r">P2P</th><th class="r">Pay prob.</th>
+              <th class="r">Past due</th><th class="r">Exp. recovery</th>
+              <th>Next best action</th>
+            </tr>
+          </thead>
+          <tbody id="wl-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Right rail -->
+    <div class="stack">
+      <section class="card">
+        <div class="card-h"><h2>Field routing</h2><span class="eyebrow">K-means · 2-opt</span></div>
+        <div class="map-legend" id="map-legend"></div>
+        <div class="map-wrap card-b" style="padding-top:6px;">
+          <canvas id="map" width="640" height="640" role="img"
+                  aria-label="Optimized field-collector routes over the portfolio geography"></canvas>
+          <div id="map-stats" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Model performance</h2><span class="eyebrow">Held-out</span></div>
+        <div class="card-b" id="metrics"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Next-best-action weighting</h2><span class="eyebrow">AHP</span></div>
+        <div class="card-b" id="ahp"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div>
+        <div class="card-b" id="compliance"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <p>Recoup is a working prototype of the three-layer decision-support framework in
+      <span class="foot-cite">Lappas &amp; Xanthopoulos, “Intelligent decision support for debt collection using
+      predictive learning and multi-criteria optimization,” Finance Research Open (2026)</span>.
+      Layer 1 <b>rule extraction</b> (K-means segments) · Layer 2 <b>prediction</b>
+      (Random Forest P2P/APP) · Layer 3 <b>optimization</b> (fuzzy priority, TOPSIS, AHP, routing).
+      All figures come from a synthetic portfolio — no real debtor data is used.</p>
+  </footer>
+</div>
+
+<script>/*__RECOUP_DATA__*/</script>
+<script>
+(function(){
+  const D = window.RECOUP_DATA;
+  const money = n => "$" + Math.round(n).toLocaleString("en-US");
+  const moneyK = n => n>=1e6 ? "$"+(n/1e6).toFixed(2)+"M" : n>=1e3 ? "$"+(n/1e3).toFixed(0)+"k" : "$"+Math.round(n);
+  const pct = x => Math.round(x*100) + "%";
+  const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
+
+  // ---- inline count + KPIs ----
+  const s = D.summary;
+  document.getElementById("acct-inline").textContent = s.accounts.toLocaleString();
+  const kpiDefs = [
+    {label:"Accounts scored", val:s.accounts.toLocaleString(), sub:"full portfolio", cls:""},
+    {label:"Total past due", val:moneyK(s.total_past_due), sub:"outstanding arrears", cls:""},
+    {label:"Expected recovery", val:moneyK(s.total_expected_recovery), sub:"prob-weighted", cls:""},
+    {label:"High priority", val:s.priority_breakdown.High.toLocaleString(), sub:"need attention now", cls:"crit"},
+    {label:"Field visits", val:s.field_visits_planned, sub:moneyK(s.field_expected_recovery)+" routed", cls:"warn"},
+  ];
+  const kpiWrap = document.getElementById("kpis");
+  kpiDefs.forEach(k=>{
+    const c = el("div","kpi"+(k.cls?" "+k.cls:""));
+    c.append(el("div","k-label",k.label), el("div","k-val",k.val), el("div","k-sub",k.sub));
+    kpiWrap.append(c);
+  });
+
+  // ---- worklist ----
+  const wl = D.worklist;
+  const counts = {All:wl.length, High:0, Medium:0, Low:0};
+  wl.forEach(w=>counts[w.priority_level]++);
+  document.getElementById("f-all").textContent = counts.All;
+  document.getElementById("f-high").textContent = counts.High;
+  document.getElementById("f-med").textContent = counts.Medium;
+  document.getElementById("f-low").textContent = counts.Low;
+
+  const body = document.getElementById("wl-body");
+  const prettyAction = a => a.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
+  let filter = "All";
+
+  function render(){
+    body.innerHTML = "";
+    wl.filter(w=>filter==="All"||w.priority_level===filter).forEach(w=>{
+      const tr = el("tr","row"); tr.dataset.id = w.account_id;
+      const seg = w.segment;
+      tr.innerHTML = `
+        <td><span class="caret">▶</span></td>
+        <td class="acct">${w.account_id}<span class="rgn">${w.region||"—"}</span></td>
+        <td><span class="seg ${seg}">${seg.replace(/_/g," ")}</span></td>
+        <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
+        <td class="r"><span class="num">${pct(w.prob_promise_to_pay)}</span></td>
+        <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
+        <td class="r"><span class="money">${money(w.past_due_amount)}</span></td>
+        <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
+        <td><span class="action ${w.next_best_action}"><span class="ic"></span>${prettyAction(w.next_best_action)}</span></td>`;
+      const det = el("tr","detail"); det.style.display="none";
+      const td = el("td"); td.colSpan = 9;
+      const rev = w.audit.human_review_required;
+      td.innerHTML = `
+        <div class="detail-box">
+          <div>
+            <h4>Why this priority &amp; action</h4>
+            <ul class="why-list">
+              ${w.reasons.map(r=>`<li>${r}</li>`).join("")}
+              <li>${w.audit.action_rationale}</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Audit trail</h4>
+            <div class="audit">
+              <div class="kv"><span>P2P model</span><span>${w.audit.model_p2p}</span></div>
+              <div class="kv"><span>Payment model</span><span>${w.audit.model_app}</span></div>
+              <div class="kv"><span>Fuzzy · pay prob.</span><span>${w.audit.fuzzy_inputs.prob_actual_payment}</span></div>
+              <div class="kv"><span>Fuzzy · exp. (norm)</span><span>${w.audit.fuzzy_inputs.expected_payment_norm}</span></div>
+              <div class="kv"><span>Fuzzy · past due (norm)</span><span>${w.audit.fuzzy_inputs.past_due_norm}</span></div>
+              <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
+              <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
+            </div>
+            <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
+          </div>
+        </div>`;
+      det.append(td);
+      tr.addEventListener("click", ()=>{
+        const open = tr.classList.toggle("open");
+        det.style.display = open ? "table-row" : "none";
+      });
+      body.append(tr, det);
+    });
+  }
+  render();
+
+  document.querySelectorAll("#filters .chip").forEach(ch=>{
+    ch.addEventListener("click", ()=>{
+      document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+      ch.setAttribute("aria-pressed","true");
+      filter = ch.dataset.f; render();
+    });
+  });
+
+  // ---- routing map ----
+  const routeColors = ["#0E8A6E","#B4431D","#3B6EA5","#9A6B12","#6E4FA0"];
+  function accentFor(i){ return routeColors[i%routeColors.length]; }
+  const legend = document.getElementById("map-legend");
+  D.routes.forEach((rt,i)=>{
+    const lg = el("div","lg");
+    const sw = el("span","sw"); sw.style.background = accentFor(i);
+    lg.append(sw, el("span",null,`${rt.collector} · ${rt.num_stops} stops`));
+    legend.append(lg);
+  });
+  const mapStats = document.getElementById("map-stats");
+  D.routes.forEach((rt,i)=>{
+    const row = el("div","map-stat");
+    row.innerHTML = `<span>${rt.collector}</span><span class="mono">${moneyK(rt.expected_recovery)} · ${rt.total_distance} dist</span>`;
+    mapStats.append(row);
+  });
+
+  function drawMap(){
+    const cv = document.getElementById("map");
+    const dpr = window.devicePixelRatio||1;
+    const size = cv.clientWidth;
+    cv.width = size*dpr; cv.height = size*dpr;
+    const ctx = cv.getContext("2d");
+    ctx.scale(dpr,dpr);
+    const W = size, H = size, pad = 18;
+    const css = getComputedStyle(document.documentElement);
+    const grid = css.getPropertyValue("--border").trim();
+    const inkFaint = css.getPropertyValue("--ink-3").trim();
+    ctx.clearRect(0,0,W,H);
+    // grid
+    ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.globalAlpha=.5;
+    for(let g=0; g<=10; g++){
+      const p = pad + (W-2*pad)*g/10;
+      ctx.beginPath(); ctx.moveTo(p,pad); ctx.lineTo(p,H-pad); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad,p); ctx.lineTo(W-pad,p); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    const X = x => pad + (W-2*pad)*(x/100);
+    const Y = y => H-pad - (H-2*pad)*(y/100);
+    // value scale for dot size
+    let maxv=1; D.routes.forEach(rt=>rt.stops.forEach(s=>maxv=Math.max(maxv,s.expected_payment)));
+    D.routes.forEach((rt,i)=>{
+      const col = accentFor(i);
+      // route lines
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.globalAlpha=.55;
+      ctx.beginPath();
+      rt.stops.forEach((s,j)=>{ const px=X(s.geo_x), py=Y(s.geo_y); j?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+      ctx.stroke(); ctx.globalAlpha=1;
+      // stops
+      rt.stops.forEach(s=>{
+        const px=X(s.geo_x), py=Y(s.geo_y);
+        const r = 3 + 6*Math.sqrt(s.expected_payment/maxv);
+        ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
+        ctx.fillStyle = col; ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1;
+        ctx.lineWidth=1.5; ctx.strokeStyle = css.getPropertyValue("--panel").trim(); ctx.stroke();
+      });
+    });
+  }
+  drawMap();
+  window.addEventListener("resize", drawMap);
+  // redraw on theme change
+  new MutationObserver(drawMap).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+
+  // ---- model performance ----
+  const met = document.getElementById("metrics");
+  const metricDefs = [
+    {key:"label_actual_payment", name:"Actual payment (APP)", sub:"will they pay?"},
+    {key:"label_promise_to_pay", name:"Promise to pay (P2P)", sub:"will they commit?"},
+  ];
+  metricDefs.forEach(md=>{
+    const m = D.model_metrics[md.key]; if(!m) return;
+    const wrap = el("div","metric");
+    wrap.innerHTML = `
+      <div class="m-top"><span class="m-name">${md.name}</span><span class="m-sub">${md.sub}</span><span class="m-auc">${m.auc}</span></div>
+      <div class="gauge"><div class="g-fill" style="width:${Math.round(m.auc*100)}%"></div></div>
+      <div class="mm-row"><span>AUC <b>${m.auc}</b></span><span>Accuracy <b>${m.accuracy}</b></span><span>F1 <b>${m.f1}</b></span><span>n=<b>${m.n_test}</b></span></div>`;
+    met.append(wrap);
+  });
+
+  // ---- AHP ----
+  const ahp = document.getElementById("ahp");
+  const maxScore = Math.max(...D.ahp_action_ranking.map(a=>a[1]));
+  D.ahp_action_ranking.forEach((a,i)=>{
+    const row = el("div","ahp-row"+(i===0?" top":""));
+    row.innerHTML = `<span class="a-name">${prettyAction(a[0])}</span>
+      <div class="a-track"><div class="a-fill" style="width:${Math.round(a[1]/maxScore*100)}%"></div></div>
+      <span class="a-val">${a[1].toFixed(3)}</span>`;
+    ahp.append(row);
+  });
+  const cr = el("div","cr-note");
+  cr.innerHTML = `Manager judgements are consistent — <b>consistency ratio ${D.ahp_consistency_ratio}</b> (≤ 0.10 is acceptable). Weights blend effectiveness, cost, and time efficiency; the priority level then constrains which actions are permitted.`;
+  ahp.append(cr);
+
+  // ---- compliance ----
+  const comp = document.getElementById("compliance");
+  const reviewCount = wl.filter(w=>w.audit.human_review_required).length;
+  comp.innerHTML = `
+    <div class="comp-stat"><span class="cs-n">${s.priority_breakdown.High}</span>
+      <span class="cs-l">high-priority accounts flagged for <b>human review</b> before action</span></div>
+    <ul class="comp-list">
+      <li><span class="tick">✓</span> Every score is traceable to the model, inputs, and rule that produced it</li>
+      <li><span class="tick">✓</span> Actions are bounded by a compliance playbook per priority tier</li>
+      <li><span class="tick">✓</span> Legal escalation always requires a human decision</li>
+      <li><span class="tick">✓</span> Interpretable outputs support GDPR / EU AI Act profiling obligations</li>
+    </ul>`;
+})();
+</script>

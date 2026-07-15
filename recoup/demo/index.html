@@ -1,0 +1,547 @@
+<title>Recoup — Collections Decision Copilot</title>
+<style>
+  :root {
+    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
+    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83;
+    --border:#DDE4E0; --border-2:#E9EEEB;
+    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
+    --crit:#B4431D; --crit-soft:#F7E7DF;
+    --warn:#9A6B12; --warn-soft:#F3EBD8;
+    --calm:#64756B; --calm-soft:#EAEEEB;
+    --good:#0E8A6E;
+    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
+      --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
+      --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
+      --crit:#E17A4E; --crit-soft:#2A1A11;
+      --warn:#D6A44C; --warn-soft:#241C10;
+      --calm:#8A9A90; --calm-soft:#1A231E;
+      --good:#35B694;
+      --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
+    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83; --border:#DDE4E0; --border-2:#E9EEEB;
+    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
+    --crit:#B4431D; --crit-soft:#F7E7DF; --warn:#9A6B12; --warn-soft:#F3EBD8;
+    --calm:#64756B; --calm-soft:#EAEEEB; --good:#0E8A6E;
+    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
+    --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
+    --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
+    --crit:#E17A4E; --crit-soft:#2A1A11; --warn:#D6A44C; --warn-soft:#241C10;
+    --calm:#8A9A90; --calm-soft:#1A231E; --good:#35B694;
+    --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--f-sans); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1240px; margin:0 auto; padding:0 20px 72px; }
+  .mono { font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+  .num { font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+  .eyebrow {
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:600;
+  }
+  h2 { font-size:15px; font-weight:650; margin:0; letter-spacing:-.01em; }
+  a { color:var(--accent-ink); }
+
+  /* ---- Header ---- */
+  header {
+    position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .head-inner {
+    max-width:1240px; margin:0 auto; padding:14px 20px;
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .brand { display:flex; align-items:baseline; gap:10px; }
+  .logo {
+    font-family:var(--f-serif); font-size:25px; font-weight:600; letter-spacing:-.02em;
+    color:var(--ink); line-height:1;
+  }
+  .logo .dot { color:var(--accent); }
+  .brand small { color:var(--ink-2); font-size:12.5px; }
+  .badge {
+    margin-left:auto; display:inline-flex; align-items:center; gap:7px;
+    font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+    color:var(--accent-ink); background:var(--accent-soft);
+    border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding:5px 10px; border-radius:999px;
+  }
+  .badge .pulse { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+
+  .lede { padding:26px 0 18px; max-width:70ch; }
+  .lede h1 {
+    font-family:var(--f-serif); font-weight:600; letter-spacing:-.02em;
+    font-size:30px; line-height:1.12; margin:0 0 8px; text-wrap:balance;
+  }
+  .lede p { margin:0; color:var(--ink-2); font-size:15px; }
+
+  /* ---- KPI strip ---- */
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:6px 0 22px; }
+  .kpi {
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .kpi .k-label { font-size:11px; letter-spacing:.04em; color:var(--ink-3); text-transform:uppercase; font-weight:600; }
+  .kpi .k-val { font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:23px; font-weight:600; margin-top:6px; letter-spacing:-.02em; }
+  .kpi .k-sub { font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+  .kpi::after { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.85; }
+  .kpi.crit::after { background:var(--crit); }
+  .kpi.warn::after { background:var(--warn); }
+
+  /* ---- Layout grid ---- */
+  .grid { display:grid; grid-template-columns:1.75fr 1fr; gap:20px; align-items:start; }
+  .card {
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .card-h {
+    display:flex; align-items:center; gap:10px; padding:14px 16px;
+    border-bottom:1px solid var(--border-2);
+  }
+  .card-h .eyebrow { margin-left:auto; }
+  .card-b { padding:14px 16px; }
+  .stack { display:grid; gap:20px; }
+
+  /* ---- Worklist ---- */
+  .filters { display:flex; gap:7px; padding:12px 16px; border-bottom:1px solid var(--border-2); flex-wrap:wrap; align-items:center; }
+  .chip {
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--border); background:var(--panel-2); color:var(--ink-2);
+    display:inline-flex; gap:7px; align-items:center; transition:.14s;
+  }
+  .chip .c-n { font-family:var(--f-mono); color:var(--ink-3); }
+  .chip[aria-pressed="true"] { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .chip[aria-pressed="true"] .c-n { color:var(--bg); opacity:.7; }
+  .chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .filters .spacer { margin-left:auto; font-size:12px; color:var(--ink-3); }
+
+  .wl-scroll { overflow-x:auto; }
+  table.wl { width:100%; border-collapse:collapse; font-size:13px; min-width:720px; }
+  table.wl thead th {
+    text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:600; padding:9px 10px; position:sticky; top:0;
+    background:var(--panel); border-bottom:1px solid var(--border);
+  }
+  table.wl thead th.r { text-align:right; }
+  table.wl tbody tr.row { border-bottom:1px solid var(--border-2); cursor:pointer; transition:background .12s; }
+  table.wl tbody tr.row:hover { background:var(--raise); }
+  table.wl td { padding:9px 10px; vertical-align:middle; }
+  table.wl td.r { text-align:right; }
+  .rank { color:var(--ink-3); font-family:var(--f-mono); font-size:12px; width:26px; }
+  .acct { font-family:var(--f-mono); font-size:12.5px; color:var(--ink); font-weight:600; }
+  .acct .rgn { color:var(--ink-3); font-weight:400; font-size:11px; display:block; }
+
+  .prio { display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:12.5px; }
+  .prio .stripe { width:4px; height:15px; border-radius:2px; background:var(--calm); }
+  .prio.High { color:var(--crit); } .prio.High .stripe { background:var(--crit); }
+  .prio.Medium { color:var(--warn); } .prio.Medium .stripe { background:var(--warn); }
+  .prio.Low { color:var(--calm); } .prio.Low .stripe { background:var(--calm); }
+
+  .seg { font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; white-space:nowrap;
+         background:var(--calm-soft); color:var(--ink-2); border:1px solid var(--border-2); }
+  .seg.self_cured { background:var(--accent-soft); color:var(--accent-ink); }
+  .seg.defaulter { background:var(--crit-soft); color:var(--crit); }
+  .seg.delinquent { background:var(--warn-soft); color:var(--warn); }
+
+  .pbar { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+  .pbar .track { width:44px; height:6px; border-radius:3px; background:var(--border); overflow:hidden; }
+  .pbar .fill { height:100%; background:var(--accent); border-radius:3px; }
+  .pbar .pv { font-family:var(--f-mono); font-size:12px; color:var(--ink-2); width:34px; text-align:right; }
+
+  .money { font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:12.5px; }
+  .money.exp { color:var(--accent-ink); font-weight:600; }
+
+  .action {
+    font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:7px; white-space:nowrap;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--ink);
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .action .ic { width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .action.legal_escalation { color:var(--crit); border-color:color-mix(in srgb,var(--crit) 35%,transparent); }
+  .action.legal_escalation .ic { background:var(--crit); }
+  .action.settlement_offer .ic { background:var(--warn); }
+  .caret { color:var(--ink-3); transition:transform .15s; display:inline-block; font-size:11px; }
+  tr.row.open .caret { transform:rotate(90deg); }
+
+  /* expanded detail */
+  tr.detail td { padding:0; }
+  .detail-box {
+    background:var(--panel-2); border-top:1px dashed var(--border);
+    padding:14px 16px 16px 44px; display:grid; grid-template-columns:1.3fr 1fr; gap:18px;
+  }
+  .detail-box h4 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
+  .why-list { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+  .why-list li { font-size:13px; color:var(--ink); padding-left:16px; position:relative; }
+  .why-list li::before { content:"→"; position:absolute; left:0; color:var(--accent); }
+  .audit { display:grid; gap:5px; font-size:12px; }
+  .audit .kv { display:flex; justify-content:space-between; gap:10px; }
+  .audit .kv span:first-child { color:var(--ink-3); }
+  .audit .kv span:last-child { font-family:var(--f-mono); color:var(--ink-2); }
+  .review-flag { margin-top:8px; font-size:11.5px; font-weight:600; display:inline-flex; gap:6px; align-items:center;
+                 color:var(--crit); background:var(--crit-soft); padding:4px 9px; border-radius:6px; }
+  .review-ok { color:var(--accent-ink); background:var(--accent-soft); }
+
+  /* ---- Routing map ---- */
+  .map-wrap { position:relative; }
+  canvas#map { width:100%; height:auto; display:block; border-radius:10px; }
+  .map-legend { display:flex; flex-wrap:wrap; gap:12px; padding:12px 16px 2px; }
+  .map-legend .lg { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-2); }
+  .map-legend .sw { width:11px; height:11px; border-radius:3px; }
+  .map-stat { display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-top:1px solid var(--border-2); }
+  .map-stat span:first-child { color:var(--ink-3); }
+  .map-stat .mono { color:var(--ink); }
+
+  /* ---- Model perf ---- */
+  .metric { display:grid; gap:8px; padding:4px 0; }
+  .metric + .metric { border-top:1px solid var(--border-2); margin-top:10px; padding-top:12px; }
+  .metric .m-top { display:flex; align-items:baseline; gap:8px; }
+  .metric .m-name { font-weight:600; font-size:13px; }
+  .metric .m-auc { margin-left:auto; font-family:var(--f-mono); font-size:16px; font-weight:600; color:var(--accent-ink); }
+  .metric .m-sub { font-size:11px; color:var(--ink-3); }
+  .gauge { height:7px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .gauge .g-fill { height:100%; background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 55%,transparent), var(--accent)); border-radius:4px; }
+  .mm-row { display:flex; gap:14px; font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+  .mm-row b { color:var(--ink); font-family:var(--f-mono); font-weight:600; }
+
+  /* ---- AHP ---- */
+  .ahp-row { display:grid; grid-template-columns:120px 1fr 42px; align-items:center; gap:10px; padding:5px 0; font-size:12.5px; }
+  .ahp-row .a-name { color:var(--ink); }
+  .ahp-row .a-track { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .ahp-row .a-fill { height:100%; background:var(--calm); border-radius:4px; }
+  .ahp-row.top .a-fill { background:var(--accent); }
+  .ahp-row .a-val { font-family:var(--f-mono); font-size:12px; color:var(--ink-2); text-align:right; }
+  .cr-note { margin-top:12px; font-size:11.5px; color:var(--ink-2); background:var(--panel-2); border:1px solid var(--border-2); padding:8px 10px; border-radius:8px; }
+  .cr-note b { color:var(--accent-ink); }
+
+  /* ---- Compliance ---- */
+  .comp-stat { display:flex; align-items:baseline; gap:8px; }
+  .comp-stat .cs-n { font-family:var(--f-mono); font-size:30px; font-weight:600; color:var(--crit); letter-spacing:-.02em; }
+  .comp-stat .cs-l { font-size:12.5px; color:var(--ink-2); }
+  .comp-list { margin:12px 0 0; padding:0; list-style:none; display:grid; gap:9px; }
+  .comp-list li { display:flex; gap:9px; font-size:12.5px; color:var(--ink-2); }
+  .comp-list .tick { color:var(--accent); font-weight:700; }
+
+  footer { margin-top:30px; padding-top:18px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
+  footer b { color:var(--ink-2); font-weight:600; }
+  .foot-cite { font-style:italic; }
+
+  @media (max-width:920px) {
+    .grid { grid-template-columns:1fr; }
+    .kpis { grid-template-columns:repeat(2,1fr); }
+    .detail-box { grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){ * { transition:none !important; } }
+</style>
+
+<header>
+  <div class="head-inner">
+    <div class="brand">
+      <span class="logo">Recoup<span class="dot">.</span></span>
+      <small>Collections Decision Copilot</small>
+    </div>
+    <span class="badge"><span class="pulse"></span>Synthetic portfolio</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="lede">
+    <h1>Every account gets a ranked action — and a reason you can defend.</h1>
+    <p>Recoup scores each debtor for promise-to-pay and actual payment, turns those
+      into a human-readable priority, picks the next best action inside a compliance
+      playbook, and routes field visits by recoverable value. Below is a live run over
+      a synthetic book of <span class="mono" id="acct-inline"></span> accounts.</p>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="grid">
+    <!-- Worklist -->
+    <section class="card" aria-label="Account worklist">
+      <div class="card-h">
+        <h2>Prioritized worklist</h2>
+        <span class="eyebrow">TOPSIS-ranked</span>
+      </div>
+      <div class="filters" id="filters">
+        <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
+        <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
+        <button class="chip" data-f="Medium" aria-pressed="false">Medium <span class="c-n" id="f-med"></span></button>
+        <button class="chip" data-f="Low" aria-pressed="false">Low <span class="c-n" id="f-low"></span></button>
+        <span class="spacer">click a row for the reasoning &amp; audit trail</span>
+      </div>
+      <div class="wl-scroll">
+        <table class="wl">
+          <thead>
+            <tr>
+              <th></th><th>Account</th><th>Segment</th><th>Priority</th>
+              <th class="r">P2P</th><th class="r">Pay prob.</th>
+              <th class="r">Past due</th><th class="r">Exp. recovery</th>
+              <th>Next best action</th>
+            </tr>
+          </thead>
+          <tbody id="wl-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Right rail -->
+    <div class="stack">
+      <section class="card">
+        <div class="card-h"><h2>Field routing</h2><span class="eyebrow">K-means · 2-opt</span></div>
+        <div class="map-legend" id="map-legend"></div>
+        <div class="map-wrap card-b" style="padding-top:6px;">
+          <canvas id="map" width="640" height="640" role="img"
+                  aria-label="Optimized field-collector routes over the portfolio geography"></canvas>
+          <div id="map-stats" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Model performance</h2><span class="eyebrow">Held-out</span></div>
+        <div class="card-b" id="metrics"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Next-best-action weighting</h2><span class="eyebrow">AHP</span></div>
+        <div class="card-b" id="ahp"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div>
+        <div class="card-b" id="compliance"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <p>Recoup is a working prototype of the three-layer decision-support framework in
+      <span class="foot-cite">Lappas &amp; Xanthopoulos, “Intelligent decision support for debt collection using
+      predictive learning and multi-criteria optimization,” Finance Research Open (2026)</span>.
+      Layer 1 <b>rule extraction</b> (K-means segments) · Layer 2 <b>prediction</b>
+      (Random Forest P2P/APP) · Layer 3 <b>optimization</b> (fuzzy priority, TOPSIS, AHP, routing).
+      All figures come from a synthetic portfolio — no real debtor data is used.</p>
+  </footer>
+</div>
+
+<script>window.RECOUP_DATA = {"summary": {"accounts": 5000, "total_past_due": 24304137.02, "total_expected_recovery": 2963615.28, "priority_breakdown": {"High": 367, "Medium": 637, "Low": 3996}, "segment_breakdown": {"self_cured": 923, "lazy_payer": 1986, "delinquent": 1447, "defaulter": 644}, "action_breakdown": {"sms_reminder": 3653, "email": 1105, "letter": 121, "agent_call": 117, "settlement_offer": 4}, "field_visits_planned": 90, "field_expected_recovery": 380090.73}, "model_metrics": {"label_promise_to_pay": {"auc": 0.9413, "accuracy": 0.8664, "f1": 0.9009, "n_test": 1250}, "label_actual_payment": {"auc": 0.9383, "accuracy": 0.8704, "f1": 0.8034, "n_test": 1250}}, "ahp_consistency_ratio": 0.008, "ahp_action_ranking": [["agent_call", 0.1659], ["sms_reminder", 0.1578], ["automated_call", 0.1549], ["settlement_offer", 0.1485], ["email", 0.1449], ["legal_escalation", 0.1374], ["letter", 0.0905]], "routes": [{"collector": "Collector-1", "num_stops": 27, "total_distance": 371.06, "expected_recovery": 116762.52, "stops": [{"seq": 1, "account_id": "ACC-01341", "geo_x": 36.98, "geo_y": 83.45, "expected_payment": 5178.51}, {"seq": 2, "account_id": "ACC-03836", "geo_x": 40.9, "geo_y": 94.87, "expected_payment": 4957.82}, {"seq": 3, "account_id": "ACC-00832", "geo_x": 30.86, "geo_y": 87.86, "expected_payment": 4635.35}, {"seq": 4, "account_id": "ACC-03904", "geo_x": 24.46, "geo_y": 86.28, "expected_payment": 4435.03}, {"seq": 5, "account_id": "ACC-02056", "geo_x": 22.11, "geo_y": 91.26, "expected_payment": 5030.29}, {"seq": 6, "account_id": "ACC-00877", "geo_x": 19.35, "geo_y": 74.57, "expected_payment": 4936.65}, {"seq": 7, "account_id": "ACC-03103", "geo_x": 19.88, "geo_y": 73.73, "expected_payment": 4787.37}, {"seq": 8, "account_id": "ACC-02397", "geo_x": 22.21, "geo_y": 71.1, "expected_payment": 4843.71}, {"seq": 9, "account_id": "ACC-00870", "geo_x": 37.24, "geo_y": 71.36, "expected_payment": 4885.05}, {"seq": 10, "account_id": "ACC-04080", "geo_x": 35.84, "geo_y": 81.35, "expected_payment": 4588.9}, {"seq": 11, "account_id": "ACC-03311", "geo_x": 46.93, "geo_y": 80.93, "expected_payment": 4035.76}, {"seq": 12, "account_id": "ACC-03741", "geo_x": 46.87, "geo_y": 71.46, "expected_payment": 3392.57}, {"seq": 13, "account_id": "ACC-00044", "geo_x": 49.69, "geo_y": 61.39, "expected_payment": 3543.68}, {"seq": 14, "account_id": "ACC-02245", "geo_x": 38.59, "geo_y": 65.87, "expected_payment": 3749.19}, {"seq": 15, "account_id": "ACC-01237", "geo_x": 28.08, "geo_y": 61.4, "expected_payment": 4149.14}, {"seq": 16, "account_id": "ACC-02665", "geo_x": 25.17, "geo_y": 68.16, "expected_payment": 4921.38}, {"seq": 17, "account_id": "ACC-01948", "geo_x": 19.98, "geo_y": 65.31, "expected_payment": 4867.93}, {"seq": 18, "account_id": "ACC-03432", "geo_x": 21.32, "geo_y": 54.66, "expected_payment": 5432.49}, {"seq": 19, "account_id": "ACC-00680", "geo_x": 14.7, "geo_y": 53.89, "expected_payment": 3615.74}, {"seq": 20, "account_id": "ACC-03189", "geo_x": 17.59, "geo_y": 62.47, "expected_payment": 3997.61}, {"seq": 21, "account_id": "ACC-03134", "geo_x": 19.83, "geo_y": 68.42, "expected_payment": 3958.45}, {"seq": 22, "account_id": "ACC-03218", "geo_x": 24.47, "geo_y": 73.05, "expected_payment": 3502.84}, {"seq": 23, "account_id": "ACC-02596", "geo_x": 24.83, "geo_y": 74.7, "expected_payment": 3997.78}, {"seq": 24, "account_id": "ACC-01797", "geo_x": 19.24, "geo_y": 82.18, "expected_payment": 4247.85}, {"seq": 25, "account_id": "ACC-01400", "geo_x": 9.41, "geo_y": 79.73, "expected_payment": 4059.92}, {"seq": 26, "account_id": "ACC-02048", "geo_x": 3.05, "geo_y": 97.13, "expected_payment": 3715.01}, {"seq": 27, "account_id": "ACC-04769", "geo_x": 11.16, "geo_y": 73.05, "expected_payment": 3296.5}]}, {"collector": "Collector-2", "num_stops": 41, "total_distance": 477.13, "expected_recovery": 169638.15, "stops": [{"seq": 1, "account_id": "ACC-01092", "geo_x": 86.46, "geo_y": 52.41, "expected_payment": 6213.64}, {"seq": 2, "account_id": "ACC-01940", "geo_x": 90.99, "geo_y": 50.31, "expected_payment": 5936.31}, {"seq": 3, "account_id": "ACC-00761", "geo_x": 92.32, "geo_y": 37.07, "expected_payment": 4359.71}, {"seq": 4, "account_id": "ACC-00099", "geo_x": 82.52, "geo_y": 57.37, "expected_payment": 3616.21}, {"seq": 5, "account_id": "ACC-01839", "geo_x": 75.89, "geo_y": 62.34, "expected_payment": 3747.32}, {"seq": 6, "account_id": "ACC-03937", "geo_x": 80.23, "geo_y": 64.52, "expected_payment": 4287.55}, {"seq": 7, "account_id": "ACC-03478", "geo_x": 78.8, "geo_y": 69.57, "expected_payment": 4122.87}, {"seq": 8, "account_id": "ACC-03397", "geo_x": 73.02, "geo_y": 69.36, "expected_payment": 4188.76}, {"seq": 9, "account_id": "ACC-03925", "geo_x": 69.19, "geo_y": 69.61, "expected_payment": 4669.68}, {"seq": 10, "account_id": "ACC-01188", "geo_x": 69.42, "geo_y": 67.08, "expected_payment": 4549.33}, {"seq": 11, "account_id": "ACC-01130", "geo_x": 66.57, "geo_y": 53.1, "expected_payment": 4091.15}, {"seq": 12, "account_id": "ACC-00941", "geo_x": 64.2, "geo_y": 57.03, "expected_payment": 3683.76}, {"seq": 13, "account_id": "ACC-04813", "geo_x": 60.01, "geo_y": 59.54, "expected_payment": 3584.65}, {"seq": 14, "account_id": "ACC-01339", "geo_x": 72.49, "geo_y": 66.79, "expected_payment": 3774.27}, {"seq": 15, "account_id": "ACC-03223", "geo_x": 65.58, "geo_y": 75.44, "expected_payment": 3793.26}, {"seq": 16, "account_id": "ACC-00691", "geo_x": 55.65, "geo_y": 79.33, "expected_payment": 3778.48}, {"seq": 17, "account_id": "ACC-04459", "geo_x": 60.03, "geo_y": 86.27, "expected_payment": 3536.88}, {"seq": 18, "account_id": "ACC-02126", "geo_x": 51.14, "geo_y": 85.73, "expected_payment": 3654.25}, {"seq": 19, "account_id": "ACC-01782", "geo_x": 51.44, "geo_y": 80.26, "expected_payment": 3867.93}, {"seq": 20, "account_id": "ACC-01886", "geo_x": 56.67, "geo_y": 79.22, "expected_payment": 4018.75}, {"seq": 21, "account_id": "ACC-02109", "geo_x": 55.12, "geo_y": 81.11, "expected_payment": 4739.48}, {"seq": 22, "account_id": "ACC-00255", "geo_x": 68.07, "geo_y": 90.35, "expected_payment": 4607.51}, {"seq": 23, "account_id": "ACC-01713", "geo_x": 58.13, "geo_y": 91.66, "expected_payment": 5156.98}, {"seq": 24, "account_id": "ACC-03118", "geo_x": 63.23, "geo_y": 100.0, "expected_payment": 5334.63}, {"seq": 25, "account_id": "ACC-03060", "geo_x": 64.85, "geo_y": 94.59, "expected_payment": 3903.54}, {"seq": 26, "account_id": "ACC-02180", "geo_x": 68.8, "geo_y": 93.01, "expected_payment": 3819.2}, {"seq": 27, "account_id": "ACC-02251", "geo_x": 66.78, "geo_y": 91.27, "expected_payment": 3383.41}, {"seq": 28, "account_id": "ACC-00717", "geo_x": 72.96, "geo_y": 87.83, "expected_payment": 3403.99}, {"seq": 29, "account_id": "ACC-04044", "geo_x": 71.19, "geo_y": 82.01, "expected_payment": 3579.83}, {"seq": 30, "account_id": "ACC-02234", "geo_x": 76.66, "geo_y": 77.81, "expected_payment": 3471.12}, {"seq": 31, "account_id": "ACC-03672", "geo_x": 77.39, "geo_y": 78.34, "expected_payment": 3494.25}, {"seq": 32, "account_id": "ACC-02868", "geo_x": 78.53, "geo_y": 79.42, "expected_payment": 3830.06}, {"seq": 33, "account_id": "ACC-04992", "geo_x": 74.02, "geo_y": 75.98, "expected_payment": 4305.99}, {"seq": 34, "account_id": "ACC-00985", "geo_x": 86.45, "geo_y": 78.58, "expected_payment": 4427.94}, {"seq": 35, "account_id": "ACC-01739", "geo_x": 96.06, "geo_y": 82.68, "expected_payment": 4457.68}, {"seq": 36, "account_id": "ACC-03738", "geo_x": 98.93, "geo_y": 95.64, "expected_payment": 4764.19}, {"seq": 37, "account_id": "ACC-04586", "geo_x": 84.1, "geo_y": 92.01, "expected_payment": 4729.56}, {"seq": 38, "account_id": "ACC-04920", "geo_x": 92.4, "geo_y": 91.99, "expected_payment": 4297.66}, {"seq": 39, "account_id": "ACC-02824", "geo_x": 91.95, "geo_y": 95.25, "expected_payment": 3297.22}, {"seq": 40, "account_id": "ACC-03314", "geo_x": 93.24, "geo_y": 79.18, "expected_payment": 3566.49}, {"seq": 41, "account_id": "ACC-03335", "geo_x": 87.78, "geo_y": 79.61, "expected_payment": 3592.66}]}, {"collector": "Collector-3", "num_stops": 22, "total_distance": 351.49, "expected_recovery": 93690.06, "stops": [{"seq": 1, "account_id": "ACC-02318", "geo_x": 71.83, "geo_y": 10.36, "expected_payment": 5564.82}, {"seq": 2, "account_id": "ACC-01586", "geo_x": 74.53, "geo_y": 13.94, "expected_payment": 4967.49}, {"seq": 3, "account_id": "ACC-02170", "geo_x": 66.95, "geo_y": 22.91, "expected_payment": 5127.52}, {"seq": 4, "account_id": "ACC-01607", "geo_x": 84.27, "geo_y": 24.62, "expected_payment": 3855.23}, {"seq": 5, "account_id": "ACC-00366", "geo_x": 81.02, "geo_y": 20.75, "expected_payment": 3775.43}, {"seq": 6, "account_id": "ACC-00194", "geo_x": 80.01, "geo_y": 23.15, "expected_payment": 3297.16}, {"seq": 7, "account_id": "ACC-03604", "geo_x": 52.64, "geo_y": 8.08, "expected_payment": 3282.89}, {"seq": 8, "account_id": "ACC-02428", "geo_x": 56.17, "geo_y": 10.43, "expected_payment": 4680.9}, {"seq": 9, "account_id": "ACC-00222", "geo_x": 56.45, "geo_y": 21.9, "expected_payment": 4260.4}, {"seq": 10, "account_id": "ACC-01136", "geo_x": 20.65, "geo_y": 12.33, "expected_payment": 4519.88}, {"seq": 11, "account_id": "ACC-01829", "geo_x": 9.72, "geo_y": 13.54, "expected_payment": 4479.89}, {"seq": 12, "account_id": "ACC-00187", "geo_x": 8.26, "geo_y": 14.95, "expected_payment": 3892.77}, {"seq": 13, "account_id": "ACC-03458", "geo_x": 0.0, "geo_y": 22.33, "expected_payment": 3704.55}, {"seq": 14, "account_id": "ACC-02737", "geo_x": 9.47, "geo_y": 20.4, "expected_payment": 4747.65}, {"seq": 15, "account_id": "ACC-00175", "geo_x": 28.19, "geo_y": 21.95, "expected_payment": 4253.87}, {"seq": 16, "account_id": "ACC-04561", "geo_x": 28.83, "geo_y": 29.29, "expected_payment": 4202.75}, {"seq": 17, "account_id": "ACC-04560", "geo_x": 36.34, "geo_y": 28.3, "expected_payment": 4871.25}, {"seq": 18, "account_id": "ACC-00940", "geo_x": 39.12, "geo_y": 44.65, "expected_payment": 4988.17}, {"seq": 19, "account_id": "ACC-01132", "geo_x": 31.11, "geo_y": 39.3, "expected_payment": 4295.57}, {"seq": 20, "account_id": "ACC-02414", "geo_x": 31.68, "geo_y": 37.11, "expected_payment": 3753.79}, {"seq": 21, "account_id": "ACC-01410", "geo_x": 32.35, "geo_y": 32.77, "expected_payment": 3756.24}, {"seq": 22, "account_id": "ACC-02578", "geo_x": 39.3, "geo_y": 21.83, "expected_payment": 3411.84}]}], "worklist": [{"account_id": "ACC-01092", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9907, "prob_actual_payment": 0.9744, "past_due_amount": 6546.33, "next_installment_amount": 6376.89, "expected_payment": 6213.64, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.8285, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 19.0, "geo_x": 86.46, "geo_y": 52.41, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9744, "expected_payment_norm": 1.0, "past_due_norm": 0.3931}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 1}, {"account_id": "ACC-01341", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.982, "prob_actual_payment": 0.9724, "past_due_amount": 2753.82, "next_installment_amount": 5325.37, "expected_payment": 5178.51, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.8262, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 9.0, "geo_x": 36.98, "geo_y": 83.45, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9724, "expected_payment_norm": 1.0, "past_due_norm": 0.1644}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 2}, {"account_id": "ACC-02318", "region": "South", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9735, "prob_actual_payment": 0.9127, "past_due_amount": 11085.86, "next_installment_amount": 6097.01, "expected_payment": 5564.82, "priority_score": 84.9, "priority_level": "High", "topsis_score": 0.7902, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 11.0, "geo_x": 71.83, "geo_y": 10.36, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9127, "expected_payment_norm": 1.0, "past_due_norm": 0.6668}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 3}, {"account_id": "ACC-03432", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9851, "prob_actual_payment": 0.8228, "past_due_amount": 5133.47, "next_installment_amount": 6602.25, "expected_payment": 5432.49, "priority_score": 83.9, "priority_level": "High", "topsis_score": 0.7884, "next_best_action": "letter", "preferred_channel": "letter", "best_contact_hour": 16.0, "geo_x": 21.32, "geo_y": 54.66, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.8228, "expected_payment_norm": 1.0, "past_due_norm": 0.3079}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (letter)", "human_review_required": true}, "rank": 4}, {"account_id": "ACC-01940", "region": "South", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9903, "prob_actual_payment": 0.931, "past_due_amount": 11194.26, "next_installment_amount": 6376.49, "expected_payment": 5936.31, "priority_score": 85.0, "priority_level": "High", "topsis_score": 0.7879, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 17.0, "geo_x": 90.99, "geo_y": 50.31, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.931, "expected_payment_norm": 1.0, "past_due_norm": 0.6733}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 5}, {"account_id": "ACC-04560", "region": "West", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9843, "prob_actual_payment": 0.9764, "past_due_amount": 1721.72, "next_installment_amount": 4989.19, "expected_payment": 4871.25, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7824, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 17.0, "geo_x": 36.34, "geo_y": 28.3, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9764, "expected_payment_norm": 1.0, "past_due_norm": 0.1021}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 6}, {"account_id": "ACC-02397", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.8405, "prob_actual_payment": 0.9233, "past_due_amount": 3824.76, "next_installment_amount": 5245.89, "expected_payment": 4843.71, "priority_score": 85.0, "priority_level": "High", "topsis_score": 0.7671, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 9.0, "geo_x": 22.21, "geo_y": 71.1, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9233, "expected_payment_norm": 1.0, "past_due_norm": 0.2289}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 7}, {"account_id": "ACC-00255", "region": "East", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9985, "prob_actual_payment": 0.968, "past_due_amount": 7107.84, "next_installment_amount": 4759.82, "expected_payment": 4607.51, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7582, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 10.0, "geo_x": 68.07, "geo_y": 90.35, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.968, "expected_payment_norm": 1.0, "past_due_norm": 0.4269}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 8}, {"account_id": "ACC-01713", "region": "North", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9847, "prob_actual_payment": 0.964, "past_due_amount": 8889.38, "next_installment_amount": 5349.6, "expected_payment": 5156.98, "priority_score": 85.2, "priority_level": "High", "topsis_score": 0.7515, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 14.0, "geo_x": 58.13, "geo_y": 91.66, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.964, "expected_payment_norm": 1.0, "past_due_norm": 0.5343}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 9}, {"account_id": "ACC-00870", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9825, "prob_actual_payment": 0.9883, "past_due_amount": 1077.81, "next_installment_amount": 4942.76, "expected_payment": 4885.05, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7514, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 16.0, "geo_x": 37.24, "geo_y": 71.36, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9883, "expected_payment_norm": 1.0, "past_due_norm": 0.0633}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 10}, {"account_id": "ACC-01586", "region": "South", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9671, "prob_actual_payment": 0.9843, "past_due_amount": 5316.47, "next_installment_amount": 5046.52, "expected_payment": 4967.49, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7512, "next_best_action": "letter", "preferred_channel": "letter", "best_contact_hour": 11.0, "geo_x": 74.53, "geo_y": 13.94, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9843, "expected_payment_norm": 1.0, "past_due_norm": 0.3189}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (letter)", "human_review_required": true}, "rank": 11}, {"account_id": "ACC-02665", "region": "North", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9669, "prob_actual_payment": 0.8026, "past_due_amount": 8080.51, "next_installment_amount": 6132.05, "expected_payment": 4921.38, "priority_score": 83.6, "priority_level": "High", "topsis_score": 0.7503, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 19.0, "geo_x": 25.17, "geo_y": 68.16, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.8026, "expected_payment_norm": 1.0, "past_due_norm": 0.4856}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 12}, {"account_id": "ACC-03836", "region": "North", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.927, "prob_actual_payment": 0.9117, "past_due_amount": 9301.38, "next_installment_amount": 5437.93, "expected_payment": 4957.82, "priority_score": 84.9, "priority_level": "High", "topsis_score": 0.7413, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 14.0, "geo_x": 40.9, "geo_y": 94.87, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9117, "expected_payment_norm": 1.0, "past_due_norm": 0.5592}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 13}, {"account_id": "ACC-04586", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9694, "prob_actual_payment": 0.9872, "past_due_amount": 1514.55, "next_installment_amount": 4790.8, "expected_payment": 4729.56, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7408, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 11.0, "geo_x": 84.1, "geo_y": 92.01, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9872, "expected_payment_norm": 1.0, "past_due_norm": 0.0896}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 14}, {"account_id": "ACC-00832", "region": "North", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.987, "prob_actual_payment": 0.9583, "past_due_amount": 7798.91, "next_installment_amount": 4836.99, "expected_payment": 4635.35, "priority_score": 85.2, "priority_level": "High", "topsis_score": 0.7388, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 18.0, "geo_x": 30.86, "geo_y": 87.86, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9583, "expected_payment_norm": 1.0, "past_due_norm": 0.4686}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 15}, {"account_id": "ACC-03118", "region": "East", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9947, "prob_actual_payment": 0.9671, "past_due_amount": 9600.58, "next_installment_amount": 5516.37, "expected_payment": 5334.63, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.738, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 11.0, "geo_x": 63.23, "geo_y": 100.0, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9671, "expected_payment_norm": 1.0, "past_due_norm": 0.5772}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 16}, {"account_id": "ACC-00877", "region": "North", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9177, "prob_actual_payment": 0.9306, "past_due_amount": 8831.87, "next_installment_amount": 5304.55, "expected_payment": 4936.65, "priority_score": 85.0, "priority_level": "High", "topsis_score": 0.7372, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 14.0, "geo_x": 19.35, "geo_y": 74.57, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9306, "expected_payment_norm": 1.0, "past_due_norm": 0.5309}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 17}, {"account_id": "ACC-02170", "region": "South", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9312, "prob_actual_payment": 0.9587, "past_due_amount": 11481.5, "next_installment_amount": 5348.59, "expected_payment": 5127.52, "priority_score": 85.2, "priority_level": "High", "topsis_score": 0.7336, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 10.0, "geo_x": 66.95, "geo_y": 22.91, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9587, "expected_payment_norm": 1.0, "past_due_norm": 0.6906}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 18}, {"account_id": "ACC-00940", "region": "West", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9895, "prob_actual_payment": 0.9085, "past_due_amount": 9907.03, "next_installment_amount": 5490.32, "expected_payment": 4988.17, "priority_score": 84.9, "priority_level": "High", "topsis_score": 0.7304, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 19.0, "geo_x": 39.12, "geo_y": 44.65, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9085, "expected_payment_norm": 1.0, "past_due_norm": 0.5957}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": true}, "rank": 19}, {"account_id": "ACC-01948", "region": "North", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9658, "prob_actual_payment": 0.9241, "past_due_amount": 10710.51, "next_installment_amount": 5267.96, "expected_payment": 4867.93, "priority_score": 85.0, "priority_level": "High", "topsis_score": 0.7296, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 9.0, "geo_x": 19.98, "geo_y": 65.31, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9241, "expected_payment_norm": 1.0, "past_due_norm": 0.6442}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 20}, {"account_id": "ACC-01188", "region": "East", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9992, "prob_actual_payment": 0.8884, "past_due_amount": 8124.6, "next_installment_amount": 5120.61, "expected_payment": 4549.33, "priority_score": 84.7, "priority_level": "High", "topsis_score": 0.7282, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 15.0, "geo_x": 69.42, "geo_y": 67.08, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.8884, "expected_payment_norm": 1.0, "past_due_norm": 0.4882}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 21}, {"account_id": "ACC-02737", "region": "West", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9988, "prob_actual_payment": 0.9761, "past_due_amount": 8862.38, "next_installment_amount": 4863.77, "expected_payment": 4747.65, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7228, "next_best_action": "letter", "preferred_channel": "letter", "best_contact_hour": 10.0, "geo_x": 9.47, "geo_y": 20.4, "reasons": ["high probability of payment on a high expected value", "likely to pay and carrying a large past-due balance"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9761, "expected_payment_norm": 1.0, "past_due_norm": 0.5327}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (letter)", "human_review_required": true}, "rank": 22}, {"account_id": "ACC-02428", "region": "South", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9016, "prob_actual_payment": 0.8238, "past_due_amount": 7010.31, "next_installment_amount": 5682.35, "expected_payment": 4680.9, "priority_score": 83.9, "priority_level": "High", "topsis_score": 0.7218, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 15.0, "geo_x": 56.17, "geo_y": 10.43, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.8238, "expected_payment_norm": 1.0, "past_due_norm": 0.421}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 23}, {"account_id": "ACC-00222", "region": "South", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9781, "prob_actual_payment": 0.9595, "past_due_amount": 2945.61, "next_installment_amount": 4440.44, "expected_payment": 4260.4, "priority_score": 85.2, "priority_level": "High", "topsis_score": 0.7177, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 19.0, "geo_x": 56.45, "geo_y": 21.9, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9595, "expected_payment_norm": 1.0, "past_due_norm": 0.1759}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 24}, {"account_id": "ACC-03937", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.8758, "prob_actual_payment": 0.9665, "past_due_amount": 2197.18, "next_installment_amount": 4436.35, "expected_payment": 4287.55, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7173, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 10.0, "geo_x": 80.23, "geo_y": 64.52, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9665, "expected_payment_norm": 1.0, "past_due_norm": 0.1308}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": true}, "rank": 25}, {"account_id": "ACC-03311", "region": "North", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9887, "prob_actual_payment": 0.9813, "past_due_amount": 2408.34, "next_installment_amount": 4112.46, "expected_payment": 4035.76, "priority_score": 85.3, "priority_level": "High", "topsis_score": 0.7077, "next_best_action": "agent_call", "preferred_channel": "call", "best_contact_hour": 9.0, "geo_x": 46.93, "geo_y": 80.93, "reasons": ["high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9813, "expected_payment_norm": 1.0, "past_due_norm": 0.1435}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (call)", "human_review_required": true}, "rank": 26}, {"account_id": "ACC-01845", "region": "South", "segment": "self_cured", "current_bucket": 2, "prob_promise_to_pay": 0.9791, "prob_actual_payment": 0.5882, "past_due_amount": 12391.41, "next_installment_amount": 5063.1, "expected_payment": 2978.16, "priority_score": 57.7, "priority_level": "Medium", "topsis_score": 0.5189, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 19.0, "geo_x": 55.58, "geo_y": 30.7, "reasons": ["moderate payment odds but significant arrears", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.5882, "expected_payment_norm": 0.8802, "past_due_norm": 0.7455}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": false}, "rank": 210}, {"account_id": "ACC-01966", "region": "North", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9927, "prob_actual_payment": 0.9945, "past_due_amount": 1504.22, "next_installment_amount": 2045.3, "expected_payment": 2033.98, "priority_score": 57.4, "priority_level": "Medium", "topsis_score": 0.4908, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 19.0, "geo_x": 9.03, "geo_y": 61.22, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9945, "expected_payment_norm": 0.6011, "past_due_norm": 0.089}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": false}, "rank": 292}, {"account_id": "ACC-00730", "region": "West", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9774, "prob_actual_payment": 0.9959, "past_due_amount": 862.99, "next_installment_amount": 2086.84, "expected_payment": 2078.34, "priority_score": 58.4, "priority_level": "Medium", "topsis_score": 0.49, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 11.0, "geo_x": 14.57, "geo_y": 28.36, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9959, "expected_payment_norm": 0.6142, "past_due_norm": 0.0503}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 296}, {"account_id": "ACC-02717", "region": "South", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9616, "prob_actual_payment": 0.9893, "past_due_amount": 1650.61, "next_installment_amount": 2131.51, "expected_payment": 2108.63, "priority_score": 59.2, "priority_level": "Medium", "topsis_score": 0.4871, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 9.0, "geo_x": 64.38, "geo_y": 30.92, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9893, "expected_payment_norm": 0.6232, "past_due_norm": 0.0978}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": false}, "rank": 308}, {"account_id": "ACC-01432", "region": "West", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9801, "prob_actual_payment": 0.9888, "past_due_amount": 1118.62, "next_installment_amount": 2014.59, "expected_payment": 1991.96, "priority_score": 56.5, "priority_level": "Medium", "topsis_score": 0.4862, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 10.0, "geo_x": 22.07, "geo_y": 13.74, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9888, "expected_payment_norm": 0.5887, "past_due_norm": 0.0658}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 310}, {"account_id": "ACC-02970", "region": "East", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9989, "prob_actual_payment": 0.9916, "past_due_amount": 3353.26, "next_installment_amount": 2104.32, "expected_payment": 2086.69, "priority_score": 58.6, "priority_level": "Medium", "topsis_score": 0.4861, "next_best_action": "sms_reminder", "preferred_channel": "call", "best_contact_hour": 18.0, "geo_x": 74.07, "geo_y": 64.37, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9916, "expected_payment_norm": 0.6167, "past_due_norm": 0.2005}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 312}, {"account_id": "ACC-00220", "region": "South", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9986, "prob_actual_payment": 0.9922, "past_due_amount": 2590.39, "next_installment_amount": 2101.83, "expected_payment": 2085.35, "priority_score": 58.6, "priority_level": "Medium", "topsis_score": 0.4847, "next_best_action": "letter", "preferred_channel": "letter", "best_contact_hour": 14.0, "geo_x": 85.29, "geo_y": 29.12, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9922, "expected_payment_norm": 0.6163, "past_due_norm": 0.1545}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (letter)", "human_review_required": false}, "rank": 317}, {"account_id": "ACC-03020", "region": "East", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9949, "prob_actual_payment": 0.9534, "past_due_amount": 1253.73, "next_installment_amount": 2118.49, "expected_payment": 2019.86, "priority_score": 57.1, "priority_level": "Medium", "topsis_score": 0.4843, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 9.0, "geo_x": 73.98, "geo_y": 89.38, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9534, "expected_payment_norm": 0.597, "past_due_norm": 0.0739}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 320}, {"account_id": "ACC-03509", "region": "West", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9988, "prob_actual_payment": 0.9947, "past_due_amount": 2263.39, "next_installment_amount": 2023.19, "expected_payment": 2012.56, "priority_score": 56.9, "priority_level": "Medium", "topsis_score": 0.4843, "next_best_action": "letter", "preferred_channel": "letter", "best_contact_hour": 14.0, "geo_x": 8.01, "geo_y": 15.1, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9947, "expected_payment_norm": 0.5948, "past_due_norm": 0.1348}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (letter)", "human_review_required": false}, "rank": 321}, {"account_id": "ACC-03748", "region": "South", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9937, "prob_actual_payment": 0.989, "past_due_amount": 1972.64, "next_installment_amount": 2078.81, "expected_payment": 2056.05, "priority_score": 57.9, "priority_level": "Medium", "topsis_score": 0.4842, "next_best_action": "sms_reminder", "preferred_channel": "call", "best_contact_hour": 14.0, "geo_x": 86.82, "geo_y": 21.33, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.989, "expected_payment_norm": 0.6077, "past_due_norm": 0.1173}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 322}, {"account_id": "ACC-04571", "region": "South", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9963, "prob_actual_payment": 0.9975, "past_due_amount": 1133.53, "next_installment_amount": 2033.81, "expected_payment": 2028.79, "priority_score": 57.3, "priority_level": "Medium", "topsis_score": 0.4839, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 18.0, "geo_x": 66.4, "geo_y": 19.22, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9975, "expected_payment_norm": 0.5996, "past_due_norm": 0.0667}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 326}, {"account_id": "ACC-02611", "region": "East", "segment": "self_cured", "current_bucket": 1, "prob_promise_to_pay": 0.9989, "prob_actual_payment": 0.9838, "past_due_amount": 2565.41, "next_installment_amount": 2077.32, "expected_payment": 2043.6, "priority_score": 57.6, "priority_level": "Medium", "topsis_score": 0.4832, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 14.0, "geo_x": 79.34, "geo_y": 86.38, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9838, "expected_payment_norm": 0.604, "past_due_norm": 0.153}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 328}, {"account_id": "ACC-01124", "region": "South", "segment": "lazy_payer", "current_bucket": 1, "prob_promise_to_pay": 0.9737, "prob_actual_payment": 0.9615, "past_due_amount": 3691.51, "next_installment_amount": 2194.18, "expected_payment": 2109.66, "priority_score": 59.2, "priority_level": "Medium", "topsis_score": 0.4828, "next_best_action": "sms_reminder", "preferred_channel": "call", "best_contact_hour": 9.0, "geo_x": 51.07, "geo_y": 24.61, "reasons": ["likely to pay a moderate recoverable amount", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9615, "expected_payment_norm": 0.6235, "past_due_norm": 0.2209}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 330}, {"account_id": "ACC-04886", "region": "South", "segment": "delinquent", "current_bucket": 0, "prob_promise_to_pay": 0.159, "prob_actual_payment": 0.5996, "past_due_amount": 1899.52, "next_installment_amount": 3623.08, "expected_payment": 2172.33, "priority_score": 58.1, "priority_level": "Medium", "topsis_score": 0.4814, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 14.0, "geo_x": 72.17, "geo_y": 23.82, "reasons": ["moderate payment odds and moderate recoverable value", "high probability of payment on a high expected value"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.5996, "expected_payment_norm": 0.642, "past_due_norm": 0.1129}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 334}, {"account_id": "ACC-00092", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.992, "prob_actual_payment": 0.9987, "past_due_amount": 317.98, "next_installment_amount": 1014.13, "expected_payment": 1012.85, "priority_score": 33.5, "priority_level": "Low", "topsis_score": 0.418, "next_best_action": "sms_reminder", "preferred_channel": "letter", "best_contact_hour": 14.0, "geo_x": 83.19, "geo_y": 66.94, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9987, "expected_payment_norm": 0.2993, "past_due_norm": 0.0175}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 731}, {"account_id": "ACC-00917", "region": "North", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9831, "prob_actual_payment": 0.9931, "past_due_amount": 458.46, "next_installment_amount": 1008.52, "expected_payment": 1001.61, "priority_score": 33.2, "priority_level": "Low", "topsis_score": 0.4169, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 15.0, "geo_x": 19.93, "geo_y": 99.36, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9931, "expected_payment_norm": 0.296, "past_due_norm": 0.026}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 743}, {"account_id": "ACC-00034", "region": "North", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9996, "prob_actual_payment": 0.9897, "past_due_amount": 965.0, "next_installment_amount": 1047.43, "expected_payment": 1036.63, "priority_score": 34.3, "priority_level": "Low", "topsis_score": 0.4163, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 17.0, "geo_x": 31.54, "geo_y": 69.55, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9897, "expected_payment_norm": 0.3064, "past_due_norm": 0.0565}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 747}, {"account_id": "ACC-02462", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9886, "prob_actual_payment": 0.9681, "past_due_amount": 376.07, "next_installment_amount": 1074.37, "expected_payment": 1040.12, "priority_score": 34.4, "priority_level": "Low", "topsis_score": 0.4156, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 15.0, "geo_x": 78.4, "geo_y": 66.97, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9681, "expected_payment_norm": 0.3074, "past_due_norm": 0.021}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 754}, {"account_id": "ACC-01243", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9615, "prob_actual_payment": 0.9836, "past_due_amount": 1089.12, "next_installment_amount": 1038.22, "expected_payment": 1021.14, "priority_score": 33.8, "priority_level": "Low", "topsis_score": 0.4152, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 9.0, "geo_x": 27.23, "geo_y": 79.45, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9836, "expected_payment_norm": 0.3018, "past_due_norm": 0.064}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 760}, {"account_id": "ACC-00528", "region": "West", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9998, "prob_actual_payment": 0.9828, "past_due_amount": 668.07, "next_installment_amount": 1036.17, "expected_payment": 1018.36, "priority_score": 33.7, "priority_level": "Low", "topsis_score": 0.4149, "next_best_action": "email", "preferred_channel": "email", "best_contact_hour": 17.0, "geo_x": 12.25, "geo_y": 8.94, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9828, "expected_payment_norm": 0.301, "past_due_norm": 0.0386}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (email)", "human_review_required": false}, "rank": 764}, {"account_id": "ACC-04188", "region": "South", "segment": "self_cured", "current_bucket": 0, "prob_promise_to_pay": 0.9729, "prob_actual_payment": 0.9932, "past_due_amount": 855.98, "next_installment_amount": 1035.43, "expected_payment": 1028.35, "priority_score": 34.1, "priority_level": "Low", "topsis_score": 0.4144, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 18.0, "geo_x": 78.47, "geo_y": 10.44, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9932, "expected_payment_norm": 0.3039, "past_due_norm": 0.0499}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 768}, {"account_id": "ACC-01348", "region": "North", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9947, "prob_actual_payment": 0.9492, "past_due_amount": 581.67, "next_installment_amount": 1084.39, "expected_payment": 1029.26, "priority_score": 34.1, "priority_level": "Low", "topsis_score": 0.4142, "next_best_action": "sms_reminder", "preferred_channel": "call", "best_contact_hour": 11.0, "geo_x": 29.42, "geo_y": 81.5, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9492, "expected_payment_norm": 0.3042, "past_due_norm": 0.0334}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 770}, {"account_id": "ACC-04904", "region": "East", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9985, "prob_actual_payment": 0.9442, "past_due_amount": 847.97, "next_installment_amount": 1109.43, "expected_payment": 1047.52, "priority_score": 34.7, "priority_level": "Low", "topsis_score": 0.4136, "next_best_action": "sms_reminder", "preferred_channel": "sms", "best_contact_hour": 14.0, "geo_x": 88.21, "geo_y": 91.34, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9442, "expected_payment_norm": 0.3096, "past_due_norm": 0.0494}, "action_from": "AHP x compliance playbook", "action_rationale": "reachable on preferred channel (sms)", "human_review_required": false}, "rank": 775}, {"account_id": "ACC-00665", "region": "South", "segment": "lazy_payer", "current_bucket": 0, "prob_promise_to_pay": 0.9963, "prob_actual_payment": 0.9939, "past_due_amount": 471.55, "next_installment_amount": 958.27, "expected_payment": 952.46, "priority_score": 31.3, "priority_level": "Low", "topsis_score": 0.4132, "next_best_action": "sms_reminder", "preferred_channel": "letter", "best_contact_hour": 19.0, "geo_x": 56.78, "geo_y": 12.37, "reasons": ["very likely to pay but low recoverable value; a low-touch reminder suffices", "likely to pay a moderate recoverable amount"], "audit": {"model_p2p": "RandomForest(200,d12)", "model_app": "RandomForest(200,d12)", "fuzzy_inputs": {"prob_actual_payment": 0.9939, "expected_payment_norm": 0.2815, "past_due_norm": 0.0267}, "action_from": "AHP x compliance playbook", "action_rationale": "AHP-preferred action within compliance playbook", "human_review_required": false}, "rank": 782}]};</script>
+<script>
+(function(){
+  const D = window.RECOUP_DATA;
+  const money = n => "$" + Math.round(n).toLocaleString("en-US");
+  const moneyK = n => n>=1e6 ? "$"+(n/1e6).toFixed(2)+"M" : n>=1e3 ? "$"+(n/1e3).toFixed(0)+"k" : "$"+Math.round(n);
+  const pct = x => Math.round(x*100) + "%";
+  const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
+
+  // ---- inline count + KPIs ----
+  const s = D.summary;
+  document.getElementById("acct-inline").textContent = s.accounts.toLocaleString();
+  const kpiDefs = [
+    {label:"Accounts scored", val:s.accounts.toLocaleString(), sub:"full portfolio", cls:""},
+    {label:"Total past due", val:moneyK(s.total_past_due), sub:"outstanding arrears", cls:""},
+    {label:"Expected recovery", val:moneyK(s.total_expected_recovery), sub:"prob-weighted", cls:""},
+    {label:"High priority", val:s.priority_breakdown.High.toLocaleString(), sub:"need attention now", cls:"crit"},
+    {label:"Field visits", val:s.field_visits_planned, sub:moneyK(s.field_expected_recovery)+" routed", cls:"warn"},
+  ];
+  const kpiWrap = document.getElementById("kpis");
+  kpiDefs.forEach(k=>{
+    const c = el("div","kpi"+(k.cls?" "+k.cls:""));
+    c.append(el("div","k-label",k.label), el("div","k-val",k.val), el("div","k-sub",k.sub));
+    kpiWrap.append(c);
+  });
+
+  // ---- worklist ----
+  const wl = D.worklist;
+  const counts = {All:wl.length, High:0, Medium:0, Low:0};
+  wl.forEach(w=>counts[w.priority_level]++);
+  document.getElementById("f-all").textContent = counts.All;
+  document.getElementById("f-high").textContent = counts.High;
+  document.getElementById("f-med").textContent = counts.Medium;
+  document.getElementById("f-low").textContent = counts.Low;
+
+  const body = document.getElementById("wl-body");
+  const prettyAction = a => a.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
+  let filter = "All";
+
+  function render(){
+    body.innerHTML = "";
+    wl.filter(w=>filter==="All"||w.priority_level===filter).forEach(w=>{
+      const tr = el("tr","row"); tr.dataset.id = w.account_id;
+      const seg = w.segment;
+      tr.innerHTML = `
+        <td><span class="caret">▶</span></td>
+        <td class="acct">${w.account_id}<span class="rgn">${w.region||"—"}</span></td>
+        <td><span class="seg ${seg}">${seg.replace(/_/g," ")}</span></td>
+        <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
+        <td class="r"><span class="num">${pct(w.prob_promise_to_pay)}</span></td>
+        <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
+        <td class="r"><span class="money">${money(w.past_due_amount)}</span></td>
+        <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
+        <td><span class="action ${w.next_best_action}"><span class="ic"></span>${prettyAction(w.next_best_action)}</span></td>`;
+      const det = el("tr","detail"); det.style.display="none";
+      const td = el("td"); td.colSpan = 9;
+      const rev = w.audit.human_review_required;
+      td.innerHTML = `
+        <div class="detail-box">
+          <div>
+            <h4>Why this priority &amp; action</h4>
+            <ul class="why-list">
+              ${w.reasons.map(r=>`<li>${r}</li>`).join("")}
+              <li>${w.audit.action_rationale}</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Audit trail</h4>
+            <div class="audit">
+              <div class="kv"><span>P2P model</span><span>${w.audit.model_p2p}</span></div>
+              <div class="kv"><span>Payment model</span><span>${w.audit.model_app}</span></div>
+              <div class="kv"><span>Fuzzy · pay prob.</span><span>${w.audit.fuzzy_inputs.prob_actual_payment}</span></div>
+              <div class="kv"><span>Fuzzy · exp. (norm)</span><span>${w.audit.fuzzy_inputs.expected_payment_norm}</span></div>
+              <div class="kv"><span>Fuzzy · past due (norm)</span><span>${w.audit.fuzzy_inputs.past_due_norm}</span></div>
+              <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
+              <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
+            </div>
+            <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
+          </div>
+        </div>`;
+      det.append(td);
+      tr.addEventListener("click", ()=>{
+        const open = tr.classList.toggle("open");
+        det.style.display = open ? "table-row" : "none";
+      });
+      body.append(tr, det);
+    });
+  }
+  render();
+
+  document.querySelectorAll("#filters .chip").forEach(ch=>{
+    ch.addEventListener("click", ()=>{
+      document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+      ch.setAttribute("aria-pressed","true");
+      filter = ch.dataset.f; render();
+    });
+  });
+
+  // ---- routing map ----
+  const routeColors = ["#0E8A6E","#B4431D","#3B6EA5","#9A6B12","#6E4FA0"];
+  function accentFor(i){ return routeColors[i%routeColors.length]; }
+  const legend = document.getElementById("map-legend");
+  D.routes.forEach((rt,i)=>{
+    const lg = el("div","lg");
+    const sw = el("span","sw"); sw.style.background = accentFor(i);
+    lg.append(sw, el("span",null,`${rt.collector} · ${rt.num_stops} stops`));
+    legend.append(lg);
+  });
+  const mapStats = document.getElementById("map-stats");
+  D.routes.forEach((rt,i)=>{
+    const row = el("div","map-stat");
+    row.innerHTML = `<span>${rt.collector}</span><span class="mono">${moneyK(rt.expected_recovery)} · ${rt.total_distance} dist</span>`;
+    mapStats.append(row);
+  });
+
+  function drawMap(){
+    const cv = document.getElementById("map");
+    const dpr = window.devicePixelRatio||1;
+    const size = cv.clientWidth;
+    cv.width = size*dpr; cv.height = size*dpr;
+    const ctx = cv.getContext("2d");
+    ctx.scale(dpr,dpr);
+    const W = size, H = size, pad = 18;
+    const css = getComputedStyle(document.documentElement);
+    const grid = css.getPropertyValue("--border").trim();
+    const inkFaint = css.getPropertyValue("--ink-3").trim();
+    ctx.clearRect(0,0,W,H);
+    // grid
+    ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.globalAlpha=.5;
+    for(let g=0; g<=10; g++){
+      const p = pad + (W-2*pad)*g/10;
+      ctx.beginPath(); ctx.moveTo(p,pad); ctx.lineTo(p,H-pad); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad,p); ctx.lineTo(W-pad,p); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    const X = x => pad + (W-2*pad)*(x/100);
+    const Y = y => H-pad - (H-2*pad)*(y/100);
+    // value scale for dot size
+    let maxv=1; D.routes.forEach(rt=>rt.stops.forEach(s=>maxv=Math.max(maxv,s.expected_payment)));
+    D.routes.forEach((rt,i)=>{
+      const col = accentFor(i);
+      // route lines
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.globalAlpha=.55;
+      ctx.beginPath();
+      rt.stops.forEach((s,j)=>{ const px=X(s.geo_x), py=Y(s.geo_y); j?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+      ctx.stroke(); ctx.globalAlpha=1;
+      // stops
+      rt.stops.forEach(s=>{
+        const px=X(s.geo_x), py=Y(s.geo_y);
+        const r = 3 + 6*Math.sqrt(s.expected_payment/maxv);
+        ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
+        ctx.fillStyle = col; ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1;
+        ctx.lineWidth=1.5; ctx.strokeStyle = css.getPropertyValue("--panel").trim(); ctx.stroke();
+      });
+    });
+  }
+  drawMap();
+  window.addEventListener("resize", drawMap);
+  // redraw on theme change
+  new MutationObserver(drawMap).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+
+  // ---- model performance ----
+  const met = document.getElementById("metrics");
+  const metricDefs = [
+    {key:"label_actual_payment", name:"Actual payment (APP)", sub:"will they pay?"},
+    {key:"label_promise_to_pay", name:"Promise to pay (P2P)", sub:"will they commit?"},
+  ];
+  metricDefs.forEach(md=>{
+    const m = D.model_metrics[md.key]; if(!m) return;
+    const wrap = el("div","metric");
+    wrap.innerHTML = `
+      <div class="m-top"><span class="m-name">${md.name}</span><span class="m-sub">${md.sub}</span><span class="m-auc">${m.auc}</span></div>
+      <div class="gauge"><div class="g-fill" style="width:${Math.round(m.auc*100)}%"></div></div>
+      <div class="mm-row"><span>AUC <b>${m.auc}</b></span><span>Accuracy <b>${m.accuracy}</b></span><span>F1 <b>${m.f1}</b></span><span>n=<b>${m.n_test}</b></span></div>`;
+    met.append(wrap);
+  });
+
+  // ---- AHP ----
+  const ahp = document.getElementById("ahp");
+  const maxScore = Math.max(...D.ahp_action_ranking.map(a=>a[1]));
+  D.ahp_action_ranking.forEach((a,i)=>{
+    const row = el("div","ahp-row"+(i===0?" top":""));
+    row.innerHTML = `<span class="a-name">${prettyAction(a[0])}</span>
+      <div class="a-track"><div class="a-fill" style="width:${Math.round(a[1]/maxScore*100)}%"></div></div>
+      <span class="a-val">${a[1].toFixed(3)}</span>`;
+    ahp.append(row);
+  });
+  const cr = el("div","cr-note");
+  cr.innerHTML = `Manager judgements are consistent — <b>consistency ratio ${D.ahp_consistency_ratio}</b> (≤ 0.10 is acceptable). Weights blend effectiveness, cost, and time efficiency; the priority level then constrains which actions are permitted.`;
+  ahp.append(cr);
+
+  // ---- compliance ----
+  const comp = document.getElementById("compliance");
+  const reviewCount = wl.filter(w=>w.audit.human_review_required).length;
+  comp.innerHTML = `
+    <div class="comp-stat"><span class="cs-n">${s.priority_breakdown.High}</span>
+      <span class="cs-l">high-priority accounts flagged for <b>human review</b> before action</span></div>
+    <ul class="comp-list">
+      <li><span class="tick">✓</span> Every score is traceable to the model, inputs, and rule that produced it</li>
+      <li><span class="tick">✓</span> Actions are bounded by a compliance playbook per priority tier</li>
+      <li><span class="tick">✓</span> Legal escalation always requires a human decision</li>
+      <li><span class="tick">✓</span> Interpretable outputs support GDPR / EU AI Act profiling obligations</li>
+    </ul>`;
+})();
+</script>

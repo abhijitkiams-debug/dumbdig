@@ -1,0 +1,5 @@
+# Regenerable artifacts (produced by src/run.py + build_demo.py)
+data/*.csv
+output/*.json
+__pycache__/
+*.pyc

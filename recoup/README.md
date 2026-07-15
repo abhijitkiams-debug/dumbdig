@@ -17,6 +17,8 @@ playbook, and an optimized field-visit route — all with a per-decision audit t
 ```
 recoup/
 ├── PRD.md                 product requirements document
+├── app.py                 local web app (file-upload UI + scoring API)
+├── web/index.html         the app's front-end (upload, worklist, routing, audit)
 ├── src/
 │   ├── generate_data.py   synthetic collections book (labeled)
 │   ├── ingest.py          schema-flexible CSV loader (auto column mapping)
@@ -40,17 +42,40 @@ recoup/
 | **2 · Prediction** (supervised) | Random Forest → Promise-to-Pay (P2P) & Actual-Payment (APP) probabilities | `pipeline.train_models` |
 | **3 · Optimization** | Fuzzy priority · TOPSIS ranking · AHP action selection · field routing | `fuzzy`, `topsis`, `ahp`, `routing` |
 
-## Quickstart
+## Run the local app (file upload)
+
+The fastest way to try Recoup on your own data — a local web app with a
+drag-and-drop CSV uploader. Nothing leaves your machine.
 
 ```bash
-pip install numpy scikit-learn
+pip install -r requirements.txt
 
-cd recoup/src
-python run.py                 # generate synthetic data, train, score, write output/results.json
-python build_demo.py          # rebuild the self-contained demo/index.html
+cd recoup
+python app.py                 # then open http://localhost:8000
+# python app.py --port 8080 --n-synth 8000   # options
 ```
 
-### Score your own data
+Then in the browser:
+
+1. **Drop a CSV** (any column names) or click **Try sample data**.
+2. Recoup maps your columns, scores every account, and shows the ranked
+   worklist, field-routing map, model performance, AHP weighting, and
+   compliance panel.
+3. Click any worklist row to see its reasons and full audit trail.
+4. **Download template CSV** gives you a correctly-shaped file to start from.
+
+If your file includes `label_actual_payment` / `label_promise_to_pay` columns,
+Recoup evaluates the models on your data and reports the metrics.
+
+## Command line
+
+```bash
+cd recoup/src
+python run.py                 # generate synthetic data, train, score, write output/results.json
+python build_demo.py          # rebuild the self-contained demo/index.html (static artifact)
+```
+
+### Score your own data (CLI)
 
 ```bash
 python run.py --data /path/to/your_accounts.csv --collectors 4 --top-field 120

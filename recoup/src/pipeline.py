@@ -112,12 +112,13 @@ def train_models(train_rows):
     return out
 
 
-def _segment(train_rows, target_rows, medians):
-    """Layer 1: unsupervised behavioral segmentation, labeled by pay behavior."""
-    seg_feats = ["pay_ratio_6m", "rpc_rate", "days_past_due", "promises_kept_6m", "days_since_last_payment"]
-    idx = [FEATURES.index(f) for f in seg_feats]
+SEG_FEATS = ["pay_ratio_6m", "rpc_rate", "days_past_due", "promises_kept_6m", "days_since_last_payment"]
+
+
+def fit_segmenter(train_rows, medians):
+    """Fit Layer-1 behavioral clustering once; returns a reusable segmenter."""
+    idx = [FEATURES.index(f) for f in SEG_FEATS]
     Xtr = _matrix(train_rows, medians)[:, idx]
-    Xte = _matrix(target_rows, medians)[:, idx]
     mu = Xtr.mean(axis=0)
     sd = Xtr.std(axis=0) + 1e-9
     km = KMeans(n_clusters=4, n_init=10, random_state=42).fit((Xtr - mu) / sd)
@@ -126,18 +127,49 @@ def _segment(train_rows, target_rows, medians):
     health = centers[:, 0] + centers[:, 1] - centers[:, 2] - centers[:, 4]
     order = np.argsort(-health)  # healthiest first
     name_map = {int(order[i]): SEGMENT_NAMES[i] for i in range(4)}
-    labels = km.predict((Xte - mu) / sd)
-    return [name_map[int(l)] for l in labels]
+    return {"km": km, "mu": mu, "sd": sd, "name_map": name_map, "idx": idx}
+
+
+def apply_segmenter(seg, target_rows, medians):
+    Xte = _matrix(target_rows, medians)[:, seg["idx"]]
+    labels = seg["km"].predict((Xte - seg["mu"]) / seg["sd"])
+    return [seg["name_map"][int(l)] for l in labels]
+
+
+class Recoup:
+    """Fit the models + segmenter once, then score any number of portfolios."""
+
+    def __init__(self):
+        self.trained = None
+        self.segmenter = None
+
+    def fit(self, train_rows):
+        self.trained = train_models(train_rows)
+        self.segmenter = fit_segmenter(train_rows, self.trained["medians"])
+        return self
+
+    @property
+    def metrics(self):
+        return self.trained["metrics"] if self.trained else {}
+
+    def score(self, target_rows, criteria_matrix=None, n_collectors=3, top_k_field=None):
+        return _score(self.trained, self.segmenter, target_rows,
+                      criteria_matrix, n_collectors, top_k_field)
 
 
 def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=3,
                     top_k_field=None):
+    """Convenience: fit on train_rows, then score target_rows in one call."""
+    model = Recoup().fit(train_rows)
+    return model.score(target_rows, criteria_matrix, n_collectors, top_k_field)
+
+
+def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3,
+           top_k_field=None):
     """
-    Full pipeline. train_rows must be labeled; target_rows are what we act on
-    (may be the same as train_rows, or freshly uploaded unlabeled accounts).
+    Score target_rows with an already-fitted model + segmenter.
     Returns a results dict ready to serialize.
     """
-    trained = train_models(train_rows)
     medians = trained["medians"]
     Xt = _matrix(target_rows, medians)
 
@@ -146,7 +178,7 @@ def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=
     prob_p2p = m_p2p.predict_proba(Xt)[:, 1] if m_p2p else np.full(len(target_rows), 0.5)
     prob_app = m_app.predict_proba(Xt)[:, 1] if m_app else np.full(len(target_rows), 0.5)
 
-    segments = _segment(train_rows, target_rows, medians)
+    segments = apply_segmenter(segmenter, target_rows, medians)
 
     # Expected recoverable value per account.
     next_inst = np.array([float(r.get("next_installment_amount") or medians[FEATURES.index("next_installment_amount")]) for r in target_rows])
@@ -252,6 +284,7 @@ def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=
         "field_expected_recovery": round(sum(rt["expected_recovery"] for rt in routes), 2),
     }
 
+    # Note any uploaded columns we could not recognize -> which get imputed.
     return {
         "model_metrics": trained["metrics"],
         "ahp_consistency_ratio": ahp_cr,

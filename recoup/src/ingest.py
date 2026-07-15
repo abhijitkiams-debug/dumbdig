@@ -8,6 +8,7 @@ found so nothing is silently fabricated.
 """
 
 import csv
+import io
 import re
 from datetime import datetime
 
@@ -187,30 +188,59 @@ def derive(rows, now=None):
     return sorted(derived)
 
 
+def _read_text(path):
+    """
+    Read a CSV as text, tolerating non-UTF-8 exports. Excel/Windows LMS files
+    are often Windows-1252 or Latin-1. We try UTF-8 (incl. BOM) first, then
+    cp1252, then latin-1 (which decodes any byte). Returns (text, encoding).
+    """
+    with open(path, "rb") as f:
+        raw = f.read()
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            return raw.decode(enc), enc
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1", errors="replace"), "latin-1"
+
+
+def _sniff_delimiter(sample):
+    """Pick the most likely delimiter (comma, tab, semicolon, or pipe)."""
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=",\t;|").delimiter
+    except csv.Error:
+        counts = {d: sample.count(d) for d in [",", "\t", ";", "|"]}
+        return max(counts, key=counts.get) if any(counts.values()) else ","
+
+
 def load_csv(path):
     """
     Returns (rows, report) where rows is a list of canonicalized dicts and
     report describes the mapping so we can show the user what was recognized.
     """
-    with open(path, newline="") as f:
-        reader = csv.DictReader(f)
-        headers = reader.fieldnames or []
-        colmap = _build_column_map(headers)
-        rows = []
-        for i, raw in enumerate(reader):
-            row = {}
-            for field, src in colmap.items():
-                val = raw.get(src)
-                row[field] = _to_num(val) if field in NUMERIC else (val or "").strip()
-            if "account_id" not in row or not row.get("account_id"):
-                row["account_id"] = f"ROW-{i:05d}"
-            rows.append(row)
+    text, encoding = _read_text(path)
+    delimiter = _sniff_delimiter(text[:4096])
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    headers = [h.strip() for h in (reader.fieldnames or [])]
+    reader.fieldnames = headers
+    colmap = _build_column_map(headers)
+    rows = []
+    for i, raw in enumerate(reader):
+        row = {}
+        for field, src in colmap.items():
+            val = raw.get(src)
+            row[field] = _to_num(val) if field in NUMERIC else (val or "").strip()
+        if "account_id" not in row or not row.get("account_id"):
+            row["account_id"] = f"ROW-{i:05d}"
+        rows.append(row)
 
     derived_fields = derive(rows)
 
     report = {
         "source_columns": headers,
         "mapped": colmap,
+        "encoding": encoding,
+        "delimiter": {",": "comma", "\t": "tab", ";": "semicolon", "|": "pipe"}.get(delimiter, delimiter),
         "recognized_fields": sorted(colmap.keys()),
         "derived_fields": derived_fields,
         "unmapped_source_columns": [h for h in headers if h not in colmap.values()],

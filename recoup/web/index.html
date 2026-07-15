@@ -391,6 +391,8 @@ function renderReport(data){
   const add = (cls, html) => { const t=el("span","rtag"+(cls?" "+cls:"")); t.innerHTML=html; box.append(t); };
   if(r.recognized_fields) add("ok", `<b>${r.recognized_fields.length}</b> fields recognized`);
   if(r.row_count!=null) add("", `<b>${r.row_count.toLocaleString()}</b> rows`);
+  if(r.derived_fields && r.derived_fields.length) add("ok", `<b>${r.derived_fields.length}</b> derived: ${r.derived_fields.map(d=>d.replace(/_/g," ")).join(", ")}`);
+  if(r.encoding) add("", `${r.encoding} · ${r.delimiter||"comma"}-delimited`);
   if(r.missing_canonical_fields && r.missing_canonical_fields.length) add("warn", `<b>${r.missing_canonical_fields.length}</b> fields imputed`);
   if(r.unmapped_source_columns && r.unmapped_source_columns.length) add("", `unmapped: ${r.unmapped_source_columns.slice(0,6).join(", ")}${r.unmapped_source_columns.length>6?" …":""}`);
   if(data.uploaded_labels_present) add("ok", `labels present → models evaluated on your data`);

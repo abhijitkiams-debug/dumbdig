@@ -13,9 +13,9 @@ Run:
 """
 
 import argparse
-import cgi
 import json
 import os
+import re
 import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -56,6 +56,38 @@ def _trim(results):
         results["worklist"] = wl[:MAX_ROWS]
         results["worklist_truncated"] = {"shown": MAX_ROWS, "total": len(wl)}
     return results
+
+
+def parse_multipart(headers, body):
+    """
+    Minimal multipart/form-data parser (stdlib only), so this runs on Python
+    3.13+ where the old `cgi` module was removed. Returns (text_fields, files)
+    where files maps field name -> {"filename", "content" (bytes)}.
+    """
+    ctype = headers.get("Content-Type", "")
+    m = re.search(r"boundary=([^;]+)", ctype)
+    if not m:
+        return {}, {}
+    delim = b"--" + m.group(1).strip().strip('"').encode()
+    fields, files = {}, {}
+    for part in body.split(delim):
+        part = part.strip(b"\r\n")
+        if not part or part == b"--" or b"\r\n\r\n" not in part:
+            continue
+        raw_headers, content = part.split(b"\r\n\r\n", 1)
+        hdrs = raw_headers.decode("utf-8", "replace")
+        disp = next((ln for ln in hdrs.split("\r\n")
+                     if ln.lower().startswith("content-disposition")), "")
+        name_m = re.search(r'name="([^"]*)"', disp)
+        if not name_m:
+            continue
+        name = name_m.group(1)
+        fname_m = re.search(r'filename="([^"]*)"', disp)
+        if fname_m:
+            files[name] = {"filename": fname_m.group(1), "content": content}
+        else:
+            fields[name] = content.decode("utf-8", "replace").strip()
+    return fields, files
 
 
 def score_rows(rows, report, collectors, top_field):
@@ -110,19 +142,17 @@ class Handler(BaseHTTPRequestHandler):
         ctype = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in ctype:
             return self._send(400, {"error": "expected a multipart file upload"})
-        form = cgi.FieldStorage(
-            fp=self.rfile, headers=self.headers,
-            environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype},
-        )
-        if "file" not in form:
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length)
+        fields, files = parse_multipart(self.headers, body)
+        if "file" not in files:
             return self._send(400, {"error": "no file field in upload"})
-        item = form["file"]
-        raw = item.file.read()
+        raw = files["file"]["content"]
         if not raw:
             return self._send(400, {"error": "uploaded file is empty"})
 
-        collectors = int(form.getvalue("collectors", "3") or 3)
-        top_field = int(form.getvalue("top_field", "90") or 90)
+        collectors = int(fields.get("collectors", "3") or 3)
+        top_field = int(fields.get("top_field", "90") or 90)
 
         tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False)
         try:
@@ -132,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
             if not rows:
                 return self._send(400, {"error": "no data rows found in file"})
             results = score_rows(rows, report, collectors, top_field)
-            results["source"] = getattr(item, "filename", "upload") or "upload"
+            results["source"] = files["file"].get("filename") or "upload"
             self._send(200, results)
         except Exception as e:  # surface parsing/scoring errors to the UI
             self._send(400, {"error": f"could not process file: {e}"})

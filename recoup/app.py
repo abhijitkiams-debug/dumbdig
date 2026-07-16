@@ -60,6 +60,41 @@ def _trim(results):
     return results
 
 
+# Curated catalog of fields a user can map to ("what to include"), grouped and
+# described for the mapping UI. Only these are offered; the loader still accepts
+# the full synonym set for auto-detection.
+MAP_FIELDS = [
+    {"key": "account_id", "label": "Account / Agreement ID", "group": "Identity", "desc": "Unique loan or agreement number", "req": True},
+    {"key": "region", "label": "Region / Branch", "group": "Identity", "desc": "Branch, area or state — used to group field visits"},
+    {"key": "geo_x", "label": "Longitude / X", "group": "Identity", "desc": "Coordinate for field-visit routing"},
+    {"key": "geo_y", "label": "Latitude / Y", "group": "Identity", "desc": "Coordinate for field-visit routing"},
+
+    {"key": "total_balance", "label": "POS / Outstanding", "group": "Exposure", "desc": "Principal outstanding — the amount to recover", "req": True},
+    {"key": "past_due_amount", "label": "Overdue / Arrears", "group": "Exposure", "desc": "Amount currently overdue"},
+    {"key": "next_installment_amount", "label": "EMI / Installment", "group": "Exposure", "desc": "Next installment amount due"},
+    {"key": "days_past_due", "label": "DPD", "group": "Exposure", "desc": "Days past due"},
+    {"key": "current_bucket", "label": "Bucket", "group": "Exposure", "desc": "Delinquency bucket (0-4)"},
+
+    {"key": "last_pay_amount", "label": "Last paid amount", "group": "Payment history", "desc": "Amount of the last payment"},
+    {"key": "last_payment_date", "label": "Last paid date (LMPD)", "group": "Payment history", "desc": "Date of the last payment"},
+    {"key": "pay_ratio_6m", "label": "Payment ratio (6m)", "group": "Payment history", "desc": "Share of dues paid recently (0-1)"},
+    {"key": "num_payments_12m", "label": "Payments (12m)", "group": "Payment history", "desc": "Number of payments in the last year"},
+
+    {"key": "rpc_rate", "label": "Right-party contact rate", "group": "Contact & mandate", "desc": "How often the right person is reached (0-1)"},
+    {"key": "promises_kept_6m", "label": "Promises kept (6m)", "group": "Contact & mandate", "desc": "Kept promises to pay"},
+    {"key": "refusals_6m", "label": "Refusals (6m)", "group": "Contact & mandate", "desc": "Refusals or disputes"},
+    {"key": "preferred_channel", "label": "Preferred channel", "group": "Contact & mandate", "desc": "sms / call / email / letter"},
+    {"key": "mandate_status", "label": "Mandate status", "group": "Contact & mandate", "desc": "NACH mandate active / cancelled"},
+    {"key": "presentation_status", "label": "Presentation status", "group": "Contact & mandate", "desc": "EMI presented / bounced / returned"},
+
+    {"key": "months_on_book", "label": "Months on book (MOB)", "group": "Profile", "desc": "Account age in months"},
+    {"key": "age", "label": "Age", "group": "Profile", "desc": "Borrower age"},
+
+    {"key": "label_actual_payment", "label": "Did pay (label)", "group": "Labels (optional)", "desc": "1/0 outcome, to evaluate model accuracy"},
+    {"key": "label_promise_to_pay", "label": "Promised to pay (label)", "group": "Labels (optional)", "desc": "1/0 promise, to evaluate model accuracy"},
+]
+
+
 def parse_multipart(headers, body):
     """
     Minimal multipart/form-data parser (stdlib only), so this runs on Python
@@ -183,7 +218,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path.split("?")[0] != "/api/score":
+        path = self.path.split("?")[0]
+        if path not in ("/api/score", "/api/inspect"):
             return self._send(404, {"error": "not found"})
         ctype = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in ctype:
@@ -191,24 +227,42 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length)
         fields, files = parse_multipart(self.headers, body)
-        if "file" not in files:
-            return self._send(400, {"error": "no file field in upload"})
+        if "file" not in files or not files["file"]["content"]:
+            return self._send(400, {"error": "no file uploaded"})
         raw = files["file"]["content"]
-        if not raw:
-            return self._send(400, {"error": "uploaded file is empty"})
+        filename = files["file"].get("filename") or "upload"
 
-        collectors = int(fields.get("collectors", "3") or 3)
-        top_field = int(fields.get("top_field", "90") or 90)
-
-        tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False)
+        tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".dat", delete=False)
         try:
             tmp.write(raw)
             tmp.close()
-            rows, report = ingest.load_csv(tmp.name)
+
+            if path == "/api/inspect":
+                headers, fmt = ingest.read_headers(tmp.name)
+                if not headers:
+                    return self._send(400, {"error": "could not read a header row from the file"})
+                return self._send(200, {
+                    "source_columns": headers,
+                    "format": fmt,
+                    "suggested": ingest.suggest_mapping(headers),
+                    "fields": MAP_FIELDS,
+                    "filename": filename,
+                })
+
+            # /api/score
+            mapping = None
+            if fields.get("mapping"):
+                try:
+                    mapping = json.loads(fields["mapping"])
+                except (ValueError, TypeError):
+                    mapping = None
+            collectors = int(fields.get("collectors", "3") or 3)
+            top_field = int(fields.get("top_field", "90") or 90)
+            rows, report = ingest.load_csv(tmp.name, mapping=mapping)
             if not rows:
                 return self._send(400, {"error": "no data rows found in file"})
             results = score_rows(rows, report, collectors, top_field)
-            results["source"] = files["file"].get("filename") or "upload"
+            results["source"] = filename
             self._send(200, results)
         except Exception as e:  # surface parsing/scoring errors to the UI
             self._send(400, {"error": f"could not process file: {e}"})

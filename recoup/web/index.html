@@ -99,6 +99,20 @@
   .spinner { display:inline-block; width:13px; height:13px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:7px; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  /* mapping */
+  .map-hint { margin:0 0 16px; font-size:13px; color:var(--ink-2); max-width:80ch; }
+  .req-dot { color:var(--crit); font-size:11px; }
+  .map-group { margin-bottom:6px; }
+  .map-group-h { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); font-weight:600; margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--border-2); }
+  .map-row { display:grid; grid-template-columns:1fr 220px; gap:14px; align-items:center; padding:7px 0; }
+  .map-field .mf-label { font-size:13px; font-weight:600; color:var(--ink); }
+  .map-field .mf-label .req-dot { margin-left:5px; }
+  .map-field .mf-desc { font-size:11.5px; color:var(--ink-3); margin-top:1px; }
+  .map-row select { width:100%; font-family:var(--f-mono); font-size:12.5px; padding:7px 9px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--ink); cursor:pointer; }
+  .map-row select:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .map-row.mapped select { border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); background:var(--accent-soft); color:var(--accent-ink); }
+  .map-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-2); }
+
   /* report */
   .report { display:flex; flex-wrap:wrap; gap:8px; }
   .rtag { font-size:11.5px; padding:4px 9px; border-radius:7px; background:var(--panel-2); border:1px solid var(--border); color:var(--ink-2); font-family:var(--f-mono); }
@@ -252,7 +266,7 @@
           <div class="ctrl"><label for="topfield">Max field visits</label><input id="topfield" type="number" min="10" max="500" value="90"></div>
         </div>
         <div class="btns">
-          <button class="act primary" id="btn-score" disabled>Score my file</button>
+          <button class="act primary" id="btn-score" disabled>Score (auto-map)</button>
           <button class="act" id="btn-sample">Try sample data</button>
           <a class="act" id="btn-template" href="/api/sample-csv" style="text-decoration:none;">Download template CSV</a>
         </div>
@@ -270,6 +284,21 @@
           <li>geo for routing: <code>geo_x</code>/<code>longitude</code>, <code>geo_y</code>/<code>latitude</code>, <code>region</code></li>
           <li>optional labels to evaluate accuracy: <code>label_actual_payment</code>, <code>label_promise_to_pay</code></li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Field mapping -->
+  <section class="card" id="map-card" style="display:none; margin-bottom:22px;">
+    <div class="card-h"><h2>Map your columns</h2><span class="eyebrow" id="map-src"></span></div>
+    <div class="card-b">
+      <p class="map-hint">We matched your file's headers to Recoup's fields automatically. Review and adjust
+        below, then score. Anything left as <b>Not mapped</b> is ignored or safely imputed. Required fields
+        are marked <span class="req-dot">●</span>.</p>
+      <div id="map-grid"></div>
+      <div class="map-actions">
+        <button class="act primary" id="btn-score-mapped">Score with this mapping</button>
+        <button class="act" id="btn-map-auto">Reset to auto</button>
       </div>
     </div>
   </section>
@@ -373,29 +402,93 @@ dz.addEventListener("dragover", e=>{ e.preventDefault(); dz.classList.add("drag"
 dz.addEventListener("dragleave", ()=>dz.classList.remove("drag"));
 dz.addEventListener("drop", e=>{ e.preventDefault(); dz.classList.remove("drag"); if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
 fileinput.addEventListener("change", ()=>{ if(fileinput.files[0]) setFile(fileinput.files[0]); });
-function setFile(f){ chosen = f; $("#filename").textContent = f.name; $("#btn-score").disabled = false; setStatus("", ""); }
+
+let INSPECT = null;  // {source_columns, suggested, fields, ...}
+
+function setFile(f){
+  chosen = f; INSPECT = null;
+  $("#filename").textContent = f.name;
+  $("#btn-score").disabled = false;
+  inspectFile();  // read the headers and show the mapping panel
+}
 
 function setStatus(msg, cls, spin){ const s=$("#status"); s.className="status "+(cls||""); s.innerHTML=(spin?'<span class="spinner"></span>':'')+msg; }
 
-$("#btn-score").addEventListener("click", async ()=>{
+async function inspectFile(){
+  if(!chosen) return;
+  setStatus("Reading columns from "+chosen.name+" …", "", true);
+  const fd = new FormData(); fd.append("file", chosen);
+  try {
+    const res = await fetch("/api/inspect", {method:"POST", body:fd});
+    const data = await res.json();
+    if(!res.ok){ setStatus(data.error||"Could not read the file.", "err"); return; }
+    INSPECT = data;
+    renderMapping(data);
+    $("#map-card").style.display = "block";
+    $("#map-card").scrollIntoView({behavior:"smooth", block:"start"});
+    setStatus(`Found ${data.source_columns.length} columns. Review the mapping below, then score.`, "ok");
+  } catch(err){ setStatus("Could not reach the local server: "+err.message, "err"); }
+}
+
+function renderMapping(insp){
+  const grid = $("#map-grid"); grid.innerHTML = "";
+  $("#map-src").textContent = insp.filename || "";
+  const groups = [];
+  insp.fields.forEach(f=>{ if(!groups.includes(f.group)) groups.push(f.group); });
+  groups.forEach(g=>{
+    const gWrap = el("div","map-group");
+    gWrap.append(el("div","map-group-h", g));
+    insp.fields.filter(f=>f.group===g).forEach(f=>{
+      const row = el("div","map-row");
+      const info = el("div","map-field");
+      const lab = el("div","mf-label"); lab.textContent = f.label;
+      if(f.req){ const d=el("span","req-dot"); d.textContent="●"; lab.append(d); }
+      info.append(lab, el("div","mf-desc", f.desc));
+      const sel = document.createElement("select");
+      sel.dataset.key = f.key;
+      sel.append(new Option("— Not mapped —", ""));
+      insp.source_columns.forEach(c=> sel.append(new Option(c, c)));
+      const suggested = insp.suggested[f.key] || "";
+      sel.value = suggested;
+      if(suggested) row.classList.add("mapped");
+      sel.addEventListener("change", ()=> row.classList.toggle("mapped", !!sel.value));
+      row.append(info, sel);
+      gWrap.append(row);
+    });
+    grid.append(gWrap);
+  });
+}
+
+function gatherMapping(){
+  const m = {};
+  document.querySelectorAll("#map-grid select").forEach(s=>{ if(s.value) m[s.dataset.key] = s.value; });
+  return m;
+}
+
+async function scoreFile(mapping){
   if(!chosen) return;
   setStatus("Scoring "+chosen.name+" …", "", true);
-  $("#btn-score").disabled = true;
+  $("#btn-score").disabled = true; $("#btn-score-mapped").disabled = true;
   const fd = new FormData();
   fd.append("file", chosen);
   fd.append("collectors", $("#collectors").value||"3");
   fd.append("top_field", $("#topfield").value||"90");
+  if(mapping) fd.append("mapping", JSON.stringify(mapping));
   try {
     const res = await fetch("/api/score", {method:"POST", body:fd});
     const data = await res.json();
-    if(!res.ok){ setStatus(data.error||"Something went wrong.", "err"); $("#btn-score").disabled=false; return; }
-    render(data);
-    setStatus("Scored "+data.summary.accounts.toLocaleString()+" accounts.", "ok");
+    if(!res.ok){ setStatus(data.error||"Something went wrong.", "err"); }
+    else { render(data); setStatus("Scored "+data.summary.accounts.toLocaleString()+" accounts.", "ok"); }
   } catch(err){ setStatus("Could not reach the local server: "+err.message, "err"); }
-  $("#btn-score").disabled = false;
-});
+  $("#btn-score").disabled = false; $("#btn-score-mapped").disabled = false;
+}
+
+$("#btn-score").addEventListener("click", ()=> scoreFile(null));          // quick auto-map
+$("#btn-score-mapped").addEventListener("click", ()=> scoreFile(gatherMapping()));  // manual mapping
+$("#btn-map-auto").addEventListener("click", ()=>{ if(INSPECT) renderMapping(INSPECT); });
 
 $("#btn-sample").addEventListener("click", async ()=>{
+  $("#map-card").style.display = "none";
   setStatus("Scoring the synthetic sample …", "", true);
   try {
     const res = await fetch("/api/sample");

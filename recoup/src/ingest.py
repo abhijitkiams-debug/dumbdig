@@ -219,11 +219,12 @@ def _col_letters(ref):
     return m.group(1).upper() if m else ""
 
 
-def _read_xlsx(path):
+def _read_xlsx(path, header_only=False):
     """
     Read the first worksheet of an .xlsx file using only the standard library
     (zipfile + XML). Returns (headers, raw_rows) where raw_rows is a list of
-    dicts keyed by header name. Avoids adding an openpyxl/pandas dependency.
+    dicts keyed by header name. With header_only=True it stops after the first
+    row (fast header inspection for large books). No openpyxl/pandas dependency.
     """
     import zipfile
     import xml.etree.ElementTree as ET
@@ -267,9 +268,15 @@ def _read_xlsx(path):
                             cells[col] = val
                     grid.append(cells)
                     el.clear()
+                    if header_only and len(grid) >= 1:
+                        break
 
     if not grid:
         return [], []
+    if header_only:
+        header_cells = grid[0]
+        ordered = sorted(header_cells.keys(), key=lambda c: (len(c), c))
+        return [str(header_cells[c]).strip() for c in ordered], []
     header_cells = grid[0]
     ordered_cols = sorted(header_cells.keys(), key=lambda c: (len(c), c))
     headers = [str(header_cells[c]).strip() for c in ordered_cols]
@@ -285,10 +292,37 @@ def _looks_like_xlsx(path):
         return f.read(4) == b"PK\x03\x04"  # xlsx is a zip archive
 
 
-def _canonicalize(headers, raw_rows, source_kind):
-    """Map arbitrary headers -> canonical fields, coerce, derive, build report."""
+def read_headers(path):
+    """Return (headers, format) without parsing the whole file. For inspection."""
+    if _looks_like_xlsx(path):
+        headers, _ = _read_xlsx(path, header_only=True)
+        return headers, "xlsx"
+    text, _ = _read_text(path)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    delim = _sniff_delimiter(text[:4096])
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delim)
+    headers = next(reader, [])
+    return [h.strip() for h in headers], "csv"
+
+
+def suggest_mapping(headers):
+    """Auto-suggested canonical_field -> source_column map for a header list."""
+    return _build_column_map([h.strip() for h in headers])
+
+
+def _canonicalize(headers, raw_rows, source_kind, mapping=None):
+    """
+    Map arbitrary headers -> canonical fields, coerce, derive, build report.
+    If `mapping` (canonical_field -> source_column) is given, it is used
+    instead of auto-detection; blank/unknown source columns are ignored.
+    """
     headers = [h.strip() for h in headers]
-    colmap = _build_column_map(headers)
+    if mapping:
+        header_set = set(headers)
+        colmap = {field: src for field, src in mapping.items()
+                  if src and src.strip() in header_set}
+    else:
+        colmap = _build_column_map(headers)
     rows = []
     for i, raw in enumerate(raw_rows):
         row = {}
@@ -304,6 +338,7 @@ def _canonicalize(headers, raw_rows, source_kind):
         "source_columns": headers,
         "mapped": colmap,
         "format": source_kind,
+        "mapping_mode": "manual" if mapping else "auto",
         "recognized_fields": sorted(colmap.keys()),
         "derived_fields": derived_fields,
         "unmapped_source_columns": [h for h in headers if h not in colmap.values()],
@@ -313,15 +348,15 @@ def _canonicalize(headers, raw_rows, source_kind):
     return rows, report
 
 
-def load_csv(path):
+def load_csv(path, mapping=None):
     """
-    Load a CSV or XLSX account file. Returns (rows, report) where rows is a list
-    of canonicalized dicts and report describes how the file was read. (Name kept
-    for backwards compatibility; it now also handles Excel .xlsx.)
+    Load a CSV or XLSX account file. Returns (rows, report). If `mapping`
+    (canonical_field -> source_column) is provided, it overrides auto-detection.
+    (Name kept for backwards compatibility; it also handles Excel .xlsx.)
     """
     if _looks_like_xlsx(path):
         headers, raw_rows = _read_xlsx(path)
-        rows, report = _canonicalize(headers, raw_rows, "xlsx")
+        rows, report = _canonicalize(headers, raw_rows, "xlsx", mapping=mapping)
         report["encoding"] = "xlsx (Excel)"
         report["delimiter"] = "n/a"
         return rows, report
@@ -335,7 +370,7 @@ def load_csv(path):
     headers = [h.strip() for h in (reader.fieldnames or [])]
     reader.fieldnames = headers
     raw_rows = list(reader)
-    rows, report = _canonicalize(headers, raw_rows, "csv")
+    rows, report = _canonicalize(headers, raw_rows, "csv", mapping=mapping)
     report["encoding"] = encoding
     report["delimiter"] = {",": "comma", "\t": "tab", ";": "semicolon", "|": "pipe"}.get(delimiter, delimiter)
     return rows, report

@@ -57,12 +57,16 @@ python app.py                 # then open http://localhost:8000
 
 Then in the browser:
 
-1. **Drop a CSV** (any column names) or click **Try sample data**.
-2. Recoup maps your columns, scores every account, and shows the ranked
-   worklist, field-routing map, model performance, AHP weighting, and
-   compliance panel.
-3. Click any worklist row to see its reasons and full audit trail.
-4. **Download template CSV** gives you a correctly-shaped file to start from.
+1. **Drop a CSV or Excel (.xlsx) file** (any column names) or click **Try sample data**.
+2. Recoup reads your headers and shows a **Map your columns** panel with its best
+   guesses pre-filled. Review/adjust which of your columns feed each field
+   ("what to include"), then **Score with this mapping** — or **Score (auto-map)**
+   to skip the manual step.
+3. It scores every account and shows the ranked worklist, field-routing map,
+   model performance, AHP weighting, and compliance panel.
+4. Click any worklist row to see its reasons and full audit trail.
+5. **Download CSV** exports the complete scored worklist; **Download template CSV**
+   gives you a correctly-shaped file to start from.
 
 If your file includes `label_actual_payment` / `label_promise_to_pay` columns,
 Recoup evaluates the models on your data and reports the metrics.

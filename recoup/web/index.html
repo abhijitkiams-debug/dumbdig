@@ -569,7 +569,7 @@ function render(data){
 
   renderReport(data);
   renderKPIs(data.summary);
-  renderCounts(data.worklist);
+  renderCounts(data.summary);
   renderTrunc(data.worklist_truncated);
   renderWorklist();
   renderMap(data.routes);
@@ -640,10 +640,13 @@ function renderKPIs(s){
   defs.forEach(k=>{ const c=el("div","kpi"+(k.cls?" "+k.cls:"")); c.append(el("div","k-label",k.label), el("div","k-val",k.val), el("div","k-sub",k.sub)); w.append(c); });
 }
 
-function renderCounts(wl){
-  const c = {All:wl.length, High:0, Medium:0, Low:0};
-  wl.forEach(w=>c[w.priority_level]++);
-  $("#f-all").textContent=c.All; $("#f-high").textContent=c.High; $("#f-med").textContent=c.Medium; $("#f-low").textContent=c.Low;
+function renderCounts(summary){
+  // Counts reflect ALL analysed accounts (whole portfolio), not just the rows
+  // loaded into the table.
+  const b = summary.priority_breakdown || {High:0, Medium:0, Low:0};
+  const all = summary.accounts != null ? summary.accounts : (b.High+b.Medium+b.Low);
+  const fmt = n => (n||0).toLocaleString();
+  $("#f-all").textContent=fmt(all); $("#f-high").textContent=fmt(b.High); $("#f-med").textContent=fmt(b.Medium); $("#f-low").textContent=fmt(b.Low);
 }
 
 function renderTrunc(t){

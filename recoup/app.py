@@ -56,11 +56,25 @@ def bootstrap(n_synth):
 
 
 def _trim(results):
-    """Cap worklist size for the browser; keep the summary computed on all rows."""
+    """
+    Cap worklist size for the browser while keeping every priority level
+    represented (stratified), so filtering High/Medium/Low still shows rows.
+    Summary counts are computed on ALL rows and left untouched.
+    """
     wl = results["worklist"]
-    if len(wl) > MAX_ROWS:
-        results["worklist"] = wl[:MAX_ROWS]
-        results["worklist_truncated"] = {"shown": MAX_ROWS, "total": len(wl)}
+    total = len(wl)
+    if total <= MAX_ROWS:
+        return results
+    buckets = {"High": [], "Medium": [], "Low": []}
+    for w in wl:
+        buckets.get(w["priority_level"], buckets["Low"]).append(w)
+    kept = []
+    for lvl, rows in buckets.items():
+        share = max(1, round(MAX_ROWS * len(rows) / total)) if rows else 0
+        kept.extend(rows[:share])  # rows are already ranked
+    kept.sort(key=lambda w: w["rank"])
+    results["worklist"] = kept[:MAX_ROWS]
+    results["worklist_truncated"] = {"shown": len(results["worklist"]), "total": total}
     return results
 
 

@@ -225,17 +225,22 @@ def score_portfolio(accounts, kb):
     confidence = "high" if n_groups >= 5 else ("medium" if n_groups >= 3 else "low")
 
     results = []
+    # Level cutoffs are percentile-anchored so we always get a usable spread
+    # (who to work first), with objective red flags overriding to High and a
+    # low absolute floor keeping genuinely benign accounts Low. This avoids a
+    # uniformly-severe book collapsing entirely into "High".
     for i, a in enumerate(accounts):
         red = _redflag(a, kb)
         comp = float(composite[i])
         p = float(pct[i])
-        if red:
+        if red or p >= 0.75 or comp >= 0.80:
             level = "High"
-        elif comp >= 0.60 or (p >= 0.80 and comp >= 0.42):
-            level = "High"
-        elif comp >= 0.35 or p >= 0.50:
+        elif p >= 0.40 or comp >= 0.55:
             level = "Medium"
         else:
+            level = "Low"
+        # absolute floor: trivially low composite is Low regardless of rank
+        if comp < 0.20 and not red:
             level = "Low"
         score = round(100 * comp, 1)
 

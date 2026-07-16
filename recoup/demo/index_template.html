@@ -404,12 +404,13 @@
 
   // ---- worklist ----
   const wl = D.worklist;
-  const counts = {All:wl.length, High:0, Medium:0, Low:0};
-  wl.forEach(w=>counts[w.priority_level]++);
-  document.getElementById("f-all").textContent = counts.All;
-  document.getElementById("f-high").textContent = counts.High;
-  document.getElementById("f-med").textContent = counts.Medium;
-  document.getElementById("f-low").textContent = counts.Low;
+  // counters reflect ALL analysed accounts (whole portfolio)
+  const pb = D.summary.priority_breakdown || {High:0,Medium:0,Low:0};
+  const allN = D.summary.accounts != null ? D.summary.accounts : (pb.High+pb.Medium+pb.Low);
+  document.getElementById("f-all").textContent = allN.toLocaleString();
+  document.getElementById("f-high").textContent = (pb.High||0).toLocaleString();
+  document.getElementById("f-med").textContent = (pb.Medium||0).toLocaleString();
+  document.getElementById("f-low").textContent = (pb.Low||0).toLocaleString();
 
   const body = document.getElementById("wl-body");
   const prettyAction = a => a.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());

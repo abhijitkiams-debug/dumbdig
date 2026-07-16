@@ -588,11 +588,13 @@ function renderWorklist(){
         <div><h4>Audit trail</h4>
           <div class="audit">
             <div class="kv"><span>Outstanding (POS)</span><span>${money(w.pos!=null?w.pos:0)}</span></div>
-            <div class="kv"><span>P2P model</span><span>${w.audit.model_p2p}</span></div>
-            <div class="kv"><span>Payment model</span><span>${w.audit.model_app}</span></div>
-            <div class="kv"><span>Fuzzy · pay prob.</span><span>${w.audit.fuzzy_inputs.prob_actual_payment}</span></div>
-            <div class="kv"><span>Fuzzy · exp. recovery (norm)</span><span>${w.audit.fuzzy_inputs.expected_recovery_norm}</span></div>
-            <div class="kv"><span>Fuzzy · exposure (norm)</span><span>${w.audit.fuzzy_inputs.exposure_norm}</span></div>
+            <div class="kv"><span>Days past due</span><span>${w.days_past_due!=null?w.days_past_due:"—"}</span></div>
+            <div class="kv"><span>Pay probability</span><span>${pct(w.prob_actual_payment)}</span></div>
+            ${w.audit.priority_components?`
+            <div class="kv"><span>Risk · delinquency</span><span>${w.audit.priority_components.severity}</span></div>
+            <div class="kv"><span>Risk · exposure</span><span>${w.audit.priority_components.exposure}</span></div>
+            <div class="kv"><span>Risk · behavior</span><span>${w.audit.priority_components.risk}</span></div>
+            <div class="kv"><span>Risk · vintage</span><span>${w.audit.priority_components.vintage}</span></div>`:``}
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
             <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
           </div>

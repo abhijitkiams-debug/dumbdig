@@ -45,7 +45,8 @@ SYNONYMS = {
     "instrument_type": ["instrument_type", "instrumenttype", "instrument"],
     "mandate_status": ["mandate_status", "mandatestatus", "nachstatus"],
     "presentation_status": ["presentation_status", "presentationstatus", "emistatus", "presentstatus"],
-    "bounce_reason": ["bounce_reason", "reason_description", "reasondescription", "returnreason", "bouncereason"],
+    "bounce_reason": ["bounce_reason", "reason_description", "reasondescription", "returnreason", "bouncereason", "failurereason", "declinereason", "rejectreason", "npareason"],
+    "field_feedback": ["field_feedback", "fieldfeedback", "disposition", "remarks", "feedback", "fosfeedback", "fos_remarks", "collectorremarks", "visitremarks", "fefeedback", "paymentremark", "reasonfornonpayment", "customerresponse"],
     "payment_type": ["payment_type", "current_month_payment_type", "currentmonthpaymenttype", "paymenttype"],
     "mode_of_payment": ["mode_of_payment", "current_month_mode_of_payment", "currentmonthmodeofpayment", "modeofpayment"],
     "paid_by": ["paid_by", "paidby"],
@@ -178,7 +179,8 @@ def derive(rows, now=None):
         # Soft payment-behavior proxy from mandate/presentation/reason statuses.
         # Only used when no explicit contact/payment-history features exist; it
         # nudges rpc_rate/pay_ratio priors rather than inventing amounts.
-        sc = _status_score(r.get("mandate_status"), r.get("presentation_status"), r.get("bounce_reason"))
+        sc = _status_score(r.get("mandate_status"), r.get("presentation_status"),
+                           r.get("bounce_reason"), r.get("field_feedback"))
         if sc != 0:
             proxy = 0.5 + 0.25 * max(-1, min(1, sc))  # 0.25 (bad) .. 0.75 (good)
             if r.get("pay_ratio_6m") is None:

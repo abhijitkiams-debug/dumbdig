@@ -86,9 +86,12 @@ MAP_FIELDS = [
     {"key": "preferred_channel", "label": "Preferred channel", "group": "Contact & mandate", "desc": "sms / call / email / letter"},
     {"key": "mandate_status", "label": "Mandate status", "group": "Contact & mandate", "desc": "NACH mandate active / cancelled"},
     {"key": "presentation_status", "label": "Presentation status", "group": "Contact & mandate", "desc": "EMI presented / bounced / returned"},
+    {"key": "bounce_reason", "label": "Failure / bounce reason", "group": "Contact & mandate", "desc": "Reason for bounce / non-payment"},
+    {"key": "field_feedback", "label": "Refusal / field feedback", "group": "Contact & mandate", "desc": "Disposition or field-executive remarks (refused, declined, absconding…)"},
 
-    {"key": "months_on_book", "label": "Months on book (MOB)", "group": "Profile", "desc": "Account age in months"},
-    {"key": "age", "label": "Age", "group": "Profile", "desc": "Borrower age"},
+    {"key": "months_on_book", "label": "Months on book (MOB)", "group": "Profile & vintage", "desc": "Account age in months — drives vintage analysis"},
+    {"key": "lent_date", "label": "Disbursal date", "group": "Profile & vintage", "desc": "Loan disbursal date — used for vintage"},
+    {"key": "age", "label": "Age", "group": "Profile & vintage", "desc": "Borrower age"},
 
     {"key": "label_actual_payment", "label": "Did pay (label)", "group": "Labels (optional)", "desc": "1/0 outcome, to evaluate model accuracy"},
     {"key": "label_promise_to_pay", "label": "Promised to pay (label)", "group": "Labels (optional)", "desc": "1/0 promise, to evaluate model accuracy"},
@@ -140,7 +143,7 @@ def score_rows(rows, report, collectors, top_field):
 
 # Columns exported to CSV, in order.
 EXPORT_COLUMNS = [
-    "rank", "account_id", "region", "segment", "current_bucket",
+    "rank", "account_id", "region", "segment", "current_bucket", "days_past_due",
     "priority_level", "priority_score", "prob_promise_to_pay", "prob_actual_payment",
     "pos", "past_due_amount", "recoverable_amount", "expected_payment", "topsis_score",
     "next_best_action", "preferred_channel", "best_contact_hour",
@@ -157,7 +160,8 @@ def worklist_to_csv(worklist):
     for row in worklist:
         w.writerow([
             row.get("rank"), row.get("account_id"), row.get("region"), row.get("segment"),
-            row.get("current_bucket"), row.get("priority_level"), row.get("priority_score"),
+            row.get("current_bucket"), row.get("days_past_due"),
+            row.get("priority_level"), row.get("priority_score"),
             row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
             row.get("pos"), row.get("past_due_amount"), row.get("recoverable_amount"),
             row.get("expected_payment"), row.get("topsis_score"), row.get("next_best_action"),

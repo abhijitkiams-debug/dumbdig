@@ -16,8 +16,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 
-import fuzzy
 import ahp
+import priority
 from topsis import topsis
 from routing import plan_routes
 
@@ -36,16 +36,29 @@ SEGMENT_NAMES = ["self_cured", "lazy_payer", "delinquent", "defaulter"]
 CHANNEL_ACTION = {"sms": "sms_reminder", "call": "agent_call", "email": "email", "letter": "letter"}
 
 
-def choose_action(level, segment, bucket, prob_app, refusals, pref_channel, action_pref):
+def choose_action(level, segment, bucket, prob_app, refusals, pref_channel, action_pref,
+                  hard_risk=False, early_default=False):
     """
     Pick the next best action for one debtor. Stays strictly inside the
-    compliance playbook for the fuzzy priority level, but personalizes within
-    it: honor the debtor's reachable channel, and de-escalate away from calls
-    when the debtor has been repeatedly refusing (contact fatigue).
-    Returns (action, rationale).
+    compliance playbook for the priority level, but personalizes within it:
+    escalate refused/hard-risk accounts, send early defaults to a field visit,
+    honor the debtor's reachable channel, and de-escalate away from calls under
+    contact fatigue. Returns (action, rationale).
     """
     allowed = ahp.PLAYBOOK[level]
     ahp_choice = next((a for a in action_pref if a in allowed), allowed[0])
+
+    # Early-stage (first-EMI) default is a field-verification priority: contact
+    # directly / send for a field check before deciding on harder measures.
+    if early_default and "agent_call" in allowed:
+        return "agent_call", "early-stage default -> direct agent contact / field check"
+
+    # Willful refusal / hard risk on a worked account -> settlement, then legal.
+    if hard_risk and level in ("High", "Medium"):
+        if "settlement_offer" in allowed:
+            return "settlement_offer", "refused / hard-risk account -> offer settlement"
+        if "legal_escalation" in allowed:
+            return "legal_escalation", "refused to pay and no softer option remains -> legal"
 
     # Contact fatigue: a High-priority debtor who keeps refusing calls is better
     # moved to a settlement offer than hit with another agent call.
@@ -195,9 +208,9 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     # present, otherwise POS (so hard-bucket accounts still register exposure).
     exposure = np.where(past_due > 0, past_due, total_bal)
 
-    # Normalization bounds for fuzzy inputs (portfolio-relative).
+    # Portfolio-relative normalization bounds.
     e_lo, e_hi = float(expected.min()), float(np.percentile(expected, 98))
-    d_lo, d_hi = float(exposure.min()), float(np.percentile(exposure, 98))
+    x_lo, x_hi = float(exposure.min()), float(np.percentile(exposure, 98))
 
     # ---- TOPSIS ranking over 5 criteria (paper Section 5.3.1) -------------
     last_pay = np.array([float(r.get("last_pay_amount") or 0.0) for r in target_rows])
@@ -212,15 +225,18 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
 
     worklist = []
     for i, r in enumerate(target_rows):
-        e_norm = _minmax(expected[i], e_lo, e_hi)
-        d_norm = _minmax(past_due[i], d_lo, d_hi)
-        dpl, level, reasons = fuzzy.infer_priority(float(prob_app[i]), e_norm, d_norm)
+        # Domain risk-priority: delinquency severity + exposure + behavioral risk
+        # (bounce/refusal/decline reason, mandate status, field feedback) + vintage.
+        exposure_n = _minmax(exposure[i], x_lo, x_hi)
+        pr = priority.assess(r, exposure_n)
+        level, reasons = pr["level"], list(pr["reasons"])
 
         # Next best action: AHP ordering, personalized within the compliance
-        # playbook allowed by the fuzzy priority level.
+        # playbook, with escalation for hard-risk / refused accounts.
         nba, nba_why = choose_action(
             level, segments[i], int(r.get("current_bucket") or 0), float(prob_app[i]),
             int(r.get("refusals_6m") or 0), r.get("preferred_channel"), action_pref,
+            hard_risk=pr["hard_risk"], early_default=pr["early_default"],
         )
 
         worklist.append({
@@ -228,6 +244,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "region": r.get("region") or "",
             "segment": segments[i],
             "current_bucket": int(r.get("current_bucket") or 0),
+            "days_past_due": int(r.get("days_past_due") or 0),
             "prob_promise_to_pay": round(float(prob_p2p[i]), 4),
             "prob_actual_payment": round(float(prob_app[i]), 4),
             "pos": round(float(total_bal[i]), 2),
@@ -235,7 +252,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "next_installment_amount": round(float(next_inst[i]), 2),
             "recoverable_amount": round(float(recoverable[i]), 2),
             "expected_payment": round(float(expected[i]), 2),
-            "priority_score": round(float(dpl), 1),
+            "priority_score": pr["score"],
             "priority_level": level,
             "topsis_score": round(float(topsis_scores[i]), 4),
             "next_best_action": nba,
@@ -247,19 +264,15 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "audit": {
                 "model_p2p": "RandomForest(200,d12)" if m_p2p else "prior=0.5",
                 "model_app": "RandomForest(200,d12)" if m_app else "prior=0.5",
-                "fuzzy_inputs": {
-                    "prob_actual_payment": round(float(prob_app[i]), 4),
-                    "expected_recovery_norm": round(e_norm, 4),
-                    "exposure_norm": round(d_norm, 4),
-                },
-                "action_from": "AHP x compliance playbook",
+                "priority_components": pr["components"],
+                "action_from": "risk-priority x compliance playbook",
                 "action_rationale": nba_why,
                 "human_review_required": level == "High" or nba == "legal_escalation",
             },
         })
 
-    # Rank worklist by TOPSIS score (primary) desc.
-    worklist.sort(key=lambda w: -w["topsis_score"])
+    # Rank by domain risk-priority (primary), TOPSIS closeness as tiebreaker.
+    worklist.sort(key=lambda w: (-w["priority_score"], -w["topsis_score"]))
     for rank, w in enumerate(worklist, 1):
         w["rank"] = rank
 

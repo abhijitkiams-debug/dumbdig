@@ -415,10 +415,8 @@
               <div class="kv"><span>P2P model</span><span>${w.audit.model_p2p}</span></div>
               <div class="kv"><span>Payment model</span><span>${w.audit.model_app}</span></div>
               <div class="kv"><span>Pay probability</span><span>${pct(w.prob_actual_payment)}</span></div>
-              <div class="kv"><span>Risk · delinquency</span><span>${w.audit.priority_components.severity}</span></div>
-              <div class="kv"><span>Risk · exposure</span><span>${w.audit.priority_components.exposure}</span></div>
-              <div class="kv"><span>Risk · behavior</span><span>${w.audit.priority_components.risk}</span></div>
-              <div class="kv"><span>Risk · vintage</span><span>${w.audit.priority_components.vintage}</span></div>
+              ${Object.entries(w.audit.priority_components||{}).map(([k,v])=>`<div class="kv"><span>Signal · ${k}</span><span>${v}</span></div>`).join("")}
+              <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||'—'}</span></div>
               <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
               <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
             </div>

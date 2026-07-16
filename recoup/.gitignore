@@ -3,3 +3,7 @@ data/*.csv
 output/*.json
 __pycache__/
 *.pyc
+
+# Persistent memory (SQLite, regenerated at runtime)
+memory/*.db
+memory/*.db-*

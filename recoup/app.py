@@ -19,11 +19,14 @@ import re
 import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import generate_data       # noqa: E402
 import ingest              # noqa: E402
+import learner             # noqa: E402
+import memory              # noqa: E402
 import pipeline            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +47,7 @@ def bootstrap(n_synth):
         print(f"Generating {n_synth} synthetic accounts …")
         generate_data.generate(n_synth, DATA)
     TRAIN_ROWS, _ = ingest.load_csv(DATA)
+    memory.init()  # persistent store for scored/feedback/outcomes/KB/model
     print(f"Fitting models on {len(TRAIN_ROWS)} accounts …")
     MODEL = pipeline.Recoup().fit(TRAIN_ROWS)
     for lbl, m in MODEL.metrics.items():
@@ -98,6 +102,48 @@ MAP_FIELDS = [
 ]
 
 
+def _parse_outcomes(path):
+    """Read an outcomes CSV/XLSX flexibly: account id + paid(+amount+action)."""
+    import csv as _csv
+    import io as _io
+    import re as _re
+    hdrs, _fmt = ingest.read_headers(path)
+    canon = {_re.sub(r"[^a-z0-9]", "", h.lower()): h for h in hdrs}
+
+    def find(*names):
+        for n in names:
+            k = _re.sub(r"[^a-z0-9]", "", n.lower())
+            if k in canon:
+                return canon[k]
+        return None
+
+    acct_col = find("account_id", "agreement_no", "agreement", "loan_id", "id")
+    paid_col = find("paid", "paid_yes_no", "paidflag", "didpay", "settled", "collected", "status")
+    amt_col = find("amount", "paid_amount", "collected_amount", "recovery")
+    act_col = find("action", "action_taken", "activity")
+    text, _enc = ingest._read_text(path) if not ingest._looks_like_xlsx(path) else (None, None)
+    out = []
+    if text is not None:
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        rdr = _csv.DictReader(_io.StringIO(text, newline=""), delimiter=ingest._sniff_delimiter(text[:4096]))
+        rdr.fieldnames = [h.strip() for h in (rdr.fieldnames or [])]
+        src = list(rdr)
+    else:
+        hh, src = ingest._read_xlsx(path)
+    for r in src:
+        aid = (r.get(acct_col) or "").strip() if acct_col else ""
+        if not aid:
+            continue
+        pv = (str(r.get(paid_col)) if paid_col else "").strip().lower()
+        paid = 1 if pv in ("1", "y", "yes", "true", "paid", "settled", "collected", "success") else 0
+        amt = 0.0
+        if amt_col:
+            amt = ingest._to_num(r.get(amt_col)) or 0.0
+        out.append({"account_id": aid, "paid": paid, "amount": amt,
+                    "action_taken": (r.get(act_col) or "").strip() if act_col else None})
+    return out
+
+
 def parse_multipart(headers, body):
     """
     Minimal multipart/form-data parser (stdlib only), so this runs on Python
@@ -130,14 +176,25 @@ def parse_multipart(headers, body):
     return fields, files
 
 
-def score_rows(rows, report, collectors, top_field):
+def score_rows(rows, report, collectors, top_field, lender="default"):
     global LAST_WORKLIST
-    results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field)
+    results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field, lender=lender)
     results["ingest_report"] = report
-    # If the upload carried labels, evaluate against them for transparency.
+    results["lender"] = lender
     labeled = [r for r in rows if r.get("label_actual_payment") is not None]
     results["uploaded_labels_present"] = len(labeled) == len(rows) and len(rows) > 0
+
+    # Persist to memory so the model can learn from later feedback/outcomes.
+    try:
+        run_id = memory.record_run(lender, len(results["worklist"]), {"confidence": results["summary"].get("confidence")})
+        memory.record_scored(run_id, lender, results["worklist"])
+    except Exception as e:
+        print("memory persist failed:", e)
+
     LAST_WORKLIST = list(results["worklist"])  # keep the FULL list for CSV export
+    # Strip internal feature vectors from the browser payload.
+    for w in results["worklist"]:
+        w.pop("_features", None)
     return _trim(results)
 
 
@@ -195,9 +252,12 @@ class Handler(BaseHTTPRequestHandler):
             with open(WEB, "rb") as f:
                 self._send(200, f.read().decode(), "text/html; charset=utf-8")
         elif path == "/api/sample":
-            results = score_rows(list(TRAIN_ROWS), {"note": "bundled synthetic sample"}, 3, 90)
+            results = score_rows(list(TRAIN_ROWS), {"note": "bundled synthetic sample"}, 3, 90, lender="sample")
             results["source"] = "synthetic sample"
             self._send(200, results)
+        elif path == "/api/memory":
+            lender = parse_qs(urlparse(self.path).query).get("lender", [None])[0]
+            self._send(200, {"stats": memory.stats(lender), "lender": lender})
         elif path == "/api/sample-csv":
             # Hand back a small, correctly-shaped CSV users can edit and re-upload.
             with open(DATA) as f:
@@ -221,24 +281,34 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, {"error": "not found"})
 
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        return self.rfile.read(length)
+
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/api/score", "/api/inspect"):
-            return self._send(404, {"error": "not found"})
+        if path in ("/api/score", "/api/inspect"):
+            return self._handle_upload(path)
+        if path == "/api/feedback":
+            return self._handle_feedback()
+        if path == "/api/outcomes":
+            return self._handle_outcomes()
+        if path == "/api/learn":
+            return self._handle_learn()
+        return self._send(404, {"error": "not found"})
+
+    def _handle_upload(self, path):
         ctype = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in ctype:
             return self._send(400, {"error": "expected a multipart file upload"})
-        length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length)
-        fields, files = parse_multipart(self.headers, body)
+        fields, files = parse_multipart(self.headers, self._read_body())
         if "file" not in files or not files["file"]["content"]:
             return self._send(400, {"error": "no file uploaded"})
-        raw = files["file"]["content"]
         filename = files["file"].get("filename") or "upload"
 
         tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".dat", delete=False)
         try:
-            tmp.write(raw)
+            tmp.write(files["file"]["content"])
             tmp.close()
 
             if path == "/api/inspect":
@@ -246,32 +316,80 @@ class Handler(BaseHTTPRequestHandler):
                 if not headers:
                     return self._send(400, {"error": "could not read a header row from the file"})
                 return self._send(200, {
-                    "source_columns": headers,
-                    "format": fmt,
+                    "source_columns": headers, "format": fmt,
                     "suggested": ingest.suggest_mapping(headers),
-                    "fields": MAP_FIELDS,
-                    "filename": filename,
+                    "fields": MAP_FIELDS, "filename": filename,
                 })
 
-            # /api/score
             mapping = None
             if fields.get("mapping"):
                 try:
                     mapping = json.loads(fields["mapping"])
                 except (ValueError, TypeError):
                     mapping = None
+            lender = (fields.get("lender") or "default").strip() or "default"
             collectors = int(fields.get("collectors", "3") or 3)
             top_field = int(fields.get("top_field", "90") or 90)
             rows, report = ingest.load_csv(tmp.name, mapping=mapping)
             if not rows:
                 return self._send(400, {"error": "no data rows found in file"})
-            results = score_rows(rows, report, collectors, top_field)
+            results = score_rows(rows, report, collectors, top_field, lender=lender)
             results["source"] = filename
             self._send(200, results)
-        except Exception as e:  # surface parsing/scoring errors to the UI
+        except Exception as e:
             self._send(400, {"error": f"could not process file: {e}"})
         finally:
             os.unlink(tmp.name)
+
+    def _handle_feedback(self):
+        """Human-in-the-loop: override / approve / correct-KB, all captured."""
+        try:
+            d = json.loads(self._read_body() or b"{}")
+        except ValueError:
+            return self._send(400, {"error": "invalid JSON"})
+        lender = (d.get("lender") or "default").strip() or "default"
+        if not d.get("account_id") or not d.get("kind"):
+            return self._send(400, {"error": "account_id and kind are required"})
+        memory.record_feedback(
+            lender, d["account_id"], d["kind"],
+            predicted_level=d.get("predicted_level"), corrected_level=d.get("corrected_level"),
+            predicted_action=d.get("predicted_action"), corrected_action=d.get("corrected_action"),
+            note=d.get("note"), reviewer=d.get("reviewer", "user"),
+        )
+        self._send(200, {"ok": True, "stats": memory.stats(lender)})
+
+    def _handle_outcomes(self):
+        """Upload a CSV of outcomes (account_id, paid, amount, action) to learn from."""
+        ctype = self.headers.get("Content-Type", "")
+        if "multipart/form-data" not in ctype:
+            return self._send(400, {"error": "expected a CSV upload"})
+        fields, files = parse_multipart(self.headers, self._read_body())
+        if "file" not in files or not files["file"]["content"]:
+            return self._send(400, {"error": "no file uploaded"})
+        lender = (fields.get("lender") or "default").strip() or "default"
+        tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False)
+        try:
+            tmp.write(files["file"]["content"])
+            tmp.close()
+            rows = _parse_outcomes(tmp.name)
+            if not rows:
+                return self._send(400, {"error": "no usable outcome rows (need account id + paid)"})
+            n = memory.record_outcomes(lender, rows)
+            summary = learner.learn(lender)  # learn immediately
+            self._send(200, {"ok": True, "recorded": n, "learn": summary, "stats": memory.stats(lender)})
+        except Exception as e:
+            self._send(400, {"error": f"could not process outcomes: {e}"})
+        finally:
+            os.unlink(tmp.name)
+
+    def _handle_learn(self):
+        try:
+            d = json.loads(self._read_body() or b"{}")
+        except ValueError:
+            d = {}
+        lender = (d.get("lender") or "default").strip() or "default"
+        summary = learner.learn(lender)
+        self._send(200, {"ok": True, "learn": summary, "stats": memory.stats(lender)})
 
 
 def main():

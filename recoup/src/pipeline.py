@@ -17,7 +17,8 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 
 import ahp
-import priority
+import learner
+import signals
 from topsis import topsis
 from routing import plan_routes
 
@@ -165,78 +166,83 @@ class Recoup:
     def metrics(self):
         return self.trained["metrics"] if self.trained else {}
 
-    def score(self, target_rows, criteria_matrix=None, n_collectors=3, top_k_field=None):
+    def score(self, target_rows, criteria_matrix=None, n_collectors=3, top_k_field=None,
+              lender="default"):
         return _score(self.trained, self.segmenter, target_rows,
-                      criteria_matrix, n_collectors, top_k_field)
+                      criteria_matrix, n_collectors, top_k_field, lender)
 
 
 def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=3,
-                    top_k_field=None):
+                    top_k_field=None, lender="default"):
     """Convenience: fit on train_rows, then score target_rows in one call."""
     model = Recoup().fit(train_rows)
-    return model.score(target_rows, criteria_matrix, n_collectors, top_k_field)
+    return model.score(target_rows, criteria_matrix, n_collectors, top_k_field, lender)
 
 
 def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3,
-           top_k_field=None):
+           top_k_field=None, lender="default"):
     """
     Score target_rows with an already-fitted model + segmenter.
     Returns a results dict ready to serialize.
     """
     medians = trained["medians"]
-    Xt = _matrix(target_rows, medians)
-
-    m_p2p = trained["models"].get("label_promise_to_pay")
-    m_app = trained["models"].get("label_actual_payment")
-    prob_p2p = m_p2p.predict_proba(Xt)[:, 1] if m_p2p else np.full(len(target_rows), 0.5)
-    prob_app = m_app.predict_proba(Xt)[:, 1] if m_app else np.full(len(target_rows), 0.5)
-
+    n = len(target_rows)
     segments = apply_segmenter(segmenter, target_rows, medians)
 
-    # Amount at stake for recovery per account. In real collections books the
-    # recoverable amount is the Principal Outstanding (POS / total balance); we
-    # fall back to arrears (past due) and then the next installment when POS is
-    # not provided. Expected recovery is that amount weighted by the payment
-    # probability.
+    # ---- Flexible, signal-based risk-priority (KB-aware) ------------------
+    kb = learner.load_kb(lender)
+    sig_results, sig_meta = signals.score_portfolio(target_rows, kb)
+
+    # Recoverable amount is Principal Outstanding first (POS), then arrears,
+    # then installment. Expected recovery = recoverable x payment likelihood.
     total_bal = np.array([float(r.get("total_balance") or 0.0) for r in target_rows])
     next_inst = np.array([float(r.get("next_installment_amount") or medians[FEATURES.index("next_installment_amount")]) for r in target_rows])
     past_due = np.array([float(r.get("past_due_amount") or 0.0) for r in target_rows])
     recoverable = np.where(total_bal > 0, total_bal, np.where(past_due > 0, past_due, next_inst))
-    expected = prob_app * recoverable
 
-    # For prioritization, the "arrears/exposure" cost criterion uses past due if
-    # present, otherwise POS (so hard-bucket accounts still register exposure).
-    exposure = np.where(past_due > 0, past_due, total_bal)
+    # Feature vectors for the learned model (same flexible signal space).
+    feature_rows = []
+    for i, r in enumerate(target_rows):
+        comp = dict(sig_results[i]["components"])
+        comp["_reason_key"] = kb.reason_key(r.get("bounce_reason"), r.get("field_feedback"))
+        comp["_stage_key"] = kb.stage_key(r.get("paid_by"))
+        feature_rows.append(comp)
 
-    # Portfolio-relative normalization bounds.
-    e_lo, e_hi = float(expected.min()), float(np.percentile(expected, 98))
-    x_lo, x_hi = float(exposure.min()), float(np.percentile(exposure, 98))
+    # Payment likelihood: the learned model if this lender has one, else a
+    # heuristic (higher risk -> lower likelihood) until outcomes arrive.
+    learned = learner.pay_likelihood(lender, feature_rows)
+    if learned is not None:
+        pay_prob = np.clip(learned, 0.02, 0.98)
+        pay_source = "learned model"
+    else:
+        pay_prob = np.array([float(np.clip(1 - 0.75 * sig_results[i]["composite"], 0.05, 0.95)) for i in range(n)])
+        pay_source = "heuristic (no outcomes yet)"
+    expected = pay_prob * recoverable
 
-    # ---- TOPSIS ranking over 5 criteria (paper Section 5.3.1) -------------
+    # ---- TOPSIS ranking (recovery value x likelihood) ---------------------
     last_pay = np.array([float(r.get("last_pay_amount") or 0.0) for r in target_rows])
-    crit = np.column_stack([recoverable, last_pay, exposure, prob_app, expected])
-    weights = [0.15, 0.05, 0.15, 0.30, 0.35]
-    benefit = [True, True, True, True, True]  # higher recoverable/exposure => higher priority
-    topsis_scores = topsis(crit, weights, benefit)
+    exposure = np.where(past_due > 0, past_due, total_bal)
+    crit = np.column_stack([recoverable, last_pay, exposure, pay_prob, expected])
+    topsis_scores = topsis(crit, [0.15, 0.05, 0.15, 0.30, 0.35], [True, True, True, True, True])
 
-    # ---- AHP action ordering (shared across the portfolio) ----------------
     ranked_actions, ahp_cr = ahp.rank_actions(criteria_matrix)
     action_pref = [a for a, _ in ranked_actions]
 
     worklist = []
     for i, r in enumerate(target_rows):
-        # Domain risk-priority: delinquency severity + exposure + behavioral risk
-        # (bounce/refusal/decline reason, mandate status, field feedback) + vintage.
-        exposure_n = _minmax(exposure[i], x_lo, x_hi)
-        pr = priority.assess(r, exposure_n)
-        level, reasons = pr["level"], list(pr["reasons"])
+        sr = sig_results[i]
+        level, reasons = sr["priority_level"], list(sr["reasons"])
+        reason_key = feature_rows[i]["_reason_key"]
+        hard_risk = sr["redflag"] and reason_key in ("refusal", "absconding", "account_closed", "dispute")
+        mob = r.get("months_on_book")
+        if mob is None and r.get("customer_tenure_years") is not None:
+            mob = float(r["customer_tenure_years"]) * 12
+        early_default = mob is not None and float(mob) <= 6
 
-        # Next best action: AHP ordering, personalized within the compliance
-        # playbook, with escalation for hard-risk / refused accounts.
         nba, nba_why = choose_action(
-            level, segments[i], int(r.get("current_bucket") or 0), float(prob_app[i]),
+            level, segments[i], int(r.get("current_bucket") or 0), float(pay_prob[i]),
             int(r.get("refusals_6m") or 0), r.get("preferred_channel"), action_pref,
-            hard_risk=pr["hard_risk"], early_default=pr["early_default"],
+            hard_risk=hard_risk, early_default=early_default,
         )
 
         worklist.append({
@@ -244,16 +250,17 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "region": r.get("region") or "",
             "segment": segments[i],
             "current_bucket": int(r.get("current_bucket") or 0),
-            "days_past_due": int(r.get("days_past_due") or 0),
-            "prob_promise_to_pay": round(float(prob_p2p[i]), 4),
-            "prob_actual_payment": round(float(prob_app[i]), 4),
+            "days_past_due": int(r.get("days_past_due") or 0) if r.get("days_past_due") is not None else None,
+            "prob_promise_to_pay": round(float(pay_prob[i]), 4),
+            "prob_actual_payment": round(float(pay_prob[i]), 4),
             "pos": round(float(total_bal[i]), 2),
             "past_due_amount": round(float(past_due[i]), 2),
             "next_installment_amount": round(float(next_inst[i]), 2),
             "recoverable_amount": round(float(recoverable[i]), 2),
             "expected_payment": round(float(expected[i]), 2),
-            "priority_score": pr["score"],
+            "priority_score": sr["priority_score"],
             "priority_level": level,
+            "confidence": sr["confidence"],
             "topsis_score": round(float(topsis_scores[i]), 4),
             "next_best_action": nba,
             "preferred_channel": r.get("preferred_channel") or "",
@@ -261,17 +268,18 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "geo_x": r.get("geo_x"),
             "geo_y": r.get("geo_y"),
             "reasons": reasons,
+            "_features": feature_rows[i],
             "audit": {
-                "model_p2p": "RandomForest(200,d12)" if m_p2p else "prior=0.5",
-                "model_app": "RandomForest(200,d12)" if m_app else "prior=0.5",
-                "priority_components": pr["components"],
-                "action_from": "risk-priority x compliance playbook",
+                "pay_source": pay_source,
+                "confidence": sr["confidence"],
+                "priority_components": sr["components"],
+                "action_from": "flexible risk-priority x compliance playbook",
                 "action_rationale": nba_why,
                 "human_review_required": level == "High" or nba == "legal_escalation",
             },
         })
 
-    # Rank by domain risk-priority (primary), TOPSIS closeness as tiebreaker.
+    # Rank by flexible risk-priority (primary), TOPSIS closeness as tiebreaker.
     worklist.sort(key=lambda w: (-w["priority_score"], -w["topsis_score"]))
     for rank, w in enumerate(worklist, 1):
         w["rank"] = rank
@@ -310,11 +318,14 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         "field_expected_recovery": round(sum(rt["expected_recovery"] for rt in routes), 2),
     }
 
-    # Note any uploaded columns we could not recognize -> which get imputed.
+    summary["confidence"] = sig_meta.get("confidence")
+    summary["pay_source"] = pay_source
+
     return {
         "model_metrics": trained["metrics"],
         "ahp_consistency_ratio": ahp_cr,
         "ahp_action_ranking": ranked_actions,
+        "signal_meta": sig_meta,
         "summary": summary,
         "worklist": worklist,
         "routes": routes,

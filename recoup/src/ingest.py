@@ -116,7 +116,10 @@ def _to_num(v):
     try:
         return float(s)
     except ValueError:
-        return None
+        # Fallback: pull the first number out of a labelled value, e.g.
+        # "MOB 4" -> 4, "3 months" -> 3, "Bucket-2" -> 2.
+        m = re.search(r"-?\d+\.?\d*", s)
+        return float(m.group()) if m else None
 
 
 def _parse_date(v):

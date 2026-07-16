@@ -218,6 +218,30 @@
   .comp-list li { display:flex; gap:9px; font-size:12.5px; color:var(--ink-2); }
   .comp-list .tick { color:var(--accent); font-weight:700; }
 
+  /* human-in-the-loop feedback (in row detail) */
+  .fb { margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .fb h4 { margin:0 8px 0 0; }
+  .fb select, .fb input { font-family:var(--f-sans); font-size:12px; padding:5px 8px; border:1px solid var(--border); border-radius:7px; background:var(--panel); color:var(--ink); }
+  .fb button { font-size:11.5px; font-weight:600; padding:5px 11px; border-radius:7px; border:1px solid var(--border); background:var(--panel); color:var(--ink); cursor:pointer; }
+  .fb button.ok { border-color:color-mix(in srgb,var(--accent) 40%,transparent); color:var(--accent-ink); }
+  .fb button:hover { border-color:var(--accent); }
+  .fb .fb-msg { font-size:11.5px; color:var(--accent-ink); }
+  .conf-tag { font-size:10px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .conf-high { background:var(--accent-soft); color:var(--accent-ink); }
+  .conf-medium { background:var(--warn-soft); color:var(--warn); }
+  .conf-low { background:var(--crit-soft); color:var(--crit); }
+
+  /* learning panel */
+  .mem-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+  .mem-stat { background:var(--panel-2); border:1px solid var(--border-2); border-radius:9px; padding:9px 10px; text-align:center; }
+  .mem-stat .ms-n { font-family:var(--f-mono); font-size:19px; font-weight:600; color:var(--ink); }
+  .mem-stat .ms-l { font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-3); margin-top:2px; }
+  .learn-hint { font-size:12px; color:var(--ink-2); margin:0 0 10px; }
+  .learn-hint code { font-family:var(--f-mono); font-size:11px; background:var(--raise); padding:1px 5px; border-radius:4px; }
+  #learn-result { margin-top:10px; font-size:12.5px; color:var(--ink-2); display:grid; gap:5px; }
+  #learn-result .lr { display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-top:1px solid var(--border-2); }
+  #learn-result .lr b { font-family:var(--f-mono); color:var(--accent-ink); }
+
   #results { display:none; scroll-margin-top:80px; }
   footer { margin-top:40px; padding-top:20px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
   footer b { color:var(--ink-2); font-weight:600; }
@@ -262,6 +286,7 @@
         </div>
         <input type="file" id="fileinput" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
         <div class="controls">
+          <div class="ctrl"><label for="lender">Lender / book</label><input id="lender" type="text" value="default" style="width:130px;" title="The model learns separately per lender"></div>
           <div class="ctrl"><label for="collectors">Field collectors</label><input id="collectors" type="number" min="1" max="12" value="3"></div>
           <div class="ctrl"><label for="topfield">Max field visits</label><input id="topfield" type="number" min="10" max="500" value="90"></div>
         </div>
@@ -340,6 +365,20 @@
         <section class="card"><div class="card-h"><h2>Model performance</h2><span class="eyebrow" id="perf-src">Held-out</span></div><div class="card-b" id="metrics"></div></section>
         <section class="card"><div class="card-h"><h2>Next-best-action weighting</h2><span class="eyebrow">AHP</span></div><div class="card-b" id="ahp"></div></section>
         <section class="card"><div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div><div class="card-b" id="compliance"></div></section>
+
+        <section class="card" id="learning-card"><div class="card-h"><h2>Learning &amp; memory</h2><span class="eyebrow">Keeps improving</span></div>
+          <div class="card-b">
+            <div id="mem-stats" class="mem-stats"></div>
+            <p class="learn-hint">Feed back real outcomes so the model keeps learning for this lender. CSV columns: <code>account_id, paid, amount, action</code>.</p>
+            <div class="btns">
+              <button class="act primary" id="btn-outcomes">Upload outcomes</button>
+              <button class="act" id="btn-learn">Retrain now</button>
+              <input type="file" id="outcomes-input" accept=".csv,.xlsx" hidden>
+            </div>
+            <div id="learn-status" class="status" role="status" aria-live="polite"></div>
+            <div id="learn-result"></div>
+          </div>
+        </section>
       </div>
     </div>
   </section>
@@ -471,6 +510,7 @@ async function scoreFile(mapping){
   $("#btn-score").disabled = true; $("#btn-score-mapped").disabled = true;
   const fd = new FormData();
   fd.append("file", chosen);
+  fd.append("lender", lenderName());
   fd.append("collectors", $("#collectors").value||"3");
   fd.append("top_field", $("#topfield").value||"90");
   if(mapping) fd.append("mapping", JSON.stringify(mapping));
@@ -514,12 +554,15 @@ function render(data){
   renderMetrics(data.model_metrics, data.uploaded_labels_present);
   renderAHP(data);
   renderCompliance(data.summary, data.worklist);
+  refreshMemory();
 
   $("#btn-download").style.display = "inline-block";
   $("#results").style.display = "block";
   $("#report-card").style.display = "block";
   $("#results").scrollIntoView({behavior:"smooth", block:"start"});
 }
+
+const lenderName = () => ($("#lender").value || "default").trim() || "default";
 
 function renderReport(data){
   const r = data.ingest_report || {};
@@ -589,20 +632,25 @@ function renderWorklist(){
           <div class="audit">
             <div class="kv"><span>Outstanding (POS)</span><span>${money(w.pos!=null?w.pos:0)}</span></div>
             <div class="kv"><span>Days past due</span><span>${w.days_past_due!=null?w.days_past_due:"—"}</span></div>
-            <div class="kv"><span>Pay probability</span><span>${pct(w.prob_actual_payment)}</span></div>
-            ${w.audit.priority_components?`
-            <div class="kv"><span>Risk · delinquency</span><span>${w.audit.priority_components.severity}</span></div>
-            <div class="kv"><span>Risk · exposure</span><span>${w.audit.priority_components.exposure}</span></div>
-            <div class="kv"><span>Risk · behavior</span><span>${w.audit.priority_components.risk}</span></div>
-            <div class="kv"><span>Risk · vintage</span><span>${w.audit.priority_components.vintage}</span></div>`:``}
+            <div class="kv"><span>Pay likelihood <span style="color:var(--ink-3)">(${w.audit.pay_source||''})</span></span><span>${pct(w.prob_actual_payment)}</span></div>
+            ${Object.entries(w.audit.priority_components||{}).map(([k,v])=>`<div class="kv"><span>Signal · ${k}</span><span>${v}</span></div>`).join("")}
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
-            <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
+            <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||'—'}</span></div>
           </div>
           <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
         </div>
+      </div>
+      <div class="fb" data-acct="${w.account_id}" data-level="${w.priority_level}" data-action="${w.next_best_action}">
+        <h4>Your call</h4>
+        <label style="font-size:11.5px;color:var(--ink-3)">Set priority</label>
+        <select class="fb-level"><option ${w.priority_level==='High'?'selected':''}>High</option><option ${w.priority_level==='Medium'?'selected':''}>Medium</option><option ${w.priority_level==='Low'?'selected':''}>Low</option></select>
+        <input class="fb-note" type="text" placeholder="reason (optional)" style="width:170px;">
+        <button class="fb-save">Save override</button>
+        <button class="ok fb-approve">✓ Approve</button>
+        <span class="fb-msg"></span>
       </div>`;
     det.append(td);
-    tr.addEventListener("click", ()=>{ const open=tr.classList.toggle("open"); det.style.display=open?"table-row":"none"; });
+    tr.addEventListener("click", (e)=>{ if(e.target.closest(".fb")) return; const open=tr.classList.toggle("open"); det.style.display=open?"table-row":"none"; });
     body.append(tr, det);
   });
   if(rows.length===0){ const tr=el("tr"); const td=el("td"); td.colSpan=9; td.style.padding="20px"; td.style.color="var(--ink-3)"; td.textContent="No accounts match."; tr.append(td); body.append(tr); }
@@ -613,6 +661,68 @@ document.querySelectorAll("#filters .chip").forEach(ch=>ch.addEventListener("cli
   ch.setAttribute("aria-pressed","true"); filter=ch.dataset.f; renderWorklist();
 }));
 $("#search").addEventListener("input", e=>{ query=e.target.value.toLowerCase().trim(); renderWorklist(); });
+
+// ---- human-in-the-loop feedback (delegated) ----
+$("#wl-body").addEventListener("click", async (e)=>{
+  const save = e.target.closest(".fb-save"), appr = e.target.closest(".fb-approve");
+  if(!save && !appr) return;
+  const fb = e.target.closest(".fb"); const msg = fb.querySelector(".fb-msg");
+  let payload;
+  if(save){
+    payload = {lender:lenderName(), account_id:fb.dataset.acct, kind:"override",
+               predicted_level:fb.dataset.level, corrected_level:fb.querySelector(".fb-level").value,
+               note:fb.querySelector(".fb-note").value};
+  } else {
+    payload = {lender:lenderName(), account_id:fb.dataset.acct, kind:"approve",
+               predicted_level:fb.dataset.level, predicted_action:fb.dataset.action};
+  }
+  msg.textContent = "saving…";
+  try {
+    const res = await fetch("/api/feedback", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+    const d = await res.json();
+    msg.textContent = res.ok ? (save?"override saved ✓":"approved ✓") : (d.error||"error");
+    if(res.ok) refreshMemory();
+  } catch(err){ msg.textContent = "error"; }
+});
+
+// ---- learning & memory ----
+async function refreshMemory(){
+  try { const res = await fetch("/api/memory?lender="+encodeURIComponent(lenderName())); const d = await res.json(); renderMemStats(d.stats); } catch(e){}
+}
+function renderMemStats(s){
+  const wrap = $("#mem-stats"); if(!wrap) return; wrap.innerHTML="";
+  [["Scored",s.scored],["Feedback",s.feedback],["Outcomes",s.outcomes],["Runs",s.runs]].forEach(([l,n])=>{
+    const c = el("div","mem-stat"); c.innerHTML = `<div class="ms-n">${(n||0).toLocaleString()}</div><div class="ms-l">${l}</div>`; wrap.append(c);
+  });
+}
+function renderLearn(l){
+  if(!l) return; const box = $("#learn-result"); box.innerHTML="";
+  const rows = [["Outcomes used", l.outcomes||0], ["Model trained on", (l.trained_on||0)+" accounts"]];
+  if(l.model){ rows.push(["Train accuracy", Math.round(l.model.train_acc*100)+"%"]); rows.push(["Observed pay rate", Math.round(l.model.pay_rate*100)+"%"]); }
+  if(l.kb_changes){ rows.push(["Reasons recalibrated", l.kb_changes.reasons_recalibrated]); rows.push(["Actions tracked", l.kb_changes.actions_tracked]); }
+  rows.forEach(([k,v])=>{ const d = el("div","lr"); d.innerHTML = `<span>${k}</span><b>${v}</b>`; box.append(d); });
+}
+$("#btn-outcomes").addEventListener("click", ()=> $("#outcomes-input").click());
+$("#outcomes-input").addEventListener("change", async ()=>{
+  const f = $("#outcomes-input").files[0]; if(!f) return;
+  const ls = $("#learn-status"); ls.className="status"; ls.innerHTML='<span class="spinner"></span>Recording outcomes &amp; learning …';
+  const fd = new FormData(); fd.append("file", f); fd.append("lender", lenderName());
+  try {
+    const res = await fetch("/api/outcomes", {method:"POST", body:fd}); const d = await res.json();
+    if(!res.ok){ ls.className="status err"; ls.textContent = d.error||"error"; }
+    else { ls.className="status ok"; ls.textContent = `Recorded ${d.recorded} outcomes and retrained.`; renderLearn(d.learn); renderMemStats(d.stats); }
+  } catch(err){ ls.className="status err"; ls.textContent = "error: "+err.message; }
+  $("#outcomes-input").value = "";
+});
+$("#btn-learn").addEventListener("click", async ()=>{
+  const ls = $("#learn-status"); ls.className="status"; ls.innerHTML='<span class="spinner"></span>Retraining …';
+  try {
+    const res = await fetch("/api/learn", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({lender:lenderName()})});
+    const d = await res.json();
+    ls.className="status ok"; ls.textContent = "Retrained on stored feedback & outcomes."; renderLearn(d.learn); renderMemStats(d.stats);
+  } catch(err){ ls.className="status err"; ls.textContent = "error"; }
+});
+$("#lender").addEventListener("change", refreshMemory);
 
 function renderMap(routes){
   const legend=$("#map-legend"); legend.innerHTML="";

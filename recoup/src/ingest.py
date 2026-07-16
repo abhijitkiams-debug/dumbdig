@@ -219,8 +219,11 @@ def load_csv(path):
     report describes the mapping so we can show the user what was recognized.
     """
     text, encoding = _read_text(path)
+    # Normalize CRLF / old-Mac CR line endings so csv sees clean '\n' terminators
+    # (Windows/Excel exports otherwise raise "new-line character in unquoted field").
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     delimiter = _sniff_delimiter(text[:4096])
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    reader = csv.DictReader(io.StringIO(text, newline=""), delimiter=delimiter)
     headers = [h.strip() for h in (reader.fieldnames or [])]
     reader.fieldnames = headers
     colmap = _build_column_map(headers)

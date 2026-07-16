@@ -242,11 +242,11 @@
     <div class="upload">
       <div class="drop">
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop a CSV file">
-          <div class="big">Drop a CSV here, or click to choose</div>
+          <div class="big">Drop a CSV or Excel file here, or click to choose</div>
           <div class="small">One row per account. Any column names. Recoup maps them for you.</div>
           <div class="file" id="filename"></div>
         </div>
-        <input type="file" id="fileinput" accept=".csv,text/csv" hidden>
+        <input type="file" id="fileinput" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
         <div class="controls">
           <div class="ctrl"><label for="collectors">Field collectors</label><input id="collectors" type="number" min="1" max="12" value="3"></div>
           <div class="ctrl"><label for="topfield">Max field visits</label><input id="topfield" type="number" min="10" max="500" value="90"></div>
@@ -346,8 +346,15 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const money = n => "$" + Math.round(n).toLocaleString("en-US");
-const moneyK = n => n>=1e6 ? "$"+(n/1e6).toFixed(2)+"M" : n>=1e3 ? "$"+(n/1e3).toFixed(0)+"k" : "$"+Math.round(n);
+// Indian Rupee formatting, with lakh (L) / crore (Cr) for large figures.
+const money = n => "₹" + Math.round(n||0).toLocaleString("en-IN");
+const moneyK = n => {
+  n = n || 0;
+  if (n >= 1e7) return "₹" + (n/1e7).toFixed(2) + " Cr";
+  if (n >= 1e5) return "₹" + (n/1e5).toFixed(2) + " L";
+  if (n >= 1e3) return "₹" + (n/1e3).toFixed(1) + "k";
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+};
 const pct = x => Math.round(x*100) + "%";
 const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
 const prettyAction = a => (a||"").replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
@@ -429,7 +436,8 @@ function renderReport(data){
   if(r.recognized_fields) add("ok", `<b>${r.recognized_fields.length}</b> fields recognized`);
   if(r.row_count!=null) add("", `<b>${r.row_count.toLocaleString()}</b> rows`);
   if(r.derived_fields && r.derived_fields.length) add("ok", `<b>${r.derived_fields.length}</b> derived: ${r.derived_fields.map(d=>d.replace(/_/g," ")).join(", ")}`);
-  if(r.encoding) add("", `${r.encoding} · ${r.delimiter||"comma"}-delimited`);
+  if(r.format==="xlsx") add("", "Excel workbook (.xlsx)");
+  else if(r.encoding) add("", `${r.encoding} · ${r.delimiter||"comma"}-delimited`);
   if(r.missing_canonical_fields && r.missing_canonical_fields.length) add("warn", `<b>${r.missing_canonical_fields.length}</b> fields imputed`);
   if(r.unmapped_source_columns && r.unmapped_source_columns.length) add("", `unmapped: ${r.unmapped_source_columns.slice(0,6).join(", ")}${r.unmapped_source_columns.length>6?" …":""}`);
   if(data.uploaded_labels_present) add("ok", `labels present → models evaluated on your data`);
@@ -456,7 +464,9 @@ function renderCounts(wl){
 
 function renderTrunc(t){
   const box=$("#trunc");
-  if(t){ box.style.display="block"; box.textContent=`Showing the top ${t.shown.toLocaleString()} of ${t.total.toLocaleString()} accounts by priority. The summary above covers all of them.`; }
+  if(t){ box.style.display="block";
+    box.innerHTML = `All <b>${t.total.toLocaleString()}</b> accounts were scored and are reflected in the totals above. This table lists the top <b>${t.shown.toLocaleString()}</b> by priority for speed. Use <b>Download CSV</b> for the complete ${t.total.toLocaleString()}-row worklist.`;
+  }
   else box.style.display="none";
 }
 

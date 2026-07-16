@@ -213,11 +213,119 @@ def _sniff_delimiter(sample):
         return max(counts, key=counts.get) if any(counts.values()) else ","
 
 
+def _col_letters(ref):
+    """'AB12' -> 'AB' (the column part of a spreadsheet cell reference)."""
+    m = re.match(r"([A-Za-z]+)", ref or "")
+    return m.group(1).upper() if m else ""
+
+
+def _read_xlsx(path):
+    """
+    Read the first worksheet of an .xlsx file using only the standard library
+    (zipfile + XML). Returns (headers, raw_rows) where raw_rows is a list of
+    dicts keyed by header name. Avoids adding an openpyxl/pandas dependency.
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+
+        shared = []
+        if "xl/sharedStrings.xml" in names:
+            with z.open("xl/sharedStrings.xml") as f:
+                for _, el in ET.iterparse(f):
+                    if el.tag == ns + "si":
+                        shared.append("".join(t.text or "" for t in el.iter(ns + "t")))
+                        el.clear()
+
+        sheet = "xl/worksheets/sheet1.xml"
+        if sheet not in names:
+            cand = sorted(n for n in names if n.startswith("xl/worksheets/") and n.endswith(".xml"))
+            sheet = cand[0] if cand else None
+        if not sheet:
+            return [], []
+
+        grid = []
+        with z.open(sheet) as f:
+            for _, el in ET.iterparse(f):
+                if el.tag == ns + "row":
+                    cells = {}
+                    for c in el.findall(ns + "c"):
+                        col = _col_letters(c.get("r"))
+                        t = c.get("t")
+                        v = c.find(ns + "v")
+                        if t == "s":
+                            val = shared[int(v.text)] if v is not None and v.text else ""
+                        elif t == "inlineStr":
+                            is_ = c.find(ns + "is")
+                            val = "".join(tt.text or "" for tt in is_.iter(ns + "t")) if is_ is not None else ""
+                        else:
+                            val = v.text if v is not None else ""
+                        if col:
+                            cells[col] = val
+                    grid.append(cells)
+                    el.clear()
+
+    if not grid:
+        return [], []
+    header_cells = grid[0]
+    ordered_cols = sorted(header_cells.keys(), key=lambda c: (len(c), c))
+    headers = [str(header_cells[c]).strip() for c in ordered_cols]
+    col_to_header = {c: str(header_cells[c]).strip() for c in ordered_cols}
+    raw_rows = []
+    for cells in grid[1:]:
+        raw_rows.append({col_to_header.get(c, c): cells.get(c, "") for c in cells})
+    return headers, raw_rows
+
+
+def _looks_like_xlsx(path):
+    with open(path, "rb") as f:
+        return f.read(4) == b"PK\x03\x04"  # xlsx is a zip archive
+
+
+def _canonicalize(headers, raw_rows, source_kind):
+    """Map arbitrary headers -> canonical fields, coerce, derive, build report."""
+    headers = [h.strip() for h in headers]
+    colmap = _build_column_map(headers)
+    rows = []
+    for i, raw in enumerate(raw_rows):
+        row = {}
+        for field, src in colmap.items():
+            val = raw.get(src)
+            row[field] = _to_num(val) if field in NUMERIC else ("" if val is None else str(val).strip())
+        if not row.get("account_id"):
+            row["account_id"] = f"ROW-{i:05d}"
+        rows.append(row)
+
+    derived_fields = derive(rows)
+    report = {
+        "source_columns": headers,
+        "mapped": colmap,
+        "format": source_kind,
+        "recognized_fields": sorted(colmap.keys()),
+        "derived_fields": derived_fields,
+        "unmapped_source_columns": [h for h in headers if h not in colmap.values()],
+        "missing_canonical_fields": sorted(set(SYNONYMS) - set(colmap)),
+        "row_count": len(rows),
+    }
+    return rows, report
+
+
 def load_csv(path):
     """
-    Returns (rows, report) where rows is a list of canonicalized dicts and
-    report describes the mapping so we can show the user what was recognized.
+    Load a CSV or XLSX account file. Returns (rows, report) where rows is a list
+    of canonicalized dicts and report describes how the file was read. (Name kept
+    for backwards compatibility; it now also handles Excel .xlsx.)
     """
+    if _looks_like_xlsx(path):
+        headers, raw_rows = _read_xlsx(path)
+        rows, report = _canonicalize(headers, raw_rows, "xlsx")
+        report["encoding"] = "xlsx (Excel)"
+        report["delimiter"] = "n/a"
+        return rows, report
+
     text, encoding = _read_text(path)
     # Normalize CRLF / old-Mac CR line endings so csv sees clean '\n' terminators
     # (Windows/Excel exports otherwise raise "new-line character in unquoted field").
@@ -226,28 +334,8 @@ def load_csv(path):
     reader = csv.DictReader(io.StringIO(text, newline=""), delimiter=delimiter)
     headers = [h.strip() for h in (reader.fieldnames or [])]
     reader.fieldnames = headers
-    colmap = _build_column_map(headers)
-    rows = []
-    for i, raw in enumerate(reader):
-        row = {}
-        for field, src in colmap.items():
-            val = raw.get(src)
-            row[field] = _to_num(val) if field in NUMERIC else (val or "").strip()
-        if "account_id" not in row or not row.get("account_id"):
-            row["account_id"] = f"ROW-{i:05d}"
-        rows.append(row)
-
-    derived_fields = derive(rows)
-
-    report = {
-        "source_columns": headers,
-        "mapped": colmap,
-        "encoding": encoding,
-        "delimiter": {",": "comma", "\t": "tab", ";": "semicolon", "|": "pipe"}.get(delimiter, delimiter),
-        "recognized_fields": sorted(colmap.keys()),
-        "derived_fields": derived_fields,
-        "unmapped_source_columns": [h for h in headers if h not in colmap.values()],
-        "missing_canonical_fields": sorted(set(SYNONYMS) - set(colmap)),
-        "row_count": len(rows),
-    }
+    raw_rows = list(reader)
+    rows, report = _canonicalize(headers, raw_rows, "csv")
+    report["encoding"] = encoding
+    report["delimiter"] = {",": "comma", "\t": "tab", ";": "semicolon", "|": "pipe"}.get(delimiter, delimiter)
     return rows, report

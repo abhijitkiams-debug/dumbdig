@@ -107,7 +107,7 @@ def score_rows(rows, report, collectors, top_field):
 EXPORT_COLUMNS = [
     "rank", "account_id", "region", "segment", "current_bucket",
     "priority_level", "priority_score", "prob_promise_to_pay", "prob_actual_payment",
-    "past_due_amount", "next_installment_amount", "expected_payment", "topsis_score",
+    "pos", "past_due_amount", "recoverable_amount", "expected_payment", "topsis_score",
     "next_best_action", "preferred_channel", "best_contact_hour",
     "human_review_required", "reason",
 ]
@@ -124,7 +124,7 @@ def worklist_to_csv(worklist):
             row.get("rank"), row.get("account_id"), row.get("region"), row.get("segment"),
             row.get("current_bucket"), row.get("priority_level"), row.get("priority_score"),
             row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
-            row.get("past_due_amount"), row.get("next_installment_amount"),
+            row.get("pos"), row.get("past_due_amount"), row.get("recoverable_amount"),
             row.get("expected_payment"), row.get("topsis_score"), row.get("next_best_action"),
             row.get("preferred_channel"), row.get("best_contact_hour"),
             row.get("audit", {}).get("human_review_required"),

@@ -180,20 +180,30 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
 
     segments = apply_segmenter(segmenter, target_rows, medians)
 
-    # Expected recoverable value per account.
+    # Amount at stake for recovery per account. In real collections books the
+    # recoverable amount is the Principal Outstanding (POS / total balance); we
+    # fall back to arrears (past due) and then the next installment when POS is
+    # not provided. Expected recovery is that amount weighted by the payment
+    # probability.
+    total_bal = np.array([float(r.get("total_balance") or 0.0) for r in target_rows])
     next_inst = np.array([float(r.get("next_installment_amount") or medians[FEATURES.index("next_installment_amount")]) for r in target_rows])
     past_due = np.array([float(r.get("past_due_amount") or 0.0) for r in target_rows])
-    expected = prob_app * next_inst
+    recoverable = np.where(total_bal > 0, total_bal, np.where(past_due > 0, past_due, next_inst))
+    expected = prob_app * recoverable
+
+    # For prioritization, the "arrears/exposure" cost criterion uses past due if
+    # present, otherwise POS (so hard-bucket accounts still register exposure).
+    exposure = np.where(past_due > 0, past_due, total_bal)
 
     # Normalization bounds for fuzzy inputs (portfolio-relative).
     e_lo, e_hi = float(expected.min()), float(np.percentile(expected, 98))
-    d_lo, d_hi = float(past_due.min()), float(np.percentile(past_due, 98))
+    d_lo, d_hi = float(exposure.min()), float(np.percentile(exposure, 98))
 
     # ---- TOPSIS ranking over 5 criteria (paper Section 5.3.1) -------------
     last_pay = np.array([float(r.get("last_pay_amount") or 0.0) for r in target_rows])
-    crit = np.column_stack([next_inst, last_pay, past_due, prob_app, expected])
-    weights = [0.10, 0.10, 0.20, 0.30, 0.30]
-    benefit = [True, True, False, True, True]  # past due is a cost criterion
+    crit = np.column_stack([recoverable, last_pay, exposure, prob_app, expected])
+    weights = [0.15, 0.05, 0.15, 0.30, 0.35]
+    benefit = [True, True, True, True, True]  # higher recoverable/exposure => higher priority
     topsis_scores = topsis(crit, weights, benefit)
 
     # ---- AHP action ordering (shared across the portfolio) ----------------
@@ -220,8 +230,10 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "current_bucket": int(r.get("current_bucket") or 0),
             "prob_promise_to_pay": round(float(prob_p2p[i]), 4),
             "prob_actual_payment": round(float(prob_app[i]), 4),
+            "pos": round(float(total_bal[i]), 2),
             "past_due_amount": round(float(past_due[i]), 2),
             "next_installment_amount": round(float(next_inst[i]), 2),
+            "recoverable_amount": round(float(recoverable[i]), 2),
             "expected_payment": round(float(expected[i]), 2),
             "priority_score": round(float(dpl), 1),
             "priority_level": level,
@@ -237,8 +249,8 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
                 "model_app": "RandomForest(200,d12)" if m_app else "prior=0.5",
                 "fuzzy_inputs": {
                     "prob_actual_payment": round(float(prob_app[i]), 4),
-                    "expected_payment_norm": round(e_norm, 4),
-                    "past_due_norm": round(d_norm, 4),
+                    "expected_recovery_norm": round(e_norm, 4),
+                    "exposure_norm": round(d_norm, 4),
                 },
                 "action_from": "AHP x compliance playbook",
                 "action_rationale": nba_why,
@@ -275,6 +287,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
 
     summary = {
         "accounts": len(worklist),
+        "total_outstanding": round(float(recoverable.sum()), 2),
         "total_past_due": round(float(past_due.sum()), 2),
         "total_expected_recovery": round(float(expected.sum()), 2),
         "priority_breakdown": levels,

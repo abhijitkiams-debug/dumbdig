@@ -298,7 +298,7 @@
         <div class="trunc" id="trunc" style="display:none;"></div>
         <div class="wl-scroll">
           <table class="wl">
-            <thead><tr><th></th><th>Account</th><th>Segment</th><th>Priority</th><th class="r">P2P</th><th class="r">Pay prob.</th><th class="r">Past due</th><th class="r">Exp. recovery</th><th>Next best action</th></tr></thead>
+            <thead><tr><th></th><th>Account</th><th>Segment</th><th>Priority</th><th class="r">P2P</th><th class="r">Pay prob.</th><th class="r">Outstanding</th><th class="r">Exp. recovery</th><th>Next best action</th></tr></thead>
             <tbody id="wl-body"></tbody>
           </table>
         </div>
@@ -447,8 +447,8 @@ function renderReport(data){
 function renderKPIs(s){
   const defs = [
     {label:"Accounts scored", val:s.accounts.toLocaleString(), sub:"this run", cls:""},
-    {label:"Total past due", val:moneyK(s.total_past_due), sub:"outstanding arrears", cls:""},
-    {label:"Expected recovery", val:moneyK(s.total_expected_recovery), sub:"prob-weighted", cls:""},
+    {label:"Total outstanding", val:moneyK(s.total_outstanding!=null?s.total_outstanding:s.total_past_due), sub:"POS at risk", cls:""},
+    {label:"Expected recovery", val:moneyK(s.total_expected_recovery), sub:"POS × pay probability", cls:""},
     {label:"High priority", val:s.priority_breakdown.High.toLocaleString(), sub:"need attention now", cls:"crit"},
     {label:"Field visits", val:s.field_visits_planned, sub:moneyK(s.field_expected_recovery)+" routed", cls:"warn"},
   ];
@@ -482,7 +482,7 @@ function renderWorklist(){
       <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
       <td class="r"><span class="num">${pct(w.prob_promise_to_pay)}</span></td>
       <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
-      <td class="r"><span class="money">${money(w.past_due_amount)}</span></td>
+      <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
       <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
       <td><span class="action ${w.next_best_action}"><span class="ic"></span>${prettyAction(w.next_best_action)}</span></td>`;
     const det=el("tr","detail"); det.style.display="none";
@@ -494,11 +494,12 @@ function renderWorklist(){
           <ul class="why-list">${w.reasons.map(r=>`<li>${r}</li>`).join("")}<li>${w.audit.action_rationale}</li></ul></div>
         <div><h4>Audit trail</h4>
           <div class="audit">
+            <div class="kv"><span>Outstanding (POS)</span><span>${money(w.pos!=null?w.pos:0)}</span></div>
             <div class="kv"><span>P2P model</span><span>${w.audit.model_p2p}</span></div>
             <div class="kv"><span>Payment model</span><span>${w.audit.model_app}</span></div>
             <div class="kv"><span>Fuzzy · pay prob.</span><span>${w.audit.fuzzy_inputs.prob_actual_payment}</span></div>
-            <div class="kv"><span>Fuzzy · exp. (norm)</span><span>${w.audit.fuzzy_inputs.expected_payment_norm}</span></div>
-            <div class="kv"><span>Fuzzy · past due (norm)</span><span>${w.audit.fuzzy_inputs.past_due_norm}</span></div>
+            <div class="kv"><span>Fuzzy · exp. recovery (norm)</span><span>${w.audit.fuzzy_inputs.expected_recovery_norm}</span></div>
+            <div class="kv"><span>Fuzzy · exposure (norm)</span><span>${w.audit.fuzzy_inputs.exposure_norm}</span></div>
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
             <div class="kv"><span>TOPSIS closeness</span><span>${w.topsis_score}</span></div>
           </div>

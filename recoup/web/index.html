@@ -124,6 +124,7 @@
   .chip[aria-pressed="true"] { background:var(--ink); color:var(--bg); border-color:var(--ink); }
   .chip[aria-pressed="true"] .c-n { color:var(--bg); opacity:.7; }
   .chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .card-h .dl { margin-left:auto; padding:5px 11px; font-size:12px; text-decoration:none; }
   .toolbar input.search { margin-left:auto; font-size:12.5px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--ink); width:150px; font-family:var(--f-mono); }
   .trunc { padding:8px 16px; font-size:11.5px; color:var(--warn); background:var(--warn-soft); border-bottom:1px solid var(--border-2); }
 
@@ -204,8 +205,18 @@
   .comp-list .tick { color:var(--accent); font-weight:700; }
 
   #results { display:none; scroll-margin-top:80px; }
-  footer { margin-top:30px; padding-top:18px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
+  footer { margin-top:40px; padding-top:20px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
   footer b { color:var(--ink-2); font-weight:600; }
+  .terms { max-width:76ch; }
+  .terms > summary { font-family:var(--f-sans); font-size:12px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); cursor:pointer; list-style:none; padding:4px 0; }
+  .terms > summary::-webkit-details-marker { display:none; }
+  .terms > summary::before { content:"›"; display:inline-block; margin-right:8px; transition:transform .15s; color:var(--ink-3); }
+  .terms[open] > summary::before { transform:rotate(90deg); }
+  .terms > summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:3px; }
+  .terms-body { margin-top:10px; display:grid; gap:9px; }
+  .terms-body p { margin:0; font-size:12px; line-height:1.6; color:var(--ink-3); }
+  .terms-body b { color:var(--ink-2); }
+  .copyright { margin:16px 0 0; font-size:11.5px; color:var(--ink-3); }
   @media (max-width:920px) { .grid, .upload { grid-template-columns:1fr; } .kpis { grid-template-columns:repeat(2,1fr); } .detail-box { grid-template-columns:1fr; } .drop { border-right:none; border-bottom:1px solid var(--border-2); } }
   @media (prefers-reduced-motion:reduce){ * { transition:none !important; animation:none !important; } }
 </style>
@@ -220,10 +231,10 @@
 
 <div class="wrap">
   <section class="lede">
-    <h1>Upload a book of accounts. Get a ranked action for each — and the reason.</h1>
-    <p>Recoup scores every debtor for promise-to-pay and actual payment, turns those into a
-      human-readable priority, picks the next best action inside a compliance playbook, and routes
-      field visits by recoverable value. It runs entirely on your machine — files never leave it.</p>
+    <h1>Know who will pay. Know what to do.</h1>
+    <p>Recoup reads your entire book and gives every account a rank, an action, and a reason.
+      Thousands of decisions become one simple list. It runs entirely on your computer, and your
+      data never leaves it.</p>
   </section>
 
   <!-- Upload -->
@@ -232,7 +243,7 @@
       <div class="drop">
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop a CSV file">
           <div class="big">Drop a CSV here, or click to choose</div>
-          <div class="small">One row per account. Any column names — Recoup maps them automatically.</div>
+          <div class="small">One row per account. Any column names. Recoup maps them for you.</div>
           <div class="file" id="filename"></div>
         </div>
         <input type="file" id="fileinput" accept=".csv,text/csv" hidden>
@@ -274,7 +285,9 @@
     <div class="kpis" id="kpis"></div>
     <div class="grid">
       <section class="card" aria-label="Account worklist">
-        <div class="card-h"><h2>Prioritized worklist</h2><span class="eyebrow">TOPSIS-ranked</span></div>
+        <div class="card-h"><h2>Prioritized worklist</h2>
+          <a class="act dl" id="btn-download" href="/api/export.csv" style="display:none;">↓ Download CSV</a>
+          <span class="eyebrow" style="margin-left:12px;">TOPSIS-ranked</span></div>
         <div class="toolbar" id="filters">
           <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
           <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
@@ -303,10 +316,31 @@
   </section>
 
   <footer>
-    <p>Recoup implements the three-layer framework from <b>Lappas &amp; Xanthopoulos, Finance Research Open (2026)</b>:
-      Layer 1 <b>rule extraction</b> (K-means segments) · Layer 2 <b>prediction</b> (Random Forest P2P/APP) ·
-      Layer 3 <b>optimization</b> (fuzzy priority, TOPSIS, AHP, routing). Models are trained on a synthetic book;
-      your uploaded file is scored locally and never transmitted.</p>
+    <details class="terms" open>
+      <summary>Terms &amp; Conditions</summary>
+      <div class="terms-body">
+        <p><b>1. What Recoup is.</b> Recoup is a decision support tool. It suggests priorities and
+          recommended actions. It does not make automated decisions about any person. A trained user
+          must review every output before acting on it.</p>
+        <p><b>2. No professional advice.</b> Recoup does not provide legal, financial, regulatory, or
+          credit advice. You are solely responsible for the decisions you make and the actions you take.</p>
+        <p><b>3. Accuracy and warranties.</b> Scores are statistical estimates produced by machine
+          learning models. Recoup is provided on an "as is" and "as available" basis, without warranty
+          of any kind, whether express or implied, including fitness for a particular purpose.</p>
+        <p><b>4. Your responsibilities.</b> You confirm that you have a lawful basis to process the
+          data you upload, and that your use complies with all applicable laws, including data
+          protection (such as the GDPR and the DPDP Act), fair lending rules, and debt collection
+          regulations in your jurisdiction.</p>
+        <p><b>5. Your data.</b> Files you upload are processed locally on your own machine. They are
+          not transmitted to us or to any third party. You remain responsible for the security and
+          lawful handling of that data.</p>
+        <p><b>6. Limitation of liability.</b> To the maximum extent permitted by law, Recoup and its
+          authors are not liable for any loss, damage, cost, or regulatory consequence arising from
+          use of the tool or reliance on its output.</p>
+        <p><b>7. Acceptance.</b> By using Recoup you agree to these Terms and Conditions.</p>
+      </div>
+    </details>
+    <p class="copyright">&copy; <span id="year"></span> Recoup. All rights reserved.</p>
   </footer>
 </div>
 
@@ -320,6 +354,8 @@ const prettyAction = a => (a||"").replace(/_/g," ").replace(/\b\w/g,m=>m.toUpper
 const routeColors = ["#0E8A6E","#B4431D","#3B6EA5","#9A6B12","#6E4FA0","#2E8B8B"];
 
 let DATA = null, filter = "All", query = "";
+
+document.getElementById("year").textContent = new Date().getFullYear();
 
 // ---- upload wiring ----
 const fileinput = $("#fileinput"), dz = $("#dropzone");
@@ -379,6 +415,7 @@ function render(data){
   renderAHP(data);
   renderCompliance(data.summary, data.worklist);
 
+  $("#btn-download").style.display = "inline-block";
   $("#results").style.display = "block";
   $("#report-card").style.display = "block";
   $("#results").scrollIntoView({behavior:"smooth", block:"start"});

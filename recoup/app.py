@@ -32,6 +32,7 @@ WEB = os.path.join(HERE, "web", "index.html")
 
 MODEL = None            # fitted pipeline.Recoup
 TRAIN_ROWS = None       # synthetic labeled book (also used as the sample)
+LAST_WORKLIST = None    # full scored worklist from the most recent run (for CSV export)
 MAX_ROWS = 4000         # cap rows returned to the browser to keep the DOM sane
 
 
@@ -92,12 +93,44 @@ def parse_multipart(headers, body):
 
 
 def score_rows(rows, report, collectors, top_field):
+    global LAST_WORKLIST
     results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field)
     results["ingest_report"] = report
     # If the upload carried labels, evaluate against them for transparency.
     labeled = [r for r in rows if r.get("label_actual_payment") is not None]
     results["uploaded_labels_present"] = len(labeled) == len(rows) and len(rows) > 0
+    LAST_WORKLIST = list(results["worklist"])  # keep the FULL list for CSV export
     return _trim(results)
+
+
+# Columns exported to CSV, in order.
+EXPORT_COLUMNS = [
+    "rank", "account_id", "region", "segment", "current_bucket",
+    "priority_level", "priority_score", "prob_promise_to_pay", "prob_actual_payment",
+    "past_due_amount", "next_installment_amount", "expected_payment", "topsis_score",
+    "next_best_action", "preferred_channel", "best_contact_hour",
+    "human_review_required", "reason",
+]
+
+
+def worklist_to_csv(worklist):
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(EXPORT_COLUMNS)
+    for row in worklist:
+        w.writerow([
+            row.get("rank"), row.get("account_id"), row.get("region"), row.get("segment"),
+            row.get("current_bucket"), row.get("priority_level"), row.get("priority_score"),
+            row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
+            row.get("past_due_amount"), row.get("next_installment_amount"),
+            row.get("expected_payment"), row.get("topsis_score"), row.get("next_best_action"),
+            row.get("preferred_channel"), row.get("best_contact_hour"),
+            row.get("audit", {}).get("human_review_required"),
+            "; ".join(row.get("reasons", []) + [row.get("audit", {}).get("action_rationale", "")]).strip("; "),
+        ])
+    return buf.getvalue()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -134,6 +167,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(head.encode())))
             self.end_headers()
             self.wfile.write(head.encode())
+        elif path == "/api/export.csv":
+            if not LAST_WORKLIST:
+                return self._send(400, {"error": "nothing to export yet; score a file first"})
+            body = worklist_to_csv(LAST_WORKLIST).encode("utf-8-sig")  # BOM so Excel opens it clean
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv")
+            self.send_header("Content-Disposition", "attachment; filename=recoup_worklist.csv")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._send(404, {"error": "not found"})
 

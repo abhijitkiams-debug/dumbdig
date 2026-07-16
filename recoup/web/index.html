@@ -172,6 +172,25 @@
   .action.legal_escalation { color:var(--crit); border-color:color-mix(in srgb,var(--crit) 35%,transparent); }
   .action.legal_escalation .ic { background:var(--crit); }
   .action.settlement_offer .ic { background:var(--warn); }
+  .strat-tag { font-size:10px; color:var(--ink-3); margin-top:3px; max-width:150px; }
+  /* strategy timeline in row detail */
+  .strategy { background:var(--panel-2); border-top:1px dashed var(--border); padding:14px 16px 14px 44px; }
+  .strat-head { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; margin-bottom:10px; }
+  .strat-name { font-size:13px; font-weight:650; color:var(--ink); }
+  .strat-why { font-size:12px; color:var(--ink-2); }
+  .strat-cost { margin-left:auto; font-family:var(--f-mono); font-size:11px; color:var(--ink-3); }
+  .touches { display:grid; gap:8px; }
+  .touch { display:grid; grid-template-columns:56px 1fr; gap:12px; align-items:start; }
+  .t-day { font-family:var(--f-mono); font-size:11px; color:var(--accent-ink); font-weight:600; padding-top:2px; border-right:2px solid var(--border); }
+  .t-head { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .t-ch { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .t-script { font-size:11px; color:var(--ink-3); text-transform:capitalize; }
+  .t-tone { font-size:10px; letter-spacing:.04em; text-transform:uppercase; font-weight:600; padding:1px 6px; border-radius:4px; background:var(--calm-soft); color:var(--ink-2); }
+  .t-tone.toneempathetic { background:var(--accent-soft); color:var(--accent-ink); }
+  .t-tone.tonefirm, .t-tone.tonefinalwarning { background:var(--warn-soft); color:var(--warn); }
+  .t-tone.tonelegal { background:var(--crit-soft); color:var(--crit); }
+  .t-msg { font-size:12px; color:var(--ink-2); margin-top:3px; font-style:italic; line-height:1.45; }
+  .strat-esc { margin-top:10px; font-size:11.5px; color:var(--ink-3); padding-top:8px; border-top:1px solid var(--border-2); }
   .caret { color:var(--ink-3); transition:transform .15s; display:inline-block; font-size:11px; }
   tr.row.open .caret { transform:rotate(90deg); }
   tr.detail td { padding:0; }
@@ -363,7 +382,8 @@
           <div class="card-b" style="padding-top:6px;"><canvas id="map" width="640" height="640" role="img" aria-label="Optimized field-collector routes"></canvas><div id="map-stats" style="margin-top:10px;"></div></div>
         </section>
         <section class="card"><div class="card-h"><h2>Model performance</h2><span class="eyebrow" id="perf-src">Held-out</span></div><div class="card-b" id="metrics"></div></section>
-        <section class="card"><div class="card-h"><h2>Next-best-action weighting</h2><span class="eyebrow">AHP</span></div><div class="card-b" id="ahp"></div></section>
+        <section class="card"><div class="card-h"><h2>Strategy &amp; channel mix</h2><span class="eyebrow">Multi-channel</span></div><div class="card-b" id="strategy-mix"></div></section>
+        <section class="card"><div class="card-h"><h2>Channel weighting</h2><span class="eyebrow">AHP</span></div><div class="card-b" id="ahp"></div></section>
         <section class="card"><div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div><div class="card-b" id="compliance"></div></section>
 
         <section class="card" id="learning-card"><div class="card-h"><h2>Learning &amp; memory</h2><span class="eyebrow">Keeps improving</span></div>
@@ -551,6 +571,7 @@ function render(data){
   renderTrunc(data.worklist_truncated);
   renderWorklist();
   renderMap(data.routes);
+  renderStrategyMix(data.summary);
   renderMetrics(data.model_metrics, data.uploaded_labels_present);
   renderAHP(data);
   renderCompliance(data.summary, data.worklist);
@@ -563,6 +584,30 @@ function render(data){
 }
 
 const lenderName = () => ($("#lender").value || "default").trim() || "default";
+
+const CH_ICON = {whatsapp:"🟢", sms:"✉", email:"✉", ivr:"☎", voicebot:"🔊", agent_call:"📞", letter:"📄", field_visit:"📍", settlement:"🤝", legal:"⚖"};
+function strategyHTML(s){
+  const touches = s.touches.map(t=>`
+    <div class="touch">
+      <div class="t-day">Day ${t.day}</div>
+      <div class="t-body">
+        <div class="t-head"><span class="t-ch">${CH_ICON[t.channel]||"•"} ${t.channel_label}</span>
+          <span class="t-tone tone-${t.tone.replace(/[^a-z]/g,'')}">${t.tone}</span>
+          <span class="t-script">${t.script_type.replace(/_/g," ")}</span></div>
+        <div class="t-msg">${t.message}</div>
+      </div>
+    </div>`).join("");
+  return `
+    <div class="strategy">
+      <div class="strat-head">
+        <span class="strat-name">${s.label}</span>
+        <span class="strat-why">${s.rationale}</span>
+        <span class="strat-cost">est. cost ${s.est_cost} · ${s.channels.length} channels</span>
+      </div>
+      <div class="touches">${touches}</div>
+      <div class="strat-esc">↳ if unresolved: ${s.escalation}</div>
+    </div>`;
+}
 
 function renderReport(data){
   const r = data.ingest_report || {};
@@ -620,7 +665,7 @@ function renderWorklist(){
       <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
       <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
       <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
-      <td><span class="action ${w.next_best_action}"><span class="ic"></span>${prettyAction(w.next_best_action)}</span></td>`;
+      <td><span class="action ${w.next_best_action}"><span class="ic"></span>${w.strategy?w.strategy.first_channel_label:prettyAction(w.next_best_action)}</span>${w.strategy?`<div class="strat-tag">${w.strategy.label}</div>`:''}</td>`;
     const det=el("tr","detail"); det.style.display="none";
     const td=el("td"); td.colSpan=9;
     const rev=w.audit.human_review_required;
@@ -640,6 +685,7 @@ function renderWorklist(){
           <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
         </div>
       </div>
+      ${w.strategy?strategyHTML(w.strategy):''}
       <div class="fb" data-acct="${w.account_id}" data-level="${w.priority_level}" data-action="${w.next_best_action}">
         <h4>Your call</h4>
         <label style="font-size:11.5px;color:var(--ink-3)">Set priority</label>
@@ -768,6 +814,32 @@ function renderMetrics(mm, uploadedLabels){
       <div class="mm-row"><span>AUC <b>${m.auc}</b></span><span>Accuracy <b>${m.accuracy}</b></span><span>F1 <b>${m.f1}</b></span><span>n=<b>${m.n_test}</b></span></div>`;
     met.append(wrap); });
   if(!any) met.innerHTML='<div style="font-size:12.5px;color:var(--ink-3)">Models trained on the synthetic book; upload a file with label columns to evaluate on your own data.</div>';
+}
+
+function renderStrategyMix(s){
+  const box = $("#strategy-mix"); if(!box) return; box.innerHTML="";
+  const strat = s.strategy_breakdown||{}, chan = s.channel_breakdown||{};
+  const total = Object.values(strat).reduce((a,b)=>a+b,0)||1;
+  const sh = el("div"); sh.innerHTML = `<div class="eyebrow" style="margin-bottom:8px;">Strategies</div>`;
+  Object.entries(strat).forEach(([k,v])=>{
+    const row = el("div","ahp-row");
+    row.innerHTML = `<span class="a-name" style="font-size:12px">${k}</span>
+      <div class="a-track"><div class="a-fill" style="width:${Math.round(v/total*100)}%"></div></div>
+      <span class="a-val">${v}</span>`;
+    sh.append(row);
+  });
+  box.append(sh);
+  if(Object.keys(chan).length){
+    const ch = el("div"); ch.style.marginTop="12px";
+    ch.innerHTML = `<div class="eyebrow" style="margin-bottom:8px;">Channels in play</div>`;
+    const wrap = el("div"); wrap.style.cssText="display:flex;flex-wrap:wrap;gap:6px;";
+    Object.entries(chan).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+      const t = el("span","seg"); t.style.cssText="background:var(--panel-2)";
+      t.innerHTML = `${(CH_ICON[k]||"•")} ${k.replace(/_/g," ")} <b style="font-family:var(--f-mono);color:var(--ink-3)">${v}</b>`;
+      wrap.append(t);
+    });
+    ch.append(wrap); box.append(ch);
+  }
 }
 
 function renderAHP(data){

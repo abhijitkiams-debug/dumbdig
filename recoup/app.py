@@ -203,8 +203,8 @@ EXPORT_COLUMNS = [
     "rank", "account_id", "region", "segment", "current_bucket", "days_past_due",
     "priority_level", "priority_score", "prob_promise_to_pay", "prob_actual_payment",
     "pos", "past_due_amount", "recoverable_amount", "expected_payment", "topsis_score",
-    "next_best_action", "preferred_channel", "best_contact_hour",
-    "human_review_required", "reason",
+    "strategy", "strategy_path", "first_action", "first_script", "est_cost",
+    "preferred_channel", "human_review_required", "reason",
 ]
 
 
@@ -221,8 +221,13 @@ def worklist_to_csv(worklist):
             row.get("priority_level"), row.get("priority_score"),
             row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
             row.get("pos"), row.get("past_due_amount"), row.get("recoverable_amount"),
-            row.get("expected_payment"), row.get("topsis_score"), row.get("next_best_action"),
-            row.get("preferred_channel"), row.get("best_contact_hour"),
+            row.get("expected_payment"), row.get("topsis_score"),
+            (row.get("strategy") or {}).get("label"),
+            " > ".join(t["channel"] for t in (row.get("strategy") or {}).get("touches", [])),
+            (row.get("strategy") or {}).get("first_action"),
+            (row.get("strategy") or {}).get("first_script"),
+            (row.get("strategy") or {}).get("est_cost"),
+            row.get("preferred_channel"),
             row.get("audit", {}).get("human_review_required"),
             "; ".join(row.get("reasons", []) + [row.get("audit", {}).get("action_rationale", "")]).strip("; "),
         ])

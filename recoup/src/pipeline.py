@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 import ahp
 import learner
 import signals
+import strategy
 from topsis import topsis
 from routing import plan_routes
 
@@ -232,18 +233,10 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     for i, r in enumerate(target_rows):
         sr = sig_results[i]
         level, reasons = sr["priority_level"], list(sr["reasons"])
-        reason_key = feature_rows[i]["_reason_key"]
-        hard_risk = sr["redflag"] and reason_key in ("refusal", "absconding", "account_closed", "dispute")
-        mob = r.get("months_on_book")
-        if mob is None and r.get("customer_tenure_years") is not None:
-            mob = float(r["customer_tenure_years"]) * 12
-        early_default = mob is not None and float(mob) <= 6
 
-        nba, nba_why = choose_action(
-            level, segments[i], int(r.get("current_bucket") or 0), float(pay_prob[i]),
-            int(r.get("refusals_6m") or 0), r.get("preferred_channel"), action_pref,
-            hard_risk=hard_risk, early_default=early_default,
-        )
+        # Multi-channel, sequenced strategy with content/script per touch.
+        strat = strategy.recommend(r, sr, kb, level, float(pay_prob[i]),
+                                   float(recoverable[i]), lender=lender)
 
         worklist.append({
             "account_id": r.get("account_id"),
@@ -262,7 +255,8 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "priority_level": level,
             "confidence": sr["confidence"],
             "topsis_score": round(float(topsis_scores[i]), 4),
-            "next_best_action": nba,
+            "next_best_action": strat["first_action"],
+            "strategy": strat,
             "preferred_channel": r.get("preferred_channel") or "",
             "best_contact_hour": r.get("best_contact_hour"),
             "geo_x": r.get("geo_x"),
@@ -273,9 +267,9 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
                 "pay_source": pay_source,
                 "confidence": sr["confidence"],
                 "priority_components": sr["components"],
-                "action_from": "flexible risk-priority x compliance playbook",
-                "action_rationale": nba_why,
-                "human_review_required": level == "High" or nba == "legal_escalation",
+                "action_from": "flexible risk-priority + strategy engine",
+                "action_rationale": strat["rationale"],
+                "human_review_required": level == "High" or strat["human_review"],
             },
         })
 
@@ -301,10 +295,16 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     levels = {"High": 0, "Medium": 0, "Low": 0}
     seg_counts = {s: 0 for s in SEGMENT_NAMES}
     action_counts = {}
+    strategy_counts = {}
+    channel_counts = {}
     for w in worklist:
         levels[w["priority_level"]] += 1
         seg_counts[w["segment"]] = seg_counts.get(w["segment"], 0) + 1
         action_counts[w["next_best_action"]] = action_counts.get(w["next_best_action"], 0) + 1
+        st = w.get("strategy", {})
+        strategy_counts[st.get("label", "—")] = strategy_counts.get(st.get("label", "—"), 0) + 1
+        for ch in st.get("channels", []):
+            channel_counts[ch] = channel_counts.get(ch, 0) + 1
 
     summary = {
         "accounts": len(worklist),
@@ -314,6 +314,8 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         "priority_breakdown": levels,
         "segment_breakdown": seg_counts,
         "action_breakdown": dict(sorted(action_counts.items(), key=lambda t: -t[1])),
+        "strategy_breakdown": dict(sorted(strategy_counts.items(), key=lambda t: -t[1])),
+        "channel_breakdown": dict(sorted(channel_counts.items(), key=lambda t: -t[1])),
         "field_visits_planned": sum(rt["num_stops"] for rt in routes),
         "field_expected_recovery": round(sum(rt["expected_recovery"] for rt in routes), 2),
     }

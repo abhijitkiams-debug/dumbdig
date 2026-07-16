@@ -179,6 +179,24 @@
   .action.settlement_offer .ic { background:var(--warn); }
   .caret { color:var(--ink-3); transition:transform .15s; display:inline-block; font-size:11px; }
   tr.row.open .caret { transform:rotate(90deg); }
+  .strat-tag { font-size:10px; color:var(--ink-3); margin-top:3px; max-width:150px; }
+  .strategy { background:var(--panel-2); border-top:1px dashed var(--border); padding:14px 16px 14px 44px; }
+  .strat-head { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; margin-bottom:10px; }
+  .strat-name { font-size:13px; font-weight:650; color:var(--ink); }
+  .strat-why { font-size:12px; color:var(--ink-2); }
+  .strat-cost { margin-left:auto; font-family:var(--f-mono); font-size:11px; color:var(--ink-3); }
+  .touches { display:grid; gap:8px; }
+  .touch { display:grid; grid-template-columns:56px 1fr; gap:12px; align-items:start; }
+  .t-day { font-family:var(--f-mono); font-size:11px; color:var(--accent-ink); font-weight:600; padding-top:2px; border-right:2px solid var(--border); }
+  .t-head { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .t-ch { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .t-script { font-size:11px; color:var(--ink-3); text-transform:capitalize; }
+  .t-tone { font-size:10px; letter-spacing:.04em; text-transform:uppercase; font-weight:600; padding:1px 6px; border-radius:4px; background:var(--calm-soft); color:var(--ink-2); }
+  .t-tone.toneempathetic { background:var(--accent-soft); color:var(--accent-ink); }
+  .t-tone.tonefirm, .t-tone.tonefinalwarning { background:var(--warn-soft); color:var(--warn); }
+  .t-tone.tonelegal { background:var(--crit-soft); color:var(--crit); }
+  .t-msg { font-size:12px; color:var(--ink-2); margin-top:3px; font-style:italic; line-height:1.45; }
+  .strat-esc { margin-top:10px; font-size:11.5px; color:var(--ink-3); padding-top:8px; border-top:1px solid var(--border-2); }
 
   /* expanded detail */
   tr.detail td { padding:0; }
@@ -343,6 +361,18 @@
 <script>
 (function(){
   const D = window.RECOUP_DATA;
+  const CH_ICON = {whatsapp:"🟢", sms:"✉", email:"✉", ivr:"☎", voicebot:"🔊", agent_call:"📞", letter:"📄", field_visit:"📍", settlement:"🤝", legal:"⚖"};
+  function strategyHTML(s){
+    const touches = s.touches.map(t=>`
+      <div class="touch"><div class="t-day">Day ${t.day}</div>
+        <div class="t-body"><div class="t-head"><span class="t-ch">${CH_ICON[t.channel]||"•"} ${t.channel_label}</span>
+          <span class="t-tone tone-${t.tone.replace(/[^a-z]/g,'')}">${t.tone}</span>
+          <span class="t-script">${t.script_type.replace(/_/g," ")}</span></div>
+          <div class="t-msg">${t.message}</div></div></div>`).join("");
+    return `<div class="strategy"><div class="strat-head"><span class="strat-name">${s.label}</span>
+      <span class="strat-why">${s.rationale}</span><span class="strat-cost">est. cost ${s.est_cost} · ${s.channels.length} channels</span></div>
+      <div class="touches">${touches}</div><div class="strat-esc">↳ if unresolved: ${s.escalation}</div></div>`;
+  }
   const money = n => "₹" + Math.round(n||0).toLocaleString("en-IN");
   const moneyK = n => { n=n||0;
     if(n>=1e7) return "₹"+(n/1e7).toFixed(2)+" Cr";
@@ -396,7 +426,7 @@
         <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
         <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
         <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
-        <td><span class="action ${w.next_best_action}"><span class="ic"></span>${prettyAction(w.next_best_action)}</span></td>`;
+        <td><span class="action ${w.next_best_action}"><span class="ic"></span>${w.strategy?w.strategy.first_channel_label:prettyAction(w.next_best_action)}</span>${w.strategy?`<div class="strat-tag">${w.strategy.label}</div>`:''}</td>`;
       const det = el("tr","detail"); det.style.display="none";
       const td = el("td"); td.colSpan = 9;
       const rev = w.audit.human_review_required;
@@ -422,7 +452,7 @@
             </div>
             <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
           </div>
-        </div>`;
+        </div>${w.strategy?strategyHTML(w.strategy):''}`;
       det.append(td);
       tr.addEventListener("click", ()=>{
         const open = tr.classList.toggle("open");

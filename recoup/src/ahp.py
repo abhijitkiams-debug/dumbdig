@@ -13,14 +13,19 @@ CRITERIA = ["effectiveness", "cost", "time_efficiency"]
 # Candidate actions and their intrinsic profile on each criterion, on a 1-9
 # scale. Cost/time are framed as benefit ("cost efficiency", "time efficiency"),
 # i.e. higher = cheaper / faster, so all criteria are maximized.
+# Channels/actions on a 1-9 scale. cost & time_efficiency are framed as
+# benefit (higher = cheaper / faster) so all criteria are maximized.
 ACTIONS = {
-    "sms_reminder":     {"effectiveness": 3, "cost": 9, "time_efficiency": 9},
-    "automated_call":   {"effectiveness": 5, "cost": 6, "time_efficiency": 7},
-    "agent_call":       {"effectiveness": 8, "cost": 3, "time_efficiency": 5},
+    "whatsapp":         {"effectiveness": 5, "cost": 9, "time_efficiency": 9},
+    "sms":              {"effectiveness": 3, "cost": 9, "time_efficiency": 9},
     "email":            {"effectiveness": 3, "cost": 8, "time_efficiency": 8},
+    "ivr":              {"effectiveness": 4, "cost": 8, "time_efficiency": 8},
+    "voicebot":         {"effectiveness": 6, "cost": 7, "time_efficiency": 8},
+    "agent_call":       {"effectiveness": 8, "cost": 3, "time_efficiency": 5},
     "letter":           {"effectiveness": 4, "cost": 4, "time_efficiency": 2},
-    "settlement_offer": {"effectiveness": 7, "cost": 4, "time_efficiency": 4},
-    "legal_escalation": {"effectiveness": 9, "cost": 1, "time_efficiency": 1},
+    "field_visit":      {"effectiveness": 9, "cost": 2, "time_efficiency": 2},
+    "settlement":       {"effectiveness": 7, "cost": 4, "time_efficiency": 4},
+    "legal":            {"effectiveness": 9, "cost": 1, "time_efficiency": 1},
 }
 
 # Random Index for consistency ratio (Saaty), by matrix size.

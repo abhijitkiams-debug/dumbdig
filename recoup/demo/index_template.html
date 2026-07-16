@@ -188,6 +188,8 @@
   .touches { display:grid; gap:8px; }
   .touch { display:grid; grid-template-columns:56px 1fr; gap:12px; align-items:start; }
   .t-day { font-family:var(--f-mono); font-size:11px; color:var(--accent-ink); font-weight:600; padding-top:2px; border-right:2px solid var(--border); }
+  .t-when { display:block; font-size:9.5px; color:var(--ink-3); font-weight:400; margin-top:2px; }
+  .strat-comp { margin-top:10px; padding-top:8px; border-top:1px solid var(--border-2); display:grid; gap:4px; font-size:11px; color:var(--warn); }
   .t-head { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .t-ch { font-size:12.5px; font-weight:600; color:var(--ink); }
   .t-script { font-size:11px; color:var(--ink-3); text-transform:capitalize; }
@@ -364,14 +366,15 @@
   const CH_ICON = {whatsapp:"🟢", sms:"✉", email:"✉", ivr:"☎", voicebot:"🔊", agent_call:"📞", letter:"📄", field_visit:"📍", settlement:"🤝", legal:"⚖"};
   function strategyHTML(s){
     const touches = s.touches.map(t=>`
-      <div class="touch"><div class="t-day">Day ${t.day}</div>
+      <div class="touch"><div class="t-day">Day ${t.day}${t.when?`<span class="t-when">${t.when}</span>`:''}</div>
         <div class="t-body"><div class="t-head"><span class="t-ch">${CH_ICON[t.channel]||"•"} ${t.channel_label}</span>
           <span class="t-tone tone-${t.tone.replace(/[^a-z]/g,'')}">${t.tone}</span>
           <span class="t-script">${t.script_type.replace(/_/g," ")}</span></div>
           <div class="t-msg">${t.message}</div></div></div>`).join("");
     return `<div class="strategy"><div class="strat-head"><span class="strat-name">${s.label}</span>
       <span class="strat-why">${s.rationale}</span><span class="strat-cost">est. cost ${s.est_cost} · ${s.channels.length} channels</span></div>
-      <div class="touches">${touches}</div><div class="strat-esc">↳ if unresolved: ${s.escalation}</div></div>`;
+      <div class="touches">${touches}</div><div class="strat-esc">↳ if unresolved: ${s.escalation}</div>
+      ${(s.compliance&&s.compliance.length)?`<div class="strat-comp">${s.compliance.map(c=>`<div>⚖ ${c}</div>`).join("")}</div>`:''}</div>`;
   }
   const money = n => "₹" + Math.round(n||0).toLocaleString("en-IN");
   const moneyK = n => { n=n||0;

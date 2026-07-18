@@ -153,6 +153,10 @@
   .rvw-badge { display:inline-block; margin-left:7px; font-family:var(--f-sans,inherit); font-weight:700; font-size:9.5px; letter-spacing:.03em; text-transform:uppercase; color:var(--crit); background:var(--crit-soft,rgba(194,51,77,.1)); border:1px solid var(--crit); border-radius:5px; padding:1px 5px; vertical-align:middle; }
   .ptp-badge { display:inline-block; margin-left:6px; font-weight:700; font-size:9.5px; letter-spacing:.03em; color:#0F9D76; background:rgba(15,157,118,.1); border:1px solid #0F9D76; border-radius:5px; padding:1px 5px; vertical-align:middle; }
   .comp-filter { margin-top:12px; font-size:12.5px; padding:7px 14px; }
+  .pay-source { font-size:12px; color:var(--ink-2); display:flex; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:11px; border-bottom:1px solid var(--border-2); }
+  .pay-source .ps-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .pay-source .ps-ok { background:#0F9D76; } .pay-source .ps-heur { background:var(--warn); }
+  .perf-note { margin-top:11px; font-size:11.5px; line-height:1.5; color:var(--ink-3); background:var(--raise); border:1px solid var(--border-2); border-radius:8px; padding:9px 11px; }
   .card-h .dl { margin-left:auto; padding:5px 11px; font-size:12px; text-decoration:none; }
   .toolbar input.search { margin-left:auto; font-size:12.5px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--ink); width:150px; font-family:var(--f-mono); }
   .trunc { padding:8px 16px; font-size:11.5px; color:var(--warn); background:var(--warn-soft); border-bottom:1px solid var(--border-2); }
@@ -911,7 +915,18 @@ new MutationObserver(()=>{ if(DATA) drawMap(DATA.routes); }).observe(document.do
 
 function renderMetrics(mm, uploadedLabels){
   const met=$("#metrics"); met.innerHTML="";
-  $("#perf-src").textContent = uploadedLabels ? "on your data" : "held-out (synthetic)";
+  const s = DATA.summary||{};
+  const paySource = s.pay_source || "";
+  const isSynthetic = /synthetic|sample/i.test(DATA.source||"");
+  const hasMetrics = mm && Object.keys(mm).length>0;
+  // Eyebrow reflects EXACTLY what the numbers were measured on.
+  $("#perf-src").textContent = hasMetrics ? (isSynthetic ? "synthetic sample · held-out" : "your data · held-out")
+                                          : "heuristic — no model yet";
+  // Always state, plainly, what is actually driving the payment probability.
+  const src=el("div","pay-source");
+  src.innerHTML = `<span class="ps-dot ${hasMetrics?'ps-ok':'ps-heur'}"></span>Payment likelihood: <b>${paySource||'—'}</b>`;
+  met.append(src);
+
   const defs=[{key:"label_actual_payment",name:"Actual payment (APP)",sub:"will they pay?"},{key:"label_promise_to_pay",name:"Promise to pay (P2P)",sub:"will they commit?"}];
   let any=false;
   defs.forEach(md=>{ const m=mm[md.key]; if(!m) return; any=true;
@@ -920,7 +935,12 @@ function renderMetrics(mm, uploadedLabels){
       <div class="gauge"><div class="g-fill" style="width:${Math.round(m.auc*100)}%"></div></div>
       <div class="mm-row"><span>AUC <b>${m.auc}</b></span><span>Accuracy <b>${m.accuracy}</b></span><span>F1 <b>${m.f1}</b></span><span>n=<b>${m.n_test}</b></span></div>`;
     met.append(wrap); });
-  if(!any) met.innerHTML='<div style="font-size:12.5px;color:var(--ink-3)">Models trained on the synthetic book; upload a file with label columns to evaluate on your own data.</div>';
+  if(any && isSynthetic){
+    met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'These figures validate the engine on the bundled <b>synthetic</b> sample. Upload a book with outcome labels to measure on your own data.'}));
+  }
+  if(!any){
+    met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'No supervised model is driving these scores yet — payment likelihood is a <b>transparent risk heuristic</b>. It becomes a validated supervised model as soon as you upload a book with outcome-label columns, or record real repayment outcomes under <b>Learning</b>. Priority, strategy and routing are fully computed regardless.'}));
+  }
 }
 
 function renderStrategyMix(s){

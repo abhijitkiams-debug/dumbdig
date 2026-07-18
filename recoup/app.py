@@ -204,11 +204,29 @@ def parse_multipart(headers, body):
 
 def score_rows(rows, report, collectors, top_field, lender="default"):
     global LAST_WORKLIST
-    results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field, lender=lender)
+    labeled = [r for r in rows if r.get("label_actual_payment") is not None]
+    has_labels = len(labeled) == len(rows) and len(rows) > 0
+    n_pos = sum(1 for r in labeled if int(float(r["label_actual_payment"])) == 1)
+
+    # If the uploaded book carries its own repayment outcomes, train a real
+    # supervised model on THIS data and use it (provenance="self"). Otherwise we
+    # never trust the bundled/reference model on real data — scoring falls back
+    # to the learned-from-outcomes model or a transparent heuristic.
+    if has_labels and len(rows) >= 40 and 0 < n_pos < len(labeled):
+        try:
+            model = pipeline.Aayudh().fit(rows)
+            results = model.score(rows, n_collectors=collectors, top_k_field=top_field,
+                                  lender=lender, model_provenance="self")
+        except Exception as e:
+            print("self-train failed, using reference model + heuristic:", e)
+            results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field,
+                                  lender=lender, model_provenance="reference")
+    else:
+        results = MODEL.score(rows, n_collectors=collectors, top_k_field=top_field,
+                              lender=lender, model_provenance="reference")
     results["ingest_report"] = report
     results["lender"] = lender
-    labeled = [r for r in rows if r.get("label_actual_payment") is not None]
-    results["uploaded_labels_present"] = len(labeled) == len(rows) and len(rows) > 0
+    results["uploaded_labels_present"] = has_labels
 
     # Persist to memory so the model can learn from later feedback/outcomes.
     try:
@@ -226,11 +244,13 @@ def score_rows(rows, report, collectors, top_field, lender="default"):
 
 # Columns exported to CSV, in order.
 EXPORT_COLUMNS = [
-    "rank", "account_id", "region", "segment", "current_bucket", "days_past_due",
-    "priority_level", "priority_score", "prob_promise_to_pay", "prob_actual_payment",
+    "rank", "account_id", "borrower_name", "region", "rm_name", "segment",
+    "current_bucket", "days_past_due", "priority_level", "priority_score",
+    "needs_review", "review_reason", "ptp_active",
+    "prob_promise_to_pay", "prob_actual_payment", "pay_source",
     "pos", "past_due_amount", "recoverable_amount", "expected_payment", "topsis_score",
     "strategy", "strategy_path", "first_action", "first_script", "est_cost",
-    "preferred_channel", "human_review_required", "reason",
+    "preferred_channel", "reason",
 ]
 
 
@@ -242,10 +262,13 @@ def worklist_to_csv(worklist):
     w.writerow(EXPORT_COLUMNS)
     for row in worklist:
         w.writerow([
-            row.get("rank"), row.get("account_id"), row.get("region"), row.get("segment"),
+            row.get("rank"), row.get("account_id"), row.get("borrower_name"),
+            row.get("region"), row.get("rm_name"), row.get("segment"),
             row.get("current_bucket"), row.get("days_past_due"),
             row.get("priority_level"), row.get("priority_score"),
+            row.get("review"), row.get("review_reason"), row.get("ptp_active"),
             row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
+            row.get("audit", {}).get("pay_source"),
             row.get("pos"), row.get("past_due_amount"), row.get("recoverable_amount"),
             row.get("expected_payment"), row.get("topsis_score"),
             (row.get("strategy") or {}).get("label"),
@@ -254,7 +277,6 @@ def worklist_to_csv(worklist):
             (row.get("strategy") or {}).get("first_script"),
             (row.get("strategy") or {}).get("est_cost"),
             row.get("preferred_channel"),
-            row.get("audit", {}).get("human_review_required"),
             "; ".join(row.get("reasons", []) + [row.get("audit", {}).get("action_rationale", "")]).strip("; "),
         ])
     return buf.getvalue()

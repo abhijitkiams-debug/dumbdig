@@ -168,9 +168,9 @@ class Aayudh:
         return self.trained["metrics"] if self.trained else {}
 
     def score(self, target_rows, criteria_matrix=None, n_collectors=3, top_k_field=None,
-              lender="default"):
+              lender="default", model_provenance="reference"):
         return _score(self.trained, self.segmenter, target_rows,
-                      criteria_matrix, n_collectors, top_k_field, lender)
+                      criteria_matrix, n_collectors, top_k_field, lender, model_provenance)
 
 
 def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=3,
@@ -181,9 +181,17 @@ def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=
 
 
 def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3,
-           top_k_field=None, lender="default"):
+           top_k_field=None, lender="default", model_provenance="reference"):
     """
     Score target_rows with an already-fitted model + segmenter.
+
+    model_provenance describes what the supervised models were fitted on:
+      "self"      -> these exact rows carried outcome labels; the model is a real
+                     supervised predictor for this book and drives pay-probability.
+      "reference" -> models were fitted on a different (e.g. bundled/synthetic)
+                     book; they are NOT trusted on this data, so pay-probability
+                     falls back to the learned-from-outcomes model or a
+                     transparent risk heuristic. Nothing is passed off as trained.
     Returns a results dict ready to serialize.
     """
     medians = trained["medians"]
@@ -197,8 +205,14 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     # Recoverable amount is Principal Outstanding first (POS), then arrears,
     # then installment. Expected recovery = recoverable x payment likelihood.
     total_bal = np.array([float(r.get("total_balance") or 0.0) for r in target_rows])
-    next_inst = np.array([float(r.get("next_installment_amount") or medians[FEATURES.index("next_installment_amount")]) for r in target_rows])
     past_due = np.array([float(r.get("past_due_amount") or 0.0) for r in target_rows])
+    # EMI is only the last-resort recoverable proxy. Impute a missing EMI from THIS
+    # book's own median (never a synthetic/reference median), else 0 — we never
+    # fabricate an amount from another dataset for a real portfolio.
+    _emi_present = [float(r["next_installment_amount"]) for r in target_rows
+                    if r.get("next_installment_amount") not in (None, "")]
+    _emi_fallback = float(np.median(_emi_present)) if _emi_present else 0.0
+    next_inst = np.array([float(r.get("next_installment_amount") or _emi_fallback) for r in target_rows])
     recoverable = np.where(total_bal > 0, total_bal, np.where(past_due > 0, past_due, next_inst))
 
     # Feature vectors for the learned model (same flexible signal space).
@@ -209,15 +223,24 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         comp["_stage_key"] = kb.stage_key(r.get("paid_by"))
         feature_rows.append(comp)
 
-    # Payment likelihood: the learned model if this lender has one, else a
-    # heuristic (higher risk -> lower likelihood) until outcomes arrive.
+    # Payment likelihood, in strict order of evidence — we never present a weaker
+    # source as a stronger one:
+    #   1. a model learned from THIS lender's recorded repayment outcomes;
+    #   2. a supervised model trained on the uploaded book's own outcome labels
+    #      (only when provenance == "self");
+    #   3. a transparent risk heuristic (monotone in composite risk) otherwise.
     learned = learner.pay_likelihood(lender, feature_rows)
+    app_model = (trained.get("models") or {}).get("label_actual_payment")
     if learned is not None:
         pay_prob = np.clip(learned, 0.02, 0.98)
-        pay_source = "learned model"
+        pay_source = "model learned from your recorded outcomes"
+    elif app_model is not None and model_provenance == "self":
+        Xp = _matrix(target_rows, medians)
+        pay_prob = np.clip(app_model.predict_proba(Xp)[:, 1], 0.02, 0.98)
+        pay_source = "supervised model trained on this book's outcome labels"
     else:
         pay_prob = np.array([float(np.clip(1 - 0.75 * sig_results[i]["composite"], 0.05, 0.95)) for i in range(n)])
-        pay_source = "heuristic (no outcomes yet)"
+        pay_source = "transparent risk heuristic (record outcomes or upload labels to train a model)"
 
     # An active promise-to-pay is a real, near-term intent signal -> lift odds.
     for i, r in enumerate(target_rows):
@@ -351,9 +374,17 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
 
     summary["confidence"] = sig_meta.get("confidence")
     summary["pay_source"] = pay_source
+    summary["model_provenance"] = model_provenance
+
+    # Only report supervised metrics when they were measured on THIS book's own
+    # labels. Reference (bundled/synthetic) metrics must not masquerade as a
+    # validation of the user's data.
+    metrics = trained["metrics"] if model_provenance == "self" else {}
 
     return {
-        "model_metrics": trained["metrics"],
+        "model_metrics": metrics,
+        "model_provenance": model_provenance,
+        "pay_source": pay_source,
         "ahp_consistency_ratio": ahp_cr,
         "ahp_action_ranking": ranked_actions,
         "signal_meta": sig_meta,

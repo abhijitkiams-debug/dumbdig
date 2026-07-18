@@ -63,6 +63,11 @@
   .lede { padding:26px 0 16px; max-width:72ch; }
   .lede h1 { font-family:var(--f-serif); font-weight:600; letter-spacing:-.02em; font-size:29px; line-height:1.12; margin:0 0 8px; text-wrap:balance; }
   .lede p { margin:0; color:var(--ink-2); font-size:15px; }
+  .intake-bar { display:flex; align-items:center; gap:14px; padding:12px 18px; margin:18px 0 20px;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px; }
+  .intake-bar .ib-left { display:flex; align-items:baseline; gap:12px; min-width:0; flex:1; }
+  .intake-bar .ib-name { font-family:var(--f-serif); font-weight:600; font-size:18px; letter-spacing:-.01em; }
+  .intake-bar .ib-note { color:var(--ink-2); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
   .card-h { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border-2); }
@@ -314,7 +319,7 @@
   </section>
 
   <!-- Upload -->
-  <section class="card" style="margin-bottom:22px;">
+  <section class="card" id="upload-card" style="margin-bottom:22px;">
     <div class="upload">
       <div class="drop">
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop a CSV file">
@@ -350,6 +355,13 @@
       </div>
     </div>
   </section>
+
+  <!-- Collapsed intake bar (shown after scoring) -->
+  <div class="intake-bar" id="intake-bar" style="display:none;">
+    <div class="ib-left"><span class="ib-name" id="ib-name">Aayudh<span class="dot">.</span></span>
+      <span class="ib-note" id="ib-note"></span></div>
+    <button class="act" id="btn-new-file">Score another file</button>
+  </div>
 
   <!-- Field mapping -->
   <section class="card" id="map-card" style="display:none; margin-bottom:22px;">
@@ -616,10 +628,17 @@ function render(data){
   $("#btn-download").style.display = "inline-block";
   $("#map-card").style.display = "none";   // collapse mapping once scored
   $("#btn-edit-map").style.display = INSPECT ? "inline-block" : "none";
+
+  // Collapse the intake so results sit at the top of the page.
+  $(".lede").style.display = "none";
+  $("#upload-card").style.display = "none";
+  $("#ib-note").textContent = `${(data.summary.accounts||0).toLocaleString()} accounts scored · ${data.source||""}`;
+  $("#intake-bar").style.display = "flex";
+
   selectTab("worklist");                   // always land on the worklist
   $("#results").style.display = "block";
   $("#report-card").style.display = "block";
-  $("#results").scrollIntoView({behavior:"smooth", block:"start"});
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
 const lenderName = () => ($("#lender").value || "default").trim() || "default";
@@ -763,6 +782,15 @@ $("#btn-edit-map").addEventListener("click", ()=>{
   if(!INSPECT) return;
   $("#map-card").style.display = "block";
   $("#map-card").scrollIntoView({behavior:"smooth", block:"start"});
+});
+
+$("#btn-new-file").addEventListener("click", ()=>{
+  $("#intake-bar").style.display = "none";
+  $(".lede").style.display = "";
+  $("#upload-card").style.display = "";
+  $("#results").style.display = "none";
+  $("#report-card").style.display = "none";
+  window.scrollTo({top:0, behavior:"smooth"});
 });
 
 // ---- human-in-the-loop feedback (delegated) ----

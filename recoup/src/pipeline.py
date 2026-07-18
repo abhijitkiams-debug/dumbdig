@@ -218,6 +218,11 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     else:
         pay_prob = np.array([float(np.clip(1 - 0.75 * sig_results[i]["composite"], 0.05, 0.95)) for i in range(n)])
         pay_source = "heuristic (no outcomes yet)"
+
+    # An active promise-to-pay is a real, near-term intent signal -> lift odds.
+    for i, r in enumerate(target_rows):
+        if str(r.get("has_active_ptp") or "").strip() in ("1", "True", "true"):
+            pay_prob[i] = float(np.clip(pay_prob[i] * 1.15 + 0.05, 0.05, 0.98))
     expected = pay_prob * recoverable
 
     # ---- TOPSIS ranking (recovery value x likelihood) ---------------------
@@ -238,8 +243,24 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         strat = strategy.recommend(r, sr, kb, level, float(pay_prob[i]),
                                    float(recoverable[i]), lender=lender)
 
+        # Human-review flag: which cases a person must clear before action.
+        if sr.get("redflag"):
+            review, review_reason = True, "objective red flag (refusal/absconding/closed/dispute or 90+ DPD)"
+        elif strat.get("human_review"):
+            review, review_reason = True, "legal / willful escalation requires a human decision"
+        elif level == "High":
+            review, review_reason = True, "high-priority tier — review before action"
+        else:
+            review, review_reason = False, ""
+
         worklist.append({
             "account_id": r.get("account_id"),
+            "borrower_name": r.get("borrower_name") or "",
+            "rm_name": r.get("rm_name") or "",
+            "review": review,
+            "review_reason": review_reason,
+            "ptp_active": strat.get("ptp_active", False),
+            "ptp_amount": r.get("ptp_amount"),
             "region": r.get("region") or "",
             "segment": segments[i],
             "current_bucket": int(r.get("current_bucket") or 0),
@@ -297,8 +318,14 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     action_counts = {}
     strategy_counts = {}
     channel_counts = {}
+    review_count = 0
+    ptp_count = 0
     for w in worklist:
         levels[w["priority_level"]] += 1
+        if w.get("review"):
+            review_count += 1
+        if w.get("ptp_active"):
+            ptp_count += 1
         seg_counts[w["segment"]] = seg_counts.get(w["segment"], 0) + 1
         action_counts[w["next_best_action"]] = action_counts.get(w["next_best_action"], 0) + 1
         st = w.get("strategy", {})
@@ -312,6 +339,8 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         "total_past_due": round(float(past_due.sum()), 2),
         "total_expected_recovery": round(float(expected.sum()), 2),
         "priority_breakdown": levels,
+        "review_required": review_count,
+        "ptp_active_count": ptp_count,
         "segment_breakdown": seg_counts,
         "action_breakdown": dict(sorted(action_counts.items(), key=lambda t: -t[1])),
         "strategy_breakdown": dict(sorted(strategy_counts.items(), key=lambda t: -t[1])),

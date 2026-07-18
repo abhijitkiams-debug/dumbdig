@@ -144,6 +144,15 @@
   .chip[aria-pressed="true"] { background:var(--ink); color:var(--bg); border-color:var(--ink); }
   .chip[aria-pressed="true"] .c-n { color:var(--bg); opacity:.7; }
   .chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .chip-review { border-color:var(--crit); color:var(--crit); }
+  .chip-review[aria-pressed="true"] { background:var(--crit); color:#fff; border-color:var(--crit); }
+  .chip-review[aria-pressed="true"] .c-n { color:#fff; }
+  .chip-ptp { border-color:var(--ok,#0F9D76); color:var(--ok,#0F9D76); }
+  .chip-ptp[aria-pressed="true"] { background:var(--ok,#0F9D76); color:#fff; border-color:var(--ok,#0F9D76); }
+  .chip-ptp[aria-pressed="true"] .c-n { color:#fff; }
+  .rvw-badge { display:inline-block; margin-left:7px; font-family:var(--f-sans,inherit); font-weight:700; font-size:9.5px; letter-spacing:.03em; text-transform:uppercase; color:var(--crit); background:var(--crit-soft,rgba(194,51,77,.1)); border:1px solid var(--crit); border-radius:5px; padding:1px 5px; vertical-align:middle; }
+  .ptp-badge { display:inline-block; margin-left:6px; font-weight:700; font-size:9.5px; letter-spacing:.03em; color:#0F9D76; background:rgba(15,157,118,.1); border:1px solid #0F9D76; border-radius:5px; padding:1px 5px; vertical-align:middle; }
+  .comp-filter { margin-top:12px; font-size:12.5px; padding:7px 14px; }
   .card-h .dl { margin-left:auto; padding:5px 11px; font-size:12px; text-decoration:none; }
   .toolbar input.search { margin-left:auto; font-size:12.5px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--ink); width:150px; font-family:var(--f-mono); }
   .trunc { padding:8px 16px; font-size:11.5px; color:var(--warn); background:var(--warn-soft); border-bottom:1px solid var(--border-2); }
@@ -407,6 +416,8 @@
           <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
           <button class="chip" data-f="Medium" aria-pressed="false">Medium <span class="c-n" id="f-med"></span></button>
           <button class="chip" data-f="Low" aria-pressed="false">Low <span class="c-n" id="f-low"></span></button>
+          <button class="chip chip-review" data-f="Review" aria-pressed="false" title="Accounts a human must clear before action">⚑ Needs review <span class="c-n" id="f-review"></span></button>
+          <button class="chip chip-ptp" data-f="PTP" aria-pressed="false" title="Accounts with an active promise-to-pay">Promise-to-pay <span class="c-n" id="f-ptp"></span></button>
           <input class="search" id="search" type="search" placeholder="account id…" aria-label="Search account id">
         </div>
         <div class="trunc" id="trunc" style="display:none;"></div>
@@ -703,6 +714,11 @@ function renderCounts(summary){
   const all = summary.accounts != null ? summary.accounts : (b.High+b.Medium+b.Low);
   const fmt = n => (n||0).toLocaleString();
   $("#f-all").textContent=fmt(all); $("#f-high").textContent=fmt(b.High); $("#f-med").textContent=fmt(b.Medium); $("#f-low").textContent=fmt(b.Low);
+  $("#f-review").textContent=fmt(summary.review_required);
+  const ptpEl=$("#f-ptp"), ptpChip=document.querySelector('.chip-ptp');
+  if(ptpEl) ptpEl.textContent=fmt(summary.ptp_active_count);
+  // Hide the PTP chip entirely when the book has no promise-to-pay data.
+  if(ptpChip) ptpChip.style.display = (summary.ptp_active_count>0) ? "" : "none";
 }
 
 function renderTrunc(t){
@@ -715,12 +731,18 @@ function renderTrunc(t){
 
 function renderWorklist(){
   const body=$("#wl-body"); body.innerHTML="";
-  const rows = DATA.worklist.filter(w=>(filter==="All"||w.priority_level===filter) && (!query || (w.account_id||"").toLowerCase().includes(query)));
+  const rows = DATA.worklist.filter(w=>{
+    const m = filter==="All" ? true
+            : filter==="Review" ? !!w.review
+            : filter==="PTP" ? !!w.ptp_active
+            : w.priority_level===filter;
+    return m && (!query || (w.account_id||"").toLowerCase().includes(query));
+  });
   rows.slice(0,600).forEach(w=>{
     const tr=el("tr","row");
     tr.innerHTML = `
       <td><span class="caret">▶</span></td>
-      <td class="acct">${w.account_id}<span class="rgn">${w.region||"—"}</span></td>
+      <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">⚑ review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||"—"}</span></td>
       <td><span class="seg ${w.segment}">${(w.segment||"").replace(/_/g," ")}</span></td>
       <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
       <td class="r"><span class="num">${pct(w.prob_promise_to_pay)}</span></td>
@@ -730,7 +752,7 @@ function renderWorklist(){
       <td><span class="action ${w.next_best_action}"><span class="ic"></span>${w.strategy?w.strategy.first_channel_label:prettyAction(w.next_best_action)}</span>${w.strategy?`<div class="strat-tag">${w.strategy.label}</div>`:''}</td>`;
     const det=el("tr","detail"); det.style.display="none";
     const td=el("td"); td.colSpan=9;
-    const rev=w.audit.human_review_required;
+    const rev=w.review!=null?w.review:w.audit.human_review_required;
     td.innerHTML = `
       <div class="detail-box">
         <div><h4>Why this priority &amp; action</h4>
@@ -744,7 +766,7 @@ function renderWorklist(){
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
             <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||'—'}</span></div>
           </div>
-          <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required':'✓ Auto-eligible action'}</div>
+          <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required — '+(w.review_reason||'high-priority tier'):'✓ Auto-eligible action'}</div>
         </div>
       </div>
       ${w.strategy?strategyHTML(w.strategy):''}
@@ -939,13 +961,23 @@ function renderAHP(data){
 
 function renderCompliance(s, wl){
   const comp=$("#compliance");
-  comp.innerHTML=`<div class="comp-stat"><span class="cs-n">${s.priority_breakdown.High}</span><span class="cs-l">high-priority accounts flagged for <b>human review</b> before action</span></div>
+  const n = s.review_required!=null ? s.review_required : s.priority_breakdown.High;
+  comp.innerHTML=`<div class="comp-stat"><span class="cs-n">${(n||0).toLocaleString()}</span><span class="cs-l">accounts flagged for <b>human review</b> before action</span>
+      <button class="act primary comp-filter" id="btn-review-filter">Show these ${(n||0).toLocaleString()} cases →</button></div>
     <ul class="comp-list">
       <li><span class="tick">✓</span> Every score is traceable to the model, inputs, and rule that produced it</li>
       <li><span class="tick">✓</span> Actions are bounded by a compliance playbook per priority tier</li>
       <li><span class="tick">✓</span> Legal escalation always requires a human decision</li>
       <li><span class="tick">✓</span> Interpretable outputs support GDPR / EU AI Act profiling obligations</li>
     </ul>`;
+  const btn=$("#btn-review-filter");
+  if(btn) btn.addEventListener("click", ()=>{
+    selectTab("worklist");
+    filter="Review";
+    document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.f==="Review"?"true":"false"));
+    renderWorklist();
+    document.getElementById("tab-worklist").scrollIntoView({behavior:"smooth", block:"start"});
+  });
 }
 </script>
 </body>

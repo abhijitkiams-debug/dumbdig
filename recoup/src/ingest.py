@@ -16,23 +16,28 @@ from datetime import datetime
 # also strip non-alphanumerics before matching so "Past Due Amount" == "past_due_amount").
 SYNONYMS = {
     "account_id": ["account_id", "loan_id", "id", "accountnumber", "loanid", "reference",
-                   "agreementno", "agreement", "agreementnumber", "agreementid", "loanaccountno"],
-    "region": ["region", "area", "zone", "branch", "branch_name", "branchname", "territory"],
+                   "agreementno", "agreement", "agreementnumber", "agreementid", "loanaccountno",
+                   "lan", "lannumber", "lanno", "code"],
+    "borrower_name": ["borrower_name", "name", "customername", "customer_name", "borrowername"],
+    "region": ["region", "area", "zone", "branch", "branch_name", "branchname", "territory",
+               "location", "state", "city"],
     "geo_x": ["geo_x", "x", "longitude", "lon", "lng"],
     "geo_y": ["geo_y", "y", "latitude", "lat"],
     "age": ["age"],
     "occupation": ["occupation", "job", "employment"],
     "marital_status": ["marital_status", "marital", "maritalstatus"],
     "customer_tenure_years": ["customer_tenure_years", "tenure", "customertenure"],
-    "months_on_book": ["months_on_book", "mob", "mob_status", "mobstatus", "monthsonbook"],
+    "months_on_book": ["months_on_book", "mob", "mob_status", "mobstatus", "monthsonbook",
+                       "mobbkt", "mobbucket", "leadvintage", "vintage"],
     "num_co_borrowers": ["num_co_borrowers", "coborrowers", "cosigners", "guarantors"],
-    "lent_amount": ["lent_amount", "loanamount", "principal", "disbursedamount"],
+    "lent_amount": ["lent_amount", "loanamount", "principal", "principle", "disbursedamount"],
     "lent_date": ["lent_date", "disbursaldate", "disburseddate", "disbursementdate", "loandate"],
     "maturity_date": ["maturity_date", "maturitydate"],
     "interest": ["interest", "interestrate", "rate", "apr"],
     "term_months": ["term_months", "term", "tenor", "loanterm"],
     "total_balance": ["total_balance", "balance", "outstanding", "totaloutstanding",
-                      "pos", "principaloutstanding", "principal_outstanding", "outstandingprincipal"],
+                      "pos", "principaloutstanding", "principal_outstanding", "outstandingprincipal",
+                      "posticketsize", "pos_ticket_size", "ticketsize", "posamount", "posvalue"],
     "next_installment_amount": ["next_installment_amount", "nextinstallment", "emi", "emiamount",
                                 "emidue", "installment", "installmentamount", "instalment", "instalmentamount",
                                 "nextduamount", "nextemi", "emiamt"],
@@ -41,26 +46,29 @@ SYNONYMS = {
                         "principaloverdue", "arrearamount", "totalarrear", "posoverdue"],
     "current_bucket": ["current_bucket", "bucket", "bucketname", "delinquencybucket", "dpdbucket", "riskbucket"],
     "days_past_due": ["days_past_due", "dpd", "dpddays", "noofdpd", "dayspastdue", "dayoverdue"],
-    "last_payment_date": ["last_payment_date", "lmpd", "lastpaymentdate", "lastmonthpaiddate", "lastemipaiddate", "lpd"],
+    "last_payment_date": ["last_payment_date", "lmpd", "lastpaymentdate", "lastmonthpaiddate",
+                          "lastemipaiddate", "lpd", "paiddate"],
     "instrument_type": ["instrument_type", "instrumenttype", "instrument"],
     "mandate_status": ["mandate_status", "mandatestatus", "nachstatus"],
-    "presentation_status": ["presentation_status", "presentationstatus", "emistatus", "presentstatus"],
-    "bounce_reason": ["bounce_reason", "reason_description", "reasondescription", "returnreason", "bouncereason", "failurereason", "declinereason", "rejectreason", "npareason"],
-    "field_feedback": ["field_feedback", "fieldfeedback", "disposition", "remarks", "feedback", "fosfeedback", "fos_remarks", "collectorremarks", "visitremarks", "fefeedback", "paymentremark", "reasonfornonpayment", "customerresponse"],
+    "presentation_status": ["presentation_status", "presentationstatus", "emistatus", "presentstatus",
+                            "paymentstatus", "payment_status"],
+    "bounce_reason": ["bounce_reason", "reason_description", "reasondescription", "returnreason", "bouncereason", "failurereason", "declinereason", "rejectreason", "npareason", "rfdcode", "rfd", "reasonfordefault"],
+    "field_feedback": ["field_feedback", "fieldfeedback", "disposition", "remarks", "feedback", "fosfeedback", "fos_remarks", "collectorremarks", "visitremarks", "fefeedback", "paymentremark", "reasonfornonpayment", "customerresponse", "callinglatestdisposition", "latestdisposition", "todaycallinglatestdisposition", "callingbestdisposition", "callingmostdisposition"],
     "payment_type": ["payment_type", "current_month_payment_type", "currentmonthpaymenttype", "paymenttype"],
     "mode_of_payment": ["mode_of_payment", "current_month_mode_of_payment", "currentmonthmodeofpayment", "modeofpayment"],
-    "paid_by": ["paid_by", "paidby"],
+    "paid_by": ["paid_by", "paidby", "callingstage", "todaycallingstage", "collectionstage", "stage"],
     "whatsapp_consent": ["whatsapp_consent", "whatsappoptin", "whatsappconsent", "waoptin", "wa_consent", "consent", "optin", "opt_in"],
     "email": ["email", "emailid", "email_id", "mailid", "emailaddress"],
     "mobile": ["mobile", "mobileno", "phone", "phoneno", "contactno", "contact_number"],
     "avg_pay_amount_ever": ["avg_pay_amount_ever", "avgpayment", "averagepayment"],
     "last_pay_amount": ["last_pay_amount", "lastpayment", "lastpaidamount", "lastreceiptamount",
-                        "lastemipaid", "lastpaidamt", "lastpaymentamount"],
+                        "lastemipaid", "lastpaidamt", "lastpaymentamount", "paidamount"],
     "days_since_last_payment": ["days_since_last_payment", "dayssincepayment", "dayssincelastpay"],
     "num_payments_12m": ["num_payments_12m", "payments12m", "numpayments"],
     "pay_ratio_6m": ["pay_ratio_6m", "payratio", "paymentratio"],
     "std_pay_amount": ["std_pay_amount", "stdpayment"],
-    "contact_attempts_6m": ["contact_attempts_6m", "contacts", "contactattempts", "callattempts"],
+    "contact_attempts_6m": ["contact_attempts_6m", "contacts", "contactattempts", "callattempts",
+                            "callingintensity", "todaycallingintensity"],
     "rpc_rate": ["rpc_rate", "rpc", "rightpartycontact", "contactrate"],
     "promises_made_6m": ["promises_made_6m", "promises", "ptpcount", "promisesmade"],
     "promises_kept_6m": ["promises_kept_6m", "promiseskept", "keptpromises"],
@@ -68,8 +76,27 @@ SYNONYMS = {
     "days_since_last_contact": ["days_since_last_contact", "dayssincecontact"],
     "preferred_channel": ["preferred_channel", "channel", "bestchannel"],
     "best_contact_hour": ["best_contact_hour", "besthour", "contacthour"],
-    "label_promise_to_pay": ["label_promise_to_pay", "promise_to_pay", "ptp", "labelptp"],
-    "label_actual_payment": ["label_actual_payment", "actual_payment", "paid", "labelapp", "didpay"],
+    "label_promise_to_pay": ["label_promise_to_pay", "promise_to_pay", "labelptp"],
+    "label_actual_payment": ["label_actual_payment", "actual_payment", "labelapp", "didpay"],
+
+    # ---- Richer real-world collections fields (mapped into logic below) -----
+    "pos_paid_pct": ["pos_paid_pct", "pospaidpercentage", "pospaidpct", "pospaid", "paidpercentage",
+                     "pospaidpercentagebucket"],
+    "pos_contribution_pct": ["pos_contribution_pct", "poscontributionpct", "poscontribution",
+                             "poscontributionpctzone", "poscontributionpctlocation"],
+    "stab_status": ["stab_status", "stabfrwd", "stabforward", "stab", "stability", "stabstatus",
+                    "repaymentbucket", "rollstatus"],
+    "ptp_date": ["ptp_date", "ptpdate", "promisedate", "promisetopaydate"],
+    "ptp_amount": ["ptp_amount", "ptpamount", "promiseamount"],
+    "ptp_risk_level": ["ptp_risk_level", "ptprisklevel", "ptprisk"],
+    "easy_cure_flag": ["easy_cure_flag", "easycureflag", "easycure"],
+    "employment_flag": ["employment_flag", "employementflag", "employmentflag", "employment"],
+    "prev_settlement_status": ["prev_settlement_status", "previoussettlementcasestatus",
+                               "previoussettlement", "settlementstatus"],
+    "max_failed_payment": ["max_failed_payment", "maxfailedpaymenttime", "maxfailedpayment"],
+    "wa_read_count": ["wa_read_count", "totalread", "readcount", "whatsappread"],
+    "wa_read_date": ["wa_read_date", "readdate", "whatsappreaddate", "lastreaddate"],
+    "rm_name": ["rm_name", "rmname", "relationshipmanager", "collectorname", "agentname"],
 }
 
 NUMERIC = {
@@ -81,10 +108,11 @@ NUMERIC = {
     "rpc_rate", "promises_made_6m", "promises_kept_6m", "refusals_6m",
     "days_since_last_contact", "best_contact_hour",
     "label_promise_to_pay", "label_actual_payment",
+    "pos_paid_pct", "pos_contribution_pct", "ptp_amount", "max_failed_payment", "wa_read_count",
 }
 
 # Fields that arrive as dates and are turned into numeric features by derive().
-DATE_FIELDS = {"last_payment_date", "lent_date", "maturity_date"}
+DATE_FIELDS = {"last_payment_date", "lent_date", "maturity_date", "ptp_date", "wa_read_date"}
 
 # Words in presentation/mandate/reason status columns that signal a failed
 # collection (bounce / return / inactive mandate). Used only as a soft behavioral
@@ -181,6 +209,35 @@ def derive(rows, now=None):
             elif ld:
                 r["customer_tenure_years"] = round(max(0, (now - ld).days) / 365.0, 1)
                 derived.add("customer_tenure_years")
+
+        # PTP (Promise-to-Pay): future promise date -> days-to-PTP + active flag.
+        ptp = _parse_date(r.get("ptp_date"))
+        if ptp:
+            r["days_to_ptp"] = (ptp - now).days
+            r["has_active_ptp"] = 1 if r["days_to_ptp"] >= -3 else 0  # today or upcoming (small grace)
+            derived.add("days_to_ptp")
+
+        # WhatsApp read receipts -> proven reachability on WhatsApp (right channel).
+        wrd = _parse_date(r.get("wa_read_date"))
+        if wrd:
+            r["wa_read_recency"] = max(0, (now - wrd).days)
+            derived.add("wa_read_recency")
+
+        # Stability / roll trajectory. "Stab forward" = last month unpaid, rolling
+        # into a worse bucket (deteriorating); "Stab" = held / paid (stable). This
+        # is one of the strongest momentum signals in a collections book.
+        stab = (r.get("stab_status") or "").lower()
+        if stab:
+            if "forward" in stab or "frwd" in stab or "roll" in stab:
+                r["roll_forward"] = 1.0; derived.add("roll_forward")
+            elif "stab" in stab or "hold" in stab or "paid" in stab:
+                r["roll_forward"] = 0.0; derived.add("roll_forward")
+
+        # POS-paid-% -> repayment-behavior prior when no explicit pay ratio exists.
+        pp = _to_num(r.get("pos_paid_pct"))
+        if pp is not None and r.get("pay_ratio_6m") is None:
+            r["pay_ratio_6m"] = round(max(0.0, min(1.0, pp / 100.0 if pp > 1 else pp)), 3)
+            derived.add("pay_ratio_6m")
 
         # Soft payment-behavior proxy from mandate/presentation/reason statuses.
         # Only used when no explicit contact/payment-history features exist; it

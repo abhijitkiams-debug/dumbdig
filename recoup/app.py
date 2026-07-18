@@ -106,9 +106,21 @@ MAP_FIELDS = [
     {"key": "presentation_status", "label": "Presentation status", "group": "Contact & mandate", "desc": "EMI presented / bounced / returned"},
     {"key": "bounce_reason", "label": "Failure / bounce reason", "group": "Contact & mandate", "desc": "Reason for bounce / non-payment"},
     {"key": "field_feedback", "label": "Refusal / field feedback", "group": "Contact & mandate", "desc": "Disposition or field-executive remarks (refused, declined, absconding…)"},
+    {"key": "paid_by", "label": "Calling / collection stage", "group": "Contact & mandate", "desc": "Which calling or collection stage is handling the account"},
+    {"key": "whatsapp_consent", "label": "WhatsApp consent", "group": "Contact & mandate", "desc": "Opt-in / opt-out for WhatsApp reminders"},
 
-    {"key": "months_on_book", "label": "Months on book (MOB)", "group": "Profile & vintage", "desc": "Account age in months — drives vintage analysis"},
+    {"key": "stab_status", "label": "Stability / roll (Stab Frwd)", "group": "Momentum & promise", "desc": "\"Stab forward\" = missed last month & rolling worse; \"Stab\" = held/paid"},
+    {"key": "pos_paid_pct", "label": "POS paid %", "group": "Momentum & promise", "desc": "Share of principal outstanding already paid down (higher = better)"},
+    {"key": "ptp_date", "label": "PTP date", "group": "Momentum & promise", "desc": "Promised-to-pay date — plan is aligned to honour it"},
+    {"key": "ptp_amount", "label": "PTP amount", "group": "Momentum & promise", "desc": "Promised-to-pay amount"},
+    {"key": "easy_cure_flag", "label": "Easy-cure flag", "group": "Momentum & promise", "desc": "Likely to self-cure with a light touch"},
+    {"key": "wa_read_count", "label": "WhatsApp reads (Total Read)", "group": "Momentum & promise", "desc": "Times the borrower opened WhatsApp messages — proves reachability"},
+    {"key": "wa_read_date", "label": "WhatsApp last read (Read Date)", "group": "Momentum & promise", "desc": "Last time a WhatsApp message was read"},
+
+    {"key": "months_on_book", "label": "Months on book (MOB / Vintage)", "group": "Profile & vintage", "desc": "Account age in months — drives vintage analysis"},
     {"key": "lent_date", "label": "Disbursal date", "group": "Profile & vintage", "desc": "Loan disbursal date — used for vintage"},
+    {"key": "borrower_name", "label": "Borrower name", "group": "Profile & vintage", "desc": "Shown on the worklist for identification"},
+    {"key": "rm_name", "label": "RM / collector name", "group": "Profile & vintage", "desc": "Relationship manager or collector assigned"},
     {"key": "age", "label": "Age", "group": "Profile & vintage", "desc": "Borrower age"},
 
     {"key": "label_actual_payment", "label": "Did pay (label)", "group": "Labels (optional)", "desc": "1/0 outcome, to evaluate model accuracy"},

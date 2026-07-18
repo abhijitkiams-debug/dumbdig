@@ -82,6 +82,10 @@ def _msg(script_type, ctx):
                             "extra charges. Pay: <pay-link>.",
         "ptp_follow_up": "Confirming the payment you promised — has it been made? If not, when may we "
                          "expect it? We're here to help you avoid escalation.",
+        "ptp_thanks": "Thank you for your commitment to pay. We've noted your promised date — a quick "
+                      "reminder will follow. Pay anytime here: <pay-link>.",
+        "ptp_confirm": "Reminder of the payment you kindly promised for today. Complete it here: "
+                       "<pay-link>. Reply if you need a little more time — we'll work with you.",
         "firm_reminder": f"Important: {pos} on your loan is seriously overdue. Please clear it immediately "
                          f"to avoid further recovery action.",
         "restructure_offer": "Facing genuine difficulty? You may qualify for restructuring / a lower EMI. "
@@ -159,8 +163,18 @@ def _reach(account):
     consent = flag("whatsapp_consent", "consent")
     fb = str(account.get("field_feedback") or "").lower()
     voice_ok = "not reachable" not in fb and "wrong number" not in fb and "untraceable" not in fb
+    # WhatsApp read receipts = proven reachability. If the borrower has opened our
+    # messages (recently), WhatsApp is a demonstrated right-channel, not a guess.
+    reads = account.get("wa_read_count")
+    recency = account.get("wa_read_recency")
+    wa_proven = False
+    try:
+        if reads is not None and float(reads) > 0:
+            wa_proven = recency is None or float(recency) <= 30
+    except (ValueError, TypeError):
+        pass
     return {
-        "sms": voice_ok, "whatsapp": consent != "out", "wa_consent": consent,
+        "sms": voice_ok, "whatsapp": consent != "out", "wa_consent": consent, "wa_proven": wa_proven,
         "email": bool(account.get("email")), "ivr": voice_ok, "voicebot": voice_ok,
         "agent_call": voice_ok, "letter": True, "field_visit": True,
         "settlement": True, "legal": True,
@@ -199,6 +213,24 @@ def recommend(account, sig, kb, level, pay_prob, recoverable, lender="your lende
         plan += [(14, "agent_call", "firm_reminder"), (24, "settlement", "settlement_offer")]
     if stage <= 1 and case == "standard":
         plan = [t for t in plan if t[1] not in ("settlement",)]
+
+    # WhatsApp is a proven right-channel when read receipts show the borrower opens
+    # our messages -> lead with it (early, reachable, non-hard cases only).
+    wa_proven = reach.get("wa_proven") and stage < 3 and case not in ("willful", "unreachable")
+    if wa_proven and "whatsapp" in avail and not any(t[1] == "whatsapp" and t[0] == 0 for t in plan):
+        plan.insert(0, (0, "whatsapp", "gentle_reminder"))
+
+    # Active Promise-to-Pay: honour it. Confirm around the promised date before any
+    # harder escalation instead of hitting a cooperating borrower with pressure.
+    ptp_active = str(account.get("has_active_ptp") or "").strip() in ("1", "True", "true")
+    if ptp_active:
+        d = account.get("days_to_ptp")
+        try:
+            pd = max(0, int(float(d))) if d is not None else 0
+        except (ValueError, TypeError):
+            pd = 0
+        plan = [(0, "sms", "ptp_thanks"), (pd, "whatsapp", "ptp_confirm")] + \
+               [t for t in plan if t[0] > pd + 1]
 
     mctx = {"pos": _fmt_money(account.get("total_balance")) or "the outstanding amount",
             "emi": _fmt_money(account.get("next_installment_amount")) or "your EMI", "lender": lender}
@@ -242,8 +274,12 @@ def recommend(account, sig, kb, level, pay_prob, recoverable, lender="your lende
                     "message": _msg("gentle_reminder", mctx), "cost": 1}]
 
     compliance = ["Contact only 08:00–19:00; not on Sundays/holidays (RBI)."]
+    if ptp_active:
+        compliance.append("Active promise-to-pay on record — confirm gently around the promised date; do not escalate before it lapses.")
     if wa_used:
         note = "WhatsApp: send as a utility payment-reminder template, in-hours, non-coercive tone."
+        if reach.get("wa_proven"):
+            note += " Read receipts confirm this borrower opens WhatsApp — proven right-channel."
         if reach["wa_consent"] != "in":
             note += " Confirm opt-in on record."
         compliance.append(note)
@@ -265,6 +301,8 @@ def recommend(account, sig, kb, level, pay_prob, recoverable, lender="your lende
         "channels": sorted({t["channel"] for t in touches}),
         "compliance": compliance,
         "escalation": _escalation(case),
+        "ptp_active": ptp_active,
+        "wa_proven": bool(reach.get("wa_proven")),
         "human_review": case == "willful" or any(t["channel"] == "legal" for t in touches),
     }
 

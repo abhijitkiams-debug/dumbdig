@@ -98,6 +98,12 @@ def _stage(a, kb):
     return kb.stage_severity(a.get("paid_by"))
 
 
+def _trajectory(a, kb):
+    # Roll-forward momentum: 1.0 = deteriorating ("Stab forward"), 0.0 = held/paid.
+    rf = _num(a.get("roll_forward"))
+    return rf if rf is not None else None
+
+
 def _contact(a, kb):
     parts = []
     ref = _num(a.get("refusals_6m"))
@@ -110,15 +116,16 @@ def _contact(a, kb):
 
 
 SIGNALS = [
-    {"name": "delinquency", "group": "Delinquency", "w": 0.20, "mode": "abs", "fn": _delinquency},
-    {"name": "exposure",    "group": "Exposure",    "w": 0.16, "mode": "rel", "fn": _exposure},
-    {"name": "recency",     "group": "Payment recency", "w": 0.12, "mode": "rel", "fn": _recency},
-    {"name": "reason",      "group": "Reason severity", "w": 0.12, "mode": "abs", "fn": _reason},
-    {"name": "failure",     "group": "Payment failure", "w": 0.10, "mode": "abs", "fn": _failure},
-    {"name": "stage",       "group": "Collection stage", "w": 0.10, "mode": "abs", "fn": _stage},
-    {"name": "behaviour",   "group": "Repayment behaviour", "w": 0.08, "mode": "abs", "fn": _behaviour},
-    {"name": "vintage",     "group": "Vintage",     "w": 0.08, "mode": "abs", "fn": _vintage},
-    {"name": "contact",     "group": "Contactability", "w": 0.04, "mode": "abs", "fn": _contact},
+    {"name": "delinquency", "group": "Delinquency", "w": 0.19, "mode": "abs", "fn": _delinquency},
+    {"name": "exposure",    "group": "Exposure",    "w": 0.15, "mode": "rel", "fn": _exposure},
+    {"name": "trajectory",  "group": "Roll trajectory", "w": 0.12, "mode": "abs", "fn": _trajectory},
+    {"name": "recency",     "group": "Payment recency", "w": 0.11, "mode": "rel", "fn": _recency},
+    {"name": "reason",      "group": "Reason severity", "w": 0.11, "mode": "abs", "fn": _reason},
+    {"name": "failure",     "group": "Payment failure", "w": 0.09, "mode": "abs", "fn": _failure},
+    {"name": "stage",       "group": "Collection stage", "w": 0.09, "mode": "abs", "fn": _stage},
+    {"name": "behaviour",   "group": "Repayment behaviour", "w": 0.07, "mode": "abs", "fn": _behaviour},
+    {"name": "vintage",     "group": "Vintage",     "w": 0.04, "mode": "abs", "fn": _vintage},
+    {"name": "contact",     "group": "Contactability", "w": 0.03, "mode": "abs", "fn": _contact},
 ]
 
 REASON_TEXT = {
@@ -133,6 +140,7 @@ REASON_TEXT = {
     "vintage": lambda a: "early-stage / vintage risk",
     "stage": lambda a: (f"already at {a.get('paid_by')} stage" if a.get("paid_by") else "later collection stage"),
     "contact": lambda a: "hard to contact / refusals",
+    "trajectory": lambda a: "rolling forward (missed last month, worsening)",
 }
 
 
@@ -242,6 +250,11 @@ def score_portfolio(accounts, kb):
         # absolute floor: trivially low composite is Low regardless of rank
         if comp < 0.20 and not red:
             level = "Low"
+        # easy-cure accounts tend to self-cure with a light touch; don't burn a
+        # High slot on them unless an objective red flag says otherwise.
+        ec = str(a.get("easy_cure_flag") or "").strip().lower()
+        if not red and ec in ("1", "y", "yes", "true", "easy", "easycure") and level == "High":
+            level = "Medium"
         score = round(100 * comp, 1)
 
         # reasons: strongest contributing active signals for this account

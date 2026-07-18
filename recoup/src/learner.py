@@ -1,5 +1,5 @@
 """
-Continuous learning for Recoup.
+Continuous learning for Aayudh.
 
 Each learning cycle replays everything accumulated in persistent memory
 (outcomes + human-in-the-loop feedback) and produces, per lender:

@@ -1,4 +1,4 @@
-# Recoup — Product Requirements Document
+# Aayudh — Product Requirements Document
 
 **A collections decision copilot that turns predictions into ranked, explainable, compliant actions.**
 
@@ -10,7 +10,7 @@ Status: prototype (v0.1) · Owner: TBD · Last updated: 2026-07-15
 
 Collections teams are drowning in accounts and starved of good decisions. They
 have risk scores but not *actions*; they have actions but not *reasons*; and
-regulators increasingly demand reasons. Recoup is a decision-support layer that
+regulators increasingly demand reasons. Aayudh is a decision-support layer that
 sits on top of a lender's or agency's account data and, for every debtor,
 produces:
 
@@ -42,7 +42,7 @@ features rather than bolt-ons.
 
 ## 3. Target users
 
-| User | What they need from Recoup |
+| User | What they need from Aayudh |
 |------|----------------------------|
 | **Collections agent** | A ranked daily worklist and a clear next action per account, with a reason they can say out loud. |
 | **Collections manager** | Portfolio-level priority and recovery view; control over strategy weighting (AHP); staffing/routing for field teams. |

@@ -1,5 +1,5 @@
 """
-Recoup knowledge base: domain intelligence that is itself learnable.
+Aayudh knowledge base: domain intelligence that is itself learnable.
 
 Holds the collections know-how the flexible scorer needs to interpret
 heterogeneous lender data -- bounce-reason severities, mandate/presentation

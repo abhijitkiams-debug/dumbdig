@@ -1,46 +1,47 @@
-<title>Recoup — Collections Decision Copilot</title>
+<title>Aayudh — Collections Decision Copilot</title>
 <style>
+  /* CredResolve brand palette: violet primary, navy-slate ink, emerald positive */
   :root {
-    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
-    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83;
-    --border:#DDE4E0; --border-2:#E9EEEB;
-    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
-    --crit:#B4431D; --crit-soft:#F7E7DF;
-    --warn:#9A6B12; --warn-soft:#F3EBD8;
-    --calm:#64756B; --calm-soft:#EAEEEB;
-    --good:#0E8A6E;
-    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
+    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E;
+    --border:#E4E0F0; --border-2:#EEEBF7;
+    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --crit:#C2334D; --crit-soft:#FBE7EC;
+    --warn:#B26A00; --warn-soft:#F7ECD9;
+    --calm:#6D758E; --calm-soft:#EEEDF5;
+    --good:#0F9D76;
+    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
     --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
-      --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
-      --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
-      --crit:#E17A4E; --crit-soft:#2A1A11;
-      --warn:#D6A44C; --warn-soft:#241C10;
-      --calm:#8A9A90; --calm-soft:#1A231E;
-      --good:#35B694;
-      --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+      --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
+      --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
+      --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
+      --crit:#F0637E; --crit-soft:#2E1620;
+      --warn:#E0A44C; --warn-soft:#2A2010;
+      --calm:#9098B4; --calm-soft:#201E33;
+      --good:#34D399;
+      --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
     }
   }
   :root[data-theme="light"] {
-    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
-    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83; --border:#DDE4E0; --border-2:#E9EEEB;
-    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
-    --crit:#B4431D; --crit-soft:#F7E7DF; --warn:#9A6B12; --warn-soft:#F3EBD8;
-    --calm:#64756B; --calm-soft:#EAEEEB; --good:#0E8A6E;
-    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
+    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E; --border:#E4E0F0; --border-2:#EEEBF7;
+    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
+    --calm:#6D758E; --calm-soft:#EEEDF5; --good:#0F9D76;
+    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
   }
   :root[data-theme="dark"] {
-    --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
-    --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
-    --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
-    --crit:#E17A4E; --crit-soft:#2A1A11; --warn:#D6A44C; --warn-soft:#241C10;
-    --calm:#8A9A90; --calm-soft:#1A231E; --good:#35B694;
-    --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+    --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
+    --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
+    --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
+    --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
+    --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
+    --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
   }
 
   * { box-sizing:border-box; }
@@ -273,7 +274,7 @@
 <header>
   <div class="head-inner">
     <div class="brand">
-      <span class="logo">Recoup<span class="dot">.</span></span>
+      <span class="logo">Aayudh<span class="dot">.</span></span>
       <small>Collections Decision Copilot</small>
     </div>
     <span class="badge"><span class="pulse"></span>Synthetic portfolio</span>
@@ -283,7 +284,7 @@
 <div class="wrap">
   <section class="lede">
     <h1>Every account gets a ranked action — and a reason you can defend.</h1>
-    <p>Recoup scores each debtor for promise-to-pay and actual payment, turns those
+    <p>Aayudh scores each debtor for promise-to-pay and actual payment, turns those
       into a human-readable priority, picks the next best action inside a compliance
       playbook, and routes field visits by recoverable value. Below is a live run over
       a synthetic book of <span class="mono" id="acct-inline"></span> accounts.</p>
@@ -350,7 +351,7 @@
   </div>
 
   <footer>
-    <p>Recoup is a working prototype of the three-layer decision-support framework in
+    <p>Aayudh is a working prototype of the three-layer decision-support framework in
       <span class="foot-cite">Lappas &amp; Xanthopoulos, “Intelligent decision support for debt collection using
       predictive learning and multi-criteria optimization,” Finance Research Open (2026)</span>.
       Layer 1 <b>rule extraction</b> (K-means segments) · Layer 2 <b>prediction</b>
@@ -476,7 +477,7 @@
   });
 
   // ---- routing map ----
-  const routeColors = ["#0E8A6E","#B4431D","#3B6EA5","#9A6B12","#6E4FA0"];
+  const routeColors = ["#7E6AB9","#C2334D","#3B6EA5","#0F9D76","#B26A00"];
   function accentFor(i){ return routeColors[i%routeColors.length]; }
   const legend = document.getElementById("map-legend");
   D.routes.forEach((rt,i)=>{

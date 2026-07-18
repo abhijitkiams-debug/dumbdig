@@ -3,44 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Recoup — Collections Decision Copilot</title>
+<title>Aayudh — Collections Decision Copilot</title>
 <style>
+  /* CredResolve brand palette: violet primary, navy-slate ink, emerald positive */
   :root {
-    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
-    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83; --border:#DDE4E0; --border-2:#E9EEEB;
-    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
-    --crit:#B4431D; --crit-soft:#F7E7DF; --warn:#9A6B12; --warn-soft:#F3EBD8;
-    --calm:#64756B; --calm-soft:#EAEEEB; --good:#0E8A6E;
-    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
+    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E; --border:#E4E0F0; --border-2:#EEEBF7;
+    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
+    --calm:#6D758E; --calm-soft:#EEEDF5; --good:#0F9D76;
+    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
     --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
-      --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
-      --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
-      --crit:#E17A4E; --crit-soft:#2A1A11; --warn:#D6A44C; --warn-soft:#241C10;
-      --calm:#8A9A90; --calm-soft:#1A231E; --good:#35B694;
-      --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+      --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
+      --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
+      --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
+      --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
+      --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
+      --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
     }
   }
   :root[data-theme="light"] {
-    --bg:#F4F6F5; --panel:#FFFFFF; --panel-2:#FBFCFB; --raise:#F0F3F1;
-    --ink:#16211C; --ink-2:#4A5A52; --ink-3:#7C8B83; --border:#DDE4E0; --border-2:#E9EEEB;
-    --accent:#0E8A6E; --accent-ink:#0A5C49; --accent-soft:#E3F1EC;
-    --crit:#B4431D; --crit-soft:#F7E7DF; --warn:#9A6B12; --warn-soft:#F3EBD8;
-    --calm:#64756B; --calm-soft:#EAEEEB; --good:#0E8A6E;
-    --shadow:0 1px 2px rgba(20,40,32,.04), 0 6px 20px rgba(20,40,32,.05);
+    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
+    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E; --border:#E4E0F0; --border-2:#EEEBF7;
+    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
+    --calm:#6D758E; --calm-soft:#EEEDF5; --good:#0F9D76;
+    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
   }
   :root[data-theme="dark"] {
-    --bg:#0B120F; --panel:#141D18; --panel-2:#101815; --raise:#1B2721;
-    --ink:#E7EEEA; --ink-2:#9EB1A7; --ink-3:#6E8078; --border:#253029; --border-2:#1E2823;
-    --accent:#35B694; --accent-ink:#84DAC1; --accent-soft:#16271F;
-    --crit:#E17A4E; --crit-soft:#2A1A11; --warn:#D6A44C; --warn-soft:#241C10;
-    --calm:#8A9A90; --calm-soft:#1A231E; --good:#35B694;
-    --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+    --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
+    --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
+    --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
+    --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
+    --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
+    --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--f-sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
@@ -283,7 +284,7 @@
 <body>
 <header>
   <div class="head-inner">
-    <div class="brand"><span class="logo">Recoup<span class="dot">.</span></span><small>Collections Decision Copilot</small></div>
+    <div class="brand"><span class="logo">Aayudh<span class="dot">.</span></span><small>Collections Decision Copilot</small></div>
     <span class="badge"><span class="pulse"></span>Running locally</span>
   </div>
 </header>
@@ -291,7 +292,7 @@
 <div class="wrap">
   <section class="lede">
     <h1>Know who will pay. Know what to do.</h1>
-    <p>Recoup reads your entire book and gives every account a rank, an action, and a reason.
+    <p>Aayudh reads your entire book and gives every account a rank, an action, and a reason.
       Thousands of decisions become one simple list. It runs entirely on your computer, and your
       data never leaves it.</p>
   </section>
@@ -302,7 +303,7 @@
       <div class="drop">
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop a CSV file">
           <div class="big">Drop a CSV or Excel file here, or click to choose</div>
-          <div class="small">One row per account. Any column names. Recoup maps them for you.</div>
+          <div class="small">One row per account. Any column names. Aayudh maps them for you.</div>
           <div class="file" id="filename"></div>
         </div>
         <input type="file" id="fileinput" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
@@ -320,7 +321,7 @@
       </div>
       <div class="guide">
         <h3>What to include</h3>
-        <p>Recoup understands common column synonyms. Helpful fields (all optional; missing ones are imputed):</p>
+        <p>Aayudh understands common column synonyms. Helpful fields (all optional; missing ones are imputed):</p>
         <ul>
           <li><code>account_id</code> / <code>loan_id</code></li>
           <li><code>past_due_amount</code> / <code>overdue</code>, <code>next_installment_amount</code> / <code>emi</code></li>
@@ -338,7 +339,7 @@
   <section class="card" id="map-card" style="display:none; margin-bottom:22px;">
     <div class="card-h"><h2>Map your columns</h2><span class="eyebrow" id="map-src"></span></div>
     <div class="card-b">
-      <p class="map-hint">We matched your file's headers to Recoup's fields automatically. Review and adjust
+      <p class="map-hint">We matched your file's headers to Aayudh's fields automatically. Review and adjust
         below, then score. Anything left as <b>Not mapped</b> is ignored or safely imputed. Required fields
         are marked <span class="req-dot">●</span>.</p>
       <div id="map-grid"></div>
@@ -409,13 +410,13 @@
     <details class="terms" open>
       <summary>Terms &amp; Conditions</summary>
       <div class="terms-body">
-        <p><b>1. What Recoup is.</b> Recoup is a decision support tool. It suggests priorities and
+        <p><b>1. What Aayudh is.</b> Aayudh is a decision support tool. It suggests priorities and
           recommended actions. It does not make automated decisions about any person. A trained user
           must review every output before acting on it.</p>
-        <p><b>2. No professional advice.</b> Recoup does not provide legal, financial, regulatory, or
+        <p><b>2. No professional advice.</b> Aayudh does not provide legal, financial, regulatory, or
           credit advice. You are solely responsible for the decisions you make and the actions you take.</p>
         <p><b>3. Accuracy and warranties.</b> Scores are statistical estimates produced by machine
-          learning models. Recoup is provided on an "as is" and "as available" basis, without warranty
+          learning models. Aayudh is provided on an "as is" and "as available" basis, without warranty
           of any kind, whether express or implied, including fitness for a particular purpose.</p>
         <p><b>4. Your responsibilities.</b> You confirm that you have a lawful basis to process the
           data you upload, and that your use complies with all applicable laws, including data
@@ -424,13 +425,13 @@
         <p><b>5. Your data.</b> Files you upload are processed locally on your own machine. They are
           not transmitted to us or to any third party. You remain responsible for the security and
           lawful handling of that data.</p>
-        <p><b>6. Limitation of liability.</b> To the maximum extent permitted by law, Recoup and its
+        <p><b>6. Limitation of liability.</b> To the maximum extent permitted by law, Aayudh and its
           authors are not liable for any loss, damage, cost, or regulatory consequence arising from
           use of the tool or reliance on its output.</p>
-        <p><b>7. Acceptance.</b> By using Recoup you agree to these Terms and Conditions.</p>
+        <p><b>7. Acceptance.</b> By using Aayudh you agree to these Terms and Conditions.</p>
       </div>
     </details>
-    <p class="copyright">&copy; <span id="year"></span> Recoup. All rights reserved.</p>
+    <p class="copyright">&copy; <span id="year"></span> Aayudh. All rights reserved.</p>
   </footer>
 </div>
 
@@ -448,7 +449,7 @@ const moneyK = n => {
 const pct = x => Math.round(x*100) + "%";
 const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
 const prettyAction = a => (a||"").replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
-const routeColors = ["#0E8A6E","#B4431D","#3B6EA5","#9A6B12","#6E4FA0","#2E8B8B"];
+const routeColors = ["#7E6AB9","#C2334D","#3B6EA5","#0F9D76","#B26A00","#5B3F96"];
 
 let DATA = null, filter = "All", query = "";
 

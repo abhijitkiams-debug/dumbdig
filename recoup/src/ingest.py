@@ -2,7 +2,7 @@
 Flexible ingestion so real uploaded data works, not just our synthetic file.
 
 Collections exports never share a schema. This module maps arbitrary column
-names onto Recoup's canonical fields using a synonym dictionary, coerces types,
+names onto Aayudh's canonical fields using a synonym dictionary, coerces types,
 and fills sensible defaults for anything missing -- reporting exactly what it
 found so nothing is silently fabricated.
 """

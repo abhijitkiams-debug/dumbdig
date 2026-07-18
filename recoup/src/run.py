@@ -1,5 +1,5 @@
 """
-Recoup CLI.
+Aayudh CLI.
 
 Usage:
   python run.py                        # train + score on synthetic data

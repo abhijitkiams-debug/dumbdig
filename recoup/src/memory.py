@@ -1,5 +1,5 @@
 """
-Persistent memory for Recoup (SQLite, standard library only).
+Persistent memory for Aayudh (SQLite, standard library only).
 
 Everything that lets the model keep learning lives here and survives restarts:
 scored accounts, human-in-the-loop feedback, real outcomes, the per-lender

@@ -1,5 +1,5 @@
 """
-Recoup pipeline orchestrator.
+Aayudh pipeline orchestrator.
 
 Layer 1 (Rule Extraction) -> behavioral segment via KMeans.
 Layer 2 (Prediction)      -> Promise-to-Pay + Actual-Payment probabilities (RF).
@@ -151,7 +151,7 @@ def apply_segmenter(seg, target_rows, medians):
     return [seg["name_map"][int(l)] for l in labels]
 
 
-class Recoup:
+class Aayudh:
     """Fit the models + segmenter once, then score any number of portfolios."""
 
     def __init__(self):
@@ -176,7 +176,7 @@ class Recoup:
 def score_portfolio(train_rows, target_rows, criteria_matrix=None, n_collectors=3,
                     top_k_field=None, lender="default"):
     """Convenience: fit on train_rows, then score target_rows in one call."""
-    model = Recoup().fit(train_rows)
+    model = Aayudh().fit(train_rows)
     return model.score(target_rows, criteria_matrix, n_collectors, top_k_field, lender)
 
 

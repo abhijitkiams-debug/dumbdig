@@ -1,5 +1,5 @@
 """
-Synthetic collections dataset generator for Recoup.
+Synthetic collections dataset generator for Aayudh.
 
 We do NOT use any real debtor data (the source paper's data is confidential).
 Instead we simulate a plausible collections book with a hidden behavioral model,

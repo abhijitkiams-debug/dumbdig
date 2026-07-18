@@ -1,5 +1,5 @@
 """
-Recoup — local web app.
+Aayudh — local web app.
 
 A dependency-light local server (Python stdlib + numpy/scikit-learn) that:
   • fits the P2P/APP models + segmenter ONCE at startup on the synthetic book,
@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data", "accounts.csv")
 WEB = os.path.join(HERE, "web", "index.html")
 
-MODEL = None            # fitted pipeline.Recoup
+MODEL = None            # fitted pipeline.Aayudh
 TRAIN_ROWS = None       # synthetic labeled book (also used as the sample)
 LAST_WORKLIST = None    # full scored worklist from the most recent run (for CSV export)
 MAX_ROWS = 4000         # cap rows returned to the browser to keep the DOM sane
@@ -49,7 +49,7 @@ def bootstrap(n_synth):
     TRAIN_ROWS, _ = ingest.load_csv(DATA)
     memory.init()  # persistent store for scored/feedback/outcomes/KB/model
     print(f"Fitting models on {len(TRAIN_ROWS)} accounts …")
-    MODEL = pipeline.Recoup().fit(TRAIN_ROWS)
+    MODEL = pipeline.Aayudh().fit(TRAIN_ROWS)
     for lbl, m in MODEL.metrics.items():
         print(f"  {lbl:26s} AUC={m['auc']}  ACC={m['accuracy']}  F1={m['f1']}")
     print("Model ready.\n")
@@ -283,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
                 head = "".join([next(f) for _ in range(26)])
             self.send_response(200)
             self.send_header("Content-Type", "text/csv")
-            self.send_header("Content-Disposition", "attachment; filename=recoup_sample.csv")
+            self.send_header("Content-Disposition", "attachment; filename=aayudh_sample.csv")
             self.send_header("Content-Length", str(len(head.encode())))
             self.end_headers()
             self.wfile.write(head.encode())
@@ -293,7 +293,7 @@ class Handler(BaseHTTPRequestHandler):
             body = worklist_to_csv(LAST_WORKLIST).encode("utf-8-sig")  # BOM so Excel opens it clean
             self.send_response(200)
             self.send_header("Content-Type", "text/csv")
-            self.send_header("Content-Disposition", "attachment; filename=recoup_worklist.csv")
+            self.send_header("Content-Disposition", "attachment; filename=aayudh_worklist.csv")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -421,7 +421,7 @@ def main():
     bootstrap(args.n_synth)
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
-    print(f"Recoup is running at {url}  (Ctrl-C to stop)")
+    print(f"Aayudh is running at {url}  (Ctrl-C to stop)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

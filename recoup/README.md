@@ -1,8 +1,8 @@
-# Recoup 💸
+# Aayudh 💸
 
 **A collections decision copilot — turns predictions into ranked, explainable, compliant actions.**
 
-Recoup is a working prototype of the three-layer decision-support framework from
+Aayudh is a working prototype of the three-layer decision-support framework from
 Lappas & Xanthopoulos, *"Intelligent decision support for debt collection using
 predictive learning and multi-criteria optimization,"* Finance Research Open (2026).
 For every debtor it produces a promise-to-pay and actual-payment probability, a
@@ -44,7 +44,7 @@ recoup/
 
 ## Run the local app (file upload)
 
-The fastest way to try Recoup on your own data — a local web app with a
+The fastest way to try Aayudh on your own data — a local web app with a
 drag-and-drop CSV uploader. Nothing leaves your machine.
 
 ```bash
@@ -58,7 +58,7 @@ python app.py                 # then open http://localhost:8000
 Then in the browser:
 
 1. **Drop a CSV or Excel (.xlsx) file** (any column names) or click **Try sample data**.
-2. Recoup reads your headers and shows a **Map your columns** panel with its best
+2. Aayudh reads your headers and shows a **Map your columns** panel with its best
    guesses pre-filled. Review/adjust which of your columns feed each field
    ("what to include"), then **Score with this mapping** — or **Score (auto-map)**
    to skip the manual step.
@@ -69,7 +69,7 @@ Then in the browser:
    gives you a correctly-shaped file to start from.
 
 If your file includes `label_actual_payment` / `label_promise_to_pay` columns,
-Recoup evaluates the models on your data and reports the metrics.
+Aayudh evaluates the models on your data and reports the metrics.
 
 ## Command line
 
@@ -85,7 +85,7 @@ python build_demo.py          # rebuild the self-contained demo/index.html (stat
 python run.py --data /path/to/your_accounts.csv --collectors 4 --top-field 120
 ```
 
-Recoup auto-maps your columns to its canonical fields (it understands common
+Aayudh auto-maps your columns to its canonical fields (it understands common
 synonyms like `loan_id`, `dpd`, `overdue`, `emi`, `ptp`, …), imputes anything
 missing, and prints exactly what it recognized. The models train on the bundled
 synthetic book unless your file carries `label_promise_to_pay` /

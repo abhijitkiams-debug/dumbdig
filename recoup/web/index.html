@@ -264,6 +264,22 @@
   #learn-result .lr { display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-top:1px solid var(--border-2); }
   #learn-result .lr b { font-family:var(--f-mono); color:var(--accent-ink); }
 
+  /* tabbed results */
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin:0 0 20px; }
+  .tab { font-size:13.5px; font-weight:600; padding:10px 18px; border:none; background:none; color:var(--ink-2); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:8px 8px 0 0; }
+  .tab[aria-selected="true"] { color:var(--accent-ink); border-bottom-color:var(--accent); background:var(--accent-soft); }
+  .tab:hover { color:var(--ink); }
+  .tab:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+  .tabpanel { display:none; }
+  .tabpanel.active { display:block; animation:fade .2s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+  .analytics-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px){ .analytics-grid { grid-template-columns:1fr; } }
+  /* compact 2-column field mapping */
+  #map-grid { column-count:2; column-gap:34px; }
+  #map-grid .map-group { break-inside:avoid; }
+  @media (max-width:760px){ #map-grid { column-count:1; } }
+
   #results { display:none; scroll-margin-top:80px; }
   footer { margin-top:40px; padding-top:20px; border-top:1px solid var(--border); color:var(--ink-3); font-size:12px; }
   footer b { color:var(--ink-2); font-weight:600; }
@@ -352,18 +368,28 @@
 
   <!-- Ingest report -->
   <section class="card" id="report-card" style="display:none; margin-bottom:22px;">
-    <div class="card-h"><h2>How your file was read</h2><span class="eyebrow" id="report-src"></span></div>
+    <div class="card-h"><h2>How your file was read</h2>
+      <button class="act" id="btn-edit-map" style="margin-left:auto; font-size:12px; padding:5px 11px; display:none;">Edit mapping</button>
+      <span class="eyebrow" id="report-src" style="margin-left:12px;"></span></div>
     <div class="card-b"><div class="report" id="report"></div></div>
   </section>
 
   <!-- Results -->
   <section id="results">
     <div class="kpis" id="kpis"></div>
-    <div class="grid">
+
+    <div class="tabs" role="tablist">
+      <button class="tab" data-tab="worklist" aria-selected="true">Worklist</button>
+      <button class="tab" data-tab="analytics" aria-selected="false">Analytics</button>
+      <button class="tab" data-tab="learning" aria-selected="false">Learning</button>
+    </div>
+
+    <!-- Worklist tab -->
+    <div class="tabpanel active" id="tab-worklist">
       <section class="card" aria-label="Account worklist">
         <div class="card-h"><h2>Prioritized worklist</h2>
           <a class="act dl" id="btn-download" href="/api/export.csv" style="display:none;">↓ Download CSV</a>
-          <span class="eyebrow" style="margin-left:12px;">TOPSIS-ranked</span></div>
+          <span class="eyebrow" style="margin-left:12px;">priority-ranked</span></div>
         <div class="toolbar" id="filters">
           <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
           <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
@@ -379,30 +405,37 @@
           </table>
         </div>
       </section>
-      <div class="stack">
+    </div>
+
+    <!-- Analytics tab -->
+    <div class="tabpanel" id="tab-analytics">
+      <div class="analytics-grid">
         <section class="card"><div class="card-h"><h2>Field routing</h2><span class="eyebrow">K-means · 2-opt</span></div>
           <div class="map-legend" id="map-legend"></div>
           <div class="card-b" style="padding-top:6px;"><canvas id="map" width="640" height="640" role="img" aria-label="Optimized field-collector routes"></canvas><div id="map-stats" style="margin-top:10px;"></div></div>
         </section>
-        <section class="card"><div class="card-h"><h2>Model performance</h2><span class="eyebrow" id="perf-src">Held-out</span></div><div class="card-b" id="metrics"></div></section>
         <section class="card"><div class="card-h"><h2>Strategy &amp; channel mix</h2><span class="eyebrow">Multi-channel</span></div><div class="card-b" id="strategy-mix"></div></section>
         <section class="card"><div class="card-h"><h2>Channel weighting</h2><span class="eyebrow">AHP</span></div><div class="card-b" id="ahp"></div></section>
-        <section class="card"><div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div><div class="card-b" id="compliance"></div></section>
-
-        <section class="card" id="learning-card"><div class="card-h"><h2>Learning &amp; memory</h2><span class="eyebrow">Keeps improving</span></div>
-          <div class="card-b">
-            <div id="mem-stats" class="mem-stats"></div>
-            <p class="learn-hint">Feed back real outcomes so the model keeps learning for this lender. CSV columns: <code>account_id, paid, amount, action</code>.</p>
-            <div class="btns">
-              <button class="act primary" id="btn-outcomes">Upload outcomes</button>
-              <button class="act" id="btn-learn">Retrain now</button>
-              <input type="file" id="outcomes-input" accept=".csv,.xlsx" hidden>
-            </div>
-            <div id="learn-status" class="status" role="status" aria-live="polite"></div>
-            <div id="learn-result"></div>
-          </div>
-        </section>
+        <section class="card"><div class="card-h"><h2>Model performance</h2><span class="eyebrow" id="perf-src">Held-out</span></div><div class="card-b" id="metrics"></div></section>
+        <section class="card" style="grid-column:1 / -1;"><div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div><div class="card-b" id="compliance"></div></section>
       </div>
+    </div>
+
+    <!-- Learning tab -->
+    <div class="tabpanel" id="tab-learning">
+      <section class="card" id="learning-card"><div class="card-h"><h2>Learning &amp; memory</h2><span class="eyebrow">Keeps improving</span></div>
+        <div class="card-b">
+          <div id="mem-stats" class="mem-stats"></div>
+          <p class="learn-hint">Feed back real outcomes so the model keeps learning for this lender. CSV columns: <code>account_id, paid, amount, action</code>.</p>
+          <div class="btns">
+            <button class="act primary" id="btn-outcomes">Upload outcomes</button>
+            <button class="act" id="btn-learn">Retrain now</button>
+            <input type="file" id="outcomes-input" accept=".csv,.xlsx" hidden>
+          </div>
+          <div id="learn-status" class="status" role="status" aria-live="polite"></div>
+          <div id="learn-result"></div>
+        </div>
+      </section>
     </div>
   </section>
 
@@ -581,6 +614,9 @@ function render(data){
   refreshMemory();
 
   $("#btn-download").style.display = "inline-block";
+  $("#map-card").style.display = "none";   // collapse mapping once scored
+  $("#btn-edit-map").style.display = INSPECT ? "inline-block" : "none";
+  selectTab("worklist");                   // always land on the worklist
   $("#results").style.display = "block";
   $("#report-card").style.display = "block";
   $("#results").scrollIntoView({behavior:"smooth", block:"start"});
@@ -714,6 +750,20 @@ document.querySelectorAll("#filters .chip").forEach(ch=>ch.addEventListener("cli
   ch.setAttribute("aria-pressed","true"); filter=ch.dataset.f; renderWorklist();
 }));
 $("#search").addEventListener("input", e=>{ query=e.target.value.toLowerCase().trim(); renderWorklist(); });
+
+// ---- tabs ----
+function selectTab(name){
+  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x.dataset.tab===name?"true":"false"));
+  document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active", p.id==="tab-"+name));
+  if(name==="analytics" && DATA) requestAnimationFrame(()=>drawMap(DATA.routes));  // canvas needs visible width
+}
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click", ()=>selectTab(t.dataset.tab)));
+
+$("#btn-edit-map").addEventListener("click", ()=>{
+  if(!INSPECT) return;
+  $("#map-card").style.display = "block";
+  $("#map-card").scrollIntoView({behavior:"smooth", block:"start"});
+});
 
 // ---- human-in-the-loop feedback (delegated) ----
 $("#wl-body").addEventListener("click", async (e)=>{

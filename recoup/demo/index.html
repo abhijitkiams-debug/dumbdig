@@ -180,6 +180,12 @@
   .action.settlement_offer .ic { background:var(--warn); }
   .caret { color:var(--ink-3); transition:transform .15s; display:inline-block; font-size:11px; }
   tr.row.open .caret { transform:rotate(90deg); }
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin:0 0 20px; }
+  .tab { font-size:13.5px; font-weight:600; padding:10px 18px; border:none; background:none; color:var(--ink-2); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:8px 8px 0 0; }
+  .tab[aria-selected="true"] { color:var(--accent-ink); border-bottom-color:var(--accent); background:var(--accent-soft); }
+  .tabpanel { display:none; } .tabpanel.active { display:block; }
+  .analytics-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px){ .analytics-grid { grid-template-columns:1fr; } }
   .strat-tag { font-size:10px; color:var(--ink-3); margin-top:3px; max-width:150px; }
   .strategy { background:var(--panel-2); border-top:1px dashed var(--border); padding:14px 16px 14px 44px; }
   .strat-head { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; margin-bottom:10px; }
@@ -292,19 +298,23 @@
 
   <section class="kpis" id="kpis"></section>
 
-  <div class="grid">
-    <!-- Worklist -->
+  <div class="tabs" role="tablist">
+    <button class="tab" data-tab="worklist" aria-selected="true">Worklist</button>
+    <button class="tab" data-tab="analytics" aria-selected="false">Analytics</button>
+  </div>
+
+  <div class="tabpanel active" id="tab-worklist">
     <section class="card" aria-label="Account worklist">
       <div class="card-h">
         <h2>Prioritized worklist</h2>
-        <span class="eyebrow">TOPSIS-ranked</span>
+        <span class="eyebrow">priority-ranked</span>
       </div>
       <div class="filters" id="filters">
         <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
         <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
         <button class="chip" data-f="Medium" aria-pressed="false">Medium <span class="c-n" id="f-med"></span></button>
         <button class="chip" data-f="Low" aria-pressed="false">Low <span class="c-n" id="f-low"></span></button>
-        <span class="spacer">click a row for the reasoning &amp; audit trail</span>
+        <span class="spacer">click a row for the strategy, reasoning &amp; audit trail</span>
       </div>
       <div class="wl-scroll">
         <table class="wl">
@@ -320,9 +330,10 @@
         </table>
       </div>
     </section>
+  </div>
 
-    <!-- Right rail -->
-    <div class="stack">
+  <div class="tabpanel" id="tab-analytics">
+    <div class="analytics-grid">
       <section class="card">
         <div class="card-h"><h2>Field routing</h2><span class="eyebrow">K-means · 2-opt</span></div>
         <div class="map-legend" id="map-legend"></div>
@@ -332,18 +343,15 @@
           <div id="map-stats" style="margin-top:10px;"></div>
         </div>
       </section>
-
+      <section class="card">
+        <div class="card-h"><h2>Channel weighting</h2><span class="eyebrow">AHP</span></div>
+        <div class="card-b" id="ahp"></div>
+      </section>
       <section class="card">
         <div class="card-h"><h2>Model performance</h2><span class="eyebrow">Held-out</span></div>
         <div class="card-b" id="metrics"></div>
       </section>
-
-      <section class="card">
-        <div class="card-h"><h2>Next-best-action weighting</h2><span class="eyebrow">AHP</span></div>
-        <div class="card-b" id="ahp"></div>
-      </section>
-
-      <section class="card">
+      <section class="card" style="grid-column:1 / -1;">
         <div class="card-h"><h2>Compliance &amp; oversight</h2><span class="eyebrow">Human-in-the-loop</span></div>
         <div class="card-b" id="compliance"></div>
       </section>
@@ -534,11 +542,17 @@
       });
     });
   }
-  drawMap();
-  window.addEventListener("resize", drawMap);
-  // redraw on theme change
-  new MutationObserver(drawMap).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+  window.addEventListener("resize", ()=>{ if(document.getElementById("tab-analytics").classList.contains("active")) drawMap(); });
+  new MutationObserver(()=>{ if(document.getElementById("tab-analytics").classList.contains("active")) drawMap(); }).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+  // ---- tabs (draw the map only when Analytics is visible so it sizes right) ----
+  let mapDrawn = false;
+  document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click", ()=>{
+    const name = t.dataset.tab;
+    document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x===t?"true":"false"));
+    document.querySelectorAll(".tabpanel").forEach(p=>p.classList.toggle("active", p.id==="tab-"+name));
+    if(name==="analytics") requestAnimationFrame(drawMap);
+  }));
 
   // ---- model performance ----
   const met = document.getElementById("metrics");

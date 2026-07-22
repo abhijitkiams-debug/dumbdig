@@ -246,7 +246,7 @@ def score_rows(rows, report, collectors, top_field, lender="default"):
 EXPORT_COLUMNS = [
     "rank", "account_id", "borrower_name", "region", "rm_name", "segment",
     "current_bucket", "days_past_due", "priority_level", "priority_score",
-    "needs_review", "review_reason", "ptp_active",
+    "intent_to_pay", "intent_score", "needs_review", "review_reason", "ptp_active",
     "prob_promise_to_pay", "prob_actual_payment", "pay_source",
     "pos", "past_due_amount", "recoverable_amount", "expected_payment", "topsis_score",
     "strategy", "strategy_path", "first_action", "first_script", "est_cost",
@@ -266,6 +266,7 @@ def worklist_to_csv(worklist):
             row.get("region"), row.get("rm_name"), row.get("segment"),
             row.get("current_bucket"), row.get("days_past_due"),
             row.get("priority_level"), row.get("priority_score"),
+            row.get("intent_band"), row.get("intent_score"),
             row.get("review"), row.get("review_reason"), row.get("ptp_active"),
             row.get("prob_promise_to_pay"), row.get("prob_actual_payment"),
             row.get("audit", {}).get("pay_source"),

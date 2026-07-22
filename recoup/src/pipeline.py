@@ -17,6 +17,7 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 
 import ahp
+import intent
 import learner
 import signals
 import strategy
@@ -266,6 +267,9 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         strat = strategy.recommend(r, sr, kb, level, float(pay_prob[i]),
                                    float(recoverable[i]), lender=lender)
 
+        # Borrower payment intent (willingness), banded for collectors.
+        intent_res = intent.assess(r, sr, kb, float(pay_prob[i]), strat)
+
         # Human-review flag: which cases a person must clear before action.
         if sr.get("redflag"):
             review, review_reason = True, "objective red flag (refusal/absconding/closed/dispute or 90+ DPD)"
@@ -297,6 +301,9 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
             "expected_payment": round(float(expected[i]), 2),
             "priority_score": sr["priority_score"],
             "priority_level": level,
+            "intent_band": intent_res["intent_band"],
+            "intent_score": intent_res["intent_score"],
+            "intent_reasons": intent_res["intent_reasons"],
             "confidence": sr["confidence"],
             "topsis_score": round(float(topsis_scores[i]), 4),
             "next_best_action": strat["first_action"],
@@ -343,8 +350,10 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
     channel_counts = {}
     review_count = 0
     ptp_count = 0
+    intent_counts = {b: 0 for b in intent.BANDS}
     for w in worklist:
         levels[w["priority_level"]] += 1
+        intent_counts[w["intent_band"]] = intent_counts.get(w["intent_band"], 0) + 1
         if w.get("review"):
             review_count += 1
         if w.get("ptp_active"):
@@ -362,6 +371,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         "total_past_due": round(float(past_due.sum()), 2),
         "total_expected_recovery": round(float(expected.sum()), 2),
         "priority_breakdown": levels,
+        "intent_breakdown": intent_counts,
         "review_required": review_count,
         "ptp_active_count": ptp_count,
         "segment_breakdown": seg_counts,

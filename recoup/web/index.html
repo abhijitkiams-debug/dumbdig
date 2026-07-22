@@ -176,6 +176,12 @@
   .prio.High { color:var(--crit); } .prio.High .stripe { background:var(--crit); }
   .prio.Medium { color:var(--warn); } .prio.Medium .stripe { background:var(--warn); }
   .prio.Low { color:var(--calm); } .prio.Low .stripe { background:var(--calm); }
+  .intent { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; border:1px solid transparent; }
+  .intent-vh { color:#0B7A5B; background:rgba(15,157,118,.14); border-color:rgba(15,157,118,.4); }
+  .intent-h  { color:#2C7A4B; background:rgba(76,175,110,.14); border-color:rgba(76,175,110,.4); }
+  .intent-m  { color:#8A6100; background:rgba(178,106,0,.14); border-color:rgba(178,106,0,.4); }
+  .intent-l  { color:#B4531A; background:rgba(200,90,30,.14); border-color:rgba(200,90,30,.4); }
+  .intent-x  { color:var(--crit); background:rgba(194,51,77,.12); border-color:rgba(194,51,77,.45); }
   .seg { font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; white-space:nowrap; background:var(--calm-soft); color:var(--ink-2); border:1px solid var(--border-2); }
   .seg.self_cured { background:var(--accent-soft); color:var(--accent-ink); }
   .seg.defaulter { background:var(--crit-soft); color:var(--crit); }
@@ -427,7 +433,7 @@
         <div class="trunc" id="trunc" style="display:none;"></div>
         <div class="wl-scroll">
           <table class="wl">
-            <thead><tr><th></th><th>Account</th><th>Segment</th><th>Priority</th><th class="r">P2P</th><th class="r">Pay prob.</th><th class="r">Outstanding</th><th class="r">Exp. recovery</th><th>Next best action</th></tr></thead>
+            <thead><tr><th></th><th>Account</th><th>Segment</th><th>Priority</th><th>Intent to pay</th><th class="r">Pay prob.</th><th class="r">Outstanding</th><th class="r">Exp. recovery</th><th>Next best action</th></tr></thead>
             <tbody id="wl-body"></tbody>
           </table>
         </div>
@@ -441,6 +447,7 @@
           <div class="map-legend" id="map-legend"></div>
           <div class="card-b" style="padding-top:6px;"><canvas id="map" width="640" height="640" role="img" aria-label="Optimized field-collector routes"></canvas><div id="map-stats" style="margin-top:10px;"></div></div>
         </section>
+        <section class="card"><div class="card-h"><h2>Intent to pay</h2><span class="eyebrow">Willingness</span></div><div class="card-b" id="intent-mix"></div></section>
         <section class="card"><div class="card-h"><h2>Strategy &amp; channel mix</h2><span class="eyebrow">Multi-channel</span></div><div class="card-b" id="strategy-mix"></div></section>
         <section class="card"><div class="card-h"><h2>Channel weighting</h2><span class="eyebrow">AHP</span></div><div class="card-b" id="ahp"></div></section>
         <section class="card"><div class="card-h"><h2>Model performance</h2><span class="eyebrow" id="perf-src">Held-out</span></div><div class="card-b" id="metrics"></div></section>
@@ -509,6 +516,8 @@ const moneyK = n => {
 const pct = x => Math.round(x*100) + "%";
 const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
 const prettyAction = a => (a||"").replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
+const INTENT_CLASS = {"Very High":"intent-vh","High":"intent-h","Medium":"intent-m","Low":"intent-l","May not pay":"intent-x"};
+const intentClass = b => INTENT_CLASS[b] || "intent-m";
 const routeColors = ["#7E6AB9","#C2334D","#3B6EA5","#0F9D76","#B26A00","#5B3F96"];
 
 let DATA = null, filter = "All", query = "";
@@ -634,6 +643,7 @@ function render(data){
   renderTrunc(data.worklist_truncated);
   renderWorklist();
   renderMap(data.routes);
+  renderIntent(data.summary);
   renderStrategyMix(data.summary);
   renderMetrics(data.model_metrics, data.uploaded_labels_present);
   renderAHP(data);
@@ -749,7 +759,7 @@ function renderWorklist(){
       <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">⚑ review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||"—"}</span></td>
       <td><span class="seg ${w.segment}">${(w.segment||"").replace(/_/g," ")}</span></td>
       <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
-      <td class="r"><span class="num">${pct(w.prob_promise_to_pay)}</span></td>
+      <td><span class="intent ${intentClass(w.intent_band)}" title="${(w.intent_reasons||[]).join('; ')}">${w.intent_band||'—'}</span></td>
       <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
       <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
       <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
@@ -766,6 +776,7 @@ function renderWorklist(){
             <div class="kv"><span>Outstanding (POS)</span><span>${money(w.pos!=null?w.pos:0)}</span></div>
             <div class="kv"><span>Days past due</span><span>${w.days_past_due!=null?w.days_past_due:"—"}</span></div>
             <div class="kv"><span>Pay likelihood <span style="color:var(--ink-3)">(${w.audit.pay_source||''})</span></span><span>${pct(w.prob_actual_payment)}</span></div>
+            <div class="kv"><span>Intent to pay <span style="color:var(--ink-3)">(${(w.intent_reasons||[]).join('; ')})</span></span><span class="intent ${intentClass(w.intent_band)}">${w.intent_band||'—'}</span></div>
             ${Object.entries(w.audit.priority_components||{}).map(([k,v])=>`<div class="kv"><span>Signal · ${k}</span><span>${v}</span></div>`).join("")}
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
             <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||'—'}</span></div>
@@ -941,6 +952,24 @@ function renderMetrics(mm, uploadedLabels){
   if(!any){
     met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'No supervised model is driving these scores yet — payment likelihood is a <b>transparent risk heuristic</b>. It becomes a validated supervised model as soon as you upload a book with outcome-label columns, or record real repayment outcomes under <b>Learning</b>. Priority, strategy and routing are fully computed regardless.'}));
   }
+}
+
+function renderIntent(s){
+  const box = $("#intent-mix"); if(!box) return; box.innerHTML="";
+  const order = ["Very High","High","Medium","Low","May not pay"];
+  const b = s.intent_breakdown || {};
+  const total = order.reduce((a,k)=>a+(b[k]||0),0)||1;
+  const note = el("p"); note.className="learn-hint"; note.style.margin="0 0 10px";
+  note.innerHTML = "Willingness to pay, from cooperation, promises and payment signals — separate from risk priority.";
+  box.append(note);
+  order.forEach(k=>{
+    const v=b[k]||0;
+    const row=el("div","ahp-row");
+    row.innerHTML = `<span class="a-name" style="font-size:12px"><span class="intent ${intentClass(k)}" style="padding:1px 7px">${k}</span></span>
+      <div class="a-track"><div class="a-fill" style="width:${Math.round(v/total*100)}%"></div></div>
+      <span class="a-val">${v.toLocaleString()}</span>`;
+    box.append(row);
+  });
 }
 
 function renderStrategyMix(s){

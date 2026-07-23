@@ -13,18 +13,34 @@ talks back).
 
 ## Mobile & voice
 
-- **Responsive / mobile-first:** on phones the assistant becomes a full-screen
-  bottom sheet, inputs use 16px text (no iOS auto-zoom), tap targets are ≥44px,
-  the layout is single-column, and safe-area insets are respected. No horizontal
-  scroll at any width.
-- **Voice, Siri-style:** the assistant has an animated gradient **orb** that
-  reacts to your voice while listening and glows while speaking. Tap 🎙️ to talk;
-  it auto-starts a spoken greeting the first time you open it.
-- **Speech providers:** if you add a **Sarvam** API key it uses Sarvam STT
-  (`saarika`) + TTS (`bulbul`); otherwise it falls back to the browser's built-in
-  **Web Speech API** (works keyless on mobile Chrome). If Sarvam is unreachable
-  (e.g. CORS), it degrades to the browser engine automatically. There's always a
-  **type** fallback too.
+- **Responsive / mobile-first:** on phones the assistant is a **Siri-style call
+  bar** docked over the form (orb, name, live status/timer, language chip, mute,
+  and a red end button). Tap the launcher to "call" the assistant; tap the orb on
+  the bar to open the text chat. Inputs use 16px text (no iOS auto-zoom), tap
+  targets are ≥44px, single-column layout, safe-area insets, no horizontal scroll.
+- **Voice, Siri-style:** an animated gradient **orb** reacts to your voice while
+  listening and glows while speaking. Starting a call auto-greets you and begins
+  listening.
+- **Multilingual (Hindi & more):** speak in **Hindi** (or Tamil, Telugu, Bengali,
+  Marathi…) — Sarvam STT auto-detects the language, the app translates it to
+  English for understanding, fills the form, and then **replies back in the same
+  language** via Sarvam translate + TTS. So you talk in Hindi and Saathi answers
+  in Hindi. Tap the language chip (EN / हिं / த …) to set it explicitly.
+- **Speech providers:** with a **Sarvam** API key it uses Sarvam STT (`saarika`),
+  translate, and TTS (`bulbul`). Without a key it falls back to the browser's
+  **Web Speech API** (English, keyless). If Sarvam is unreachable it degrades to
+  the browser engine automatically, and there's always a **type** fallback.
+
+### How the multilingual voice loop works
+
+```
+you speak (Hindi) ─▶ Sarvam STT ─▶ translate hi→en ─▶ NLU fills the form
+                                                          │
+   TTS (Hindi) ◀─ translate en→hi ◀─ English reply ◀──────┘
+```
+
+The NLU also understands spoken/translated number words like "five lakh" and
+"sixty thousand", not just digits.
 
 ### Setting a Sarvam key (optional)
 

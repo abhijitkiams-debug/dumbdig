@@ -60,6 +60,33 @@
 
   /* ---------- amount parsing (lakh / crore / k) ---------- */
 
+  // Spelled-out numbers (from speech / translation): "five lakh", "sixty thousand".
+  var NUM_SMALL = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+    nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+    sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19
+  };
+  var NUM_TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  var NUM_SCALE = { thousand: 1000, lakh: 1e5, lakhs: 1e5, lac: 1e5, lacs: 1e5, crore: 1e7, crores: 1e7, million: 1e6, k: 1000 };
+
+  // Convert the first spelled-out number phrase to a value. Only returns when a
+  // scale word (thousand/lakh/crore/…) is present, so a bare "twelve" isn't read
+  // as ₹12.
+  function wordsToNumber(text) {
+    var tokens = text.toLowerCase().replace(/[,\-]/g, ' ').split(/\s+/);
+    var total = 0, current = 0, found = false, hadScale = false;
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i];
+      if (NUM_SMALL[tk] != null) { current += NUM_SMALL[tk]; found = true; }
+      else if (NUM_TENS[tk] != null) { current += NUM_TENS[tk]; found = true; }
+      else if (tk === 'hundred') { current = (current || 1) * 100; found = true; hadScale = true; }
+      else if (NUM_SCALE[tk] != null) { current = (current || 1) * NUM_SCALE[tk]; total += current; current = 0; found = true; hadScale = true; }
+      else if (found) { break; } // number phrase ended
+    }
+    var val = total + current;
+    return (found && hadScale && val > 0) ? Math.round(val) : null;
+  }
+
   // Returns the numeric rupee value of the first monetary mention, or null.
   function parseAmount(text) {
     var t = text.toLowerCase().replace(/,/g, '');
@@ -80,6 +107,10 @@
     // plain numbers only with an explicit currency cue (avoids grabbing phone/pincode)
     m = t.match(/(?:₹|rs\.?|inr)\s*\b(\d{4,})/);
     if (m) return parseInt(m[1], 10);
+
+    // spelled-out numbers ("five lakh", "sixty thousand") from speech/translation
+    var w = wordsToNumber(t);
+    if (w != null) return w;
 
     return null;
   }

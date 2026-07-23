@@ -246,6 +246,48 @@
 @keyframes lc-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(236,72,153,.5); } 50% { box-shadow: 0 0 0 8px rgba(236,72,153,0); } }
 .lc-mic[disabled] { opacity: .4; cursor: default; }
 
+/* ===== Siri-style call bar (mockup) ===== */
+.lc-callbar {
+  position: absolute; left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  width: min(520px, calc(100% - 24px));
+  display: none; align-items: center; gap: 11px;
+  padding: 9px 11px; border-radius: 40px;
+  background: linear-gradient(100deg, #4f46e5, #7c3aed 55%, #a855f7);
+  box-shadow: 0 16px 40px rgba(79,70,229,.45);
+  pointer-events: auto; z-index: 6;
+  transition: box-shadow .25s ease;
+}
+.lc-root.lc-incall .lc-callbar { display: flex; animation: lc-callin .28s ease; }
+.lc-root.lc-incall .lc-fab { display: none; }
+@keyframes lc-callin { from { opacity: 0; transform: translateX(-50%) translateY(28px); } }
+.lc-orb-lg { width: 46px; height: 46px; cursor: pointer; }
+.lc-call-mid { flex: 1; min-width: 0; color: #fff; }
+.lc-call-name { font-weight: 700; font-size: 16px; line-height: 1.15; }
+.lc-call-cap {
+  font-size: 13px; opacity: .9; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lc-call-lang {
+  background: rgba(255,255,255,.16); color: #fff; border: none; border-radius: 16px;
+  min-width: 42px; height: 34px; padding: 0 10px; font-size: 13px; font-weight: 700;
+  cursor: pointer; flex: none;
+}
+.lc-call-lang:hover { background: rgba(255,255,255,.28); }
+.lc-call-mute {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; flex: none;
+  background: rgba(17,8,36,.55); color: #fff; font-size: 18px; display: grid; place-items: center;
+}
+.lc-call-mute.lc-muted { background: rgba(17,8,36,.32); }
+.lc-call-end {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; flex: none;
+  background: #ef4444; color: #fff; font-size: 16px; display: grid; place-items: center;
+}
+.lc-call-end:hover { background: #dc2626; }
+.lc-root.lc-listening .lc-callbar { box-shadow: 0 16px 46px rgba(236,72,153,.5); }
+.lc-root.lc-speaking .lc-callbar { box-shadow: 0 16px 46px rgba(139,92,246,.55); }
+
 /* settings modal */
 .lc-modal-back {
   position: absolute; inset: 0; background: rgba(15,23,42,.45);

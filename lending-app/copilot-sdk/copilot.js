@@ -54,7 +54,9 @@
     this._speakBuffer = '';
     this._collecting = false;
     this._convDone = false;
-    if (this.voice && config.brand && config.brand.language) this.voice.setLang(config.brand.language);
+    this._inCall = false;
+    this.convLang = (config.brand && config.brand.language) || 'en-IN';
+    if (this.voice) this.voice.setLang(this.convLang);
 
     this._build();
     this._greet();
@@ -103,8 +105,8 @@
 
     // Floating launcher button
     var fab = el('button', 'lc-fab', '<span class="lc-fab-dot"></span>💬');
-    fab.title = 'Ask ' + this.brand.name;
-    fab.addEventListener('click', function () { self.toggle(); });
+    fab.title = 'Talk to ' + this.brand.name;
+    fab.addEventListener('click', function () { self._fabTap(); });
     this.fab = fab;
 
     // Panel
@@ -163,6 +165,29 @@
     }
     this._reflectVoiceBtn();
 
+    // ===== Siri-style call bar (the primary voice surface, mockup-style) =====
+    var callbar = el('div', 'lc-callbar');
+    callbar.innerHTML =
+      '<span class="lc-orb lc-orb-lg" title="Open chat"><span class="lc-orb-glow"></span><span class="lc-orb-core"></span></span>' +
+      '<div class="lc-call-mid">' +
+        '<div class="lc-call-name">' + esc(this.brand.name) + '</div>' +
+        '<div class="lc-call-cap">00:00</div>' +
+      '</div>' +
+      '<button class="lc-call-lang" title="Language">EN</button>' +
+      '<button class="lc-call-mute" title="Mute / speak">🎙️</button>' +
+      '<button class="lc-call-end" title="End">✕</button>';
+    this.callbar = callbar;
+    this.callName = callbar.querySelector('.lc-call-name');
+    this.callCap = callbar.querySelector('.lc-call-cap');
+    this.callLangBtn = callbar.querySelector('.lc-call-lang');
+    this.callMuteBtn = callbar.querySelector('.lc-call-mute');
+    callbar.querySelector('.lc-orb-lg').addEventListener('click', function () { self.toggle(true); });
+    callbar.querySelector('.lc-call-end').addEventListener('click', function () { self.endCall(); });
+    this.callMuteBtn.addEventListener('click', function () { self._callMuteTap(); });
+    this.callLangBtn.addEventListener('click', function () { self._cycleLang(); });
+    root.appendChild(callbar);
+    this._reflectLangBtn();
+
     root.appendChild(panel);
     root.appendChild(fab);
     document.body.appendChild(root);
@@ -190,8 +215,11 @@
         }
       }
     } else {
-      if (this.voice) this.voice.stop();
-      this._setPhase('idle');
+      // Closing the chat panel shouldn't hang up an active call.
+      if (!this._inCall) {
+        if (this.voice) this.voice.stop();
+        this._setPhase('idle');
+      }
     }
   };
 
@@ -207,7 +235,7 @@
       this._lastBotText = plain;
       if (this._collecting) {
         this._speakBuffer += (this._speakBuffer ? ' ' : '') + plain;
-      } else if (this.voiceOn && this.open) {
+      } else if (this.voiceOn && (this.open || this._inCall)) {
         this._speak(plain);
       }
     }
@@ -249,17 +277,18 @@
 
   // One conversational turn: process input, then (in voice mode) speak the
   // reply and — if it came from voice — listen again.
-  Copilot.prototype._turn = function (text, fromVoice) {
+  Copilot.prototype._turn = function (text, fromVoice, displayText) {
     var self = this;
     this._collecting = true;
     this._speakBuffer = '';
-    this.handle(text);
+    this.handle(text, displayText);
     this._collecting = false;
     var toSpeak = this._speakBuffer.trim();
     this._speakBuffer = '';
-    if (this.voiceOn && this.voice && this.open && toSpeak) {
+    var active = this.open || this._inCall;
+    if (this.voiceOn && this.voice && active && toSpeak) {
       this._speak(toSpeak).then(function () {
-        if (fromVoice && self.open && self.voiceOn && !self._convDone) self._startListen();
+        if (fromVoice && (self.open || self._inCall) && self.voiceOn && !self._convDone) self._startListen();
       });
     } else {
       this._setPhase('idle');
@@ -270,7 +299,8 @@
     if (!text || !this.voice || !this.voiceOn) return Promise.resolve();
     this._setPhase('speaking');
     var self = this;
-    return this.voice.speak(text).then(function () {
+    // Speak in the conversation language (auto-set to whatever the user spoke).
+    return this.voice.speak(text, this.convLang || 'en-IN').then(function () {
       if (self.phase === 'speaking') self._setPhase('idle');
     }).catch(function () { self._setPhase('idle'); });
   };
@@ -283,15 +313,19 @@
     }
     var self = this;
     this._setPhase('listening');
-    this.voice.listen().then(function (text) {
-      if (!self.open) { self._setPhase('idle'); return; }
-      if (text && text.trim()) {
+    this.voice.listen().then(function (res) {
+      if (!self.open && !self._inCall) { self._setPhase('idle'); return; }
+      res = res || {};
+      var english = (res.text || '').trim();     // for the NLU
+      var shown = (res.display || res.text || '').trim(); // what they actually said
+      if (res.lang) self.convLang = res.lang;    // reply in the same language
+      if (english) {
         self._setPhase('thinking');
-        self._turn(text.trim(), true);
+        self._turn(english, true, shown);
       } else {
         self._setPhase('idle');
         self.voiceCap.textContent = 'Didn\'t catch that — tap 🎙️ to retry';
-        self.root.classList.add('lc-thinking'); // keep the status bar visible briefly
+        self.root.classList.add('lc-thinking');
         setTimeout(function () { if (self.phase === 'idle') self.root.classList.remove('lc-thinking'); }, 1800);
       }
     }).catch(function () { self._setPhase('idle'); });
@@ -314,6 +348,83 @@
     if (!this.voiceOn) { if (this.voice) this.voice.stop(); this._setPhase('idle'); }
   };
 
+  /* ---- the "call" experience (mockup-style bar) ---- */
+
+  Copilot.prototype._fabTap = function () {
+    // Voice-capable -> start a call; otherwise open the text chat panel.
+    if (this.voice && this.voice.isSupported()) this.startCall();
+    else this.toggle(true);
+  };
+
+  Copilot.prototype.startCall = function () {
+    if (!this.voice || !this.voice.isSupported()) { this.toggle(true); return; }
+    if (this._inCall) return;
+    this._inCall = true;
+    this._firstOpen = false;
+    this.voiceOn = true;
+    this._reflectVoiceBtn();
+    this.root.classList.add('lc-incall');
+    this._callStart = Date.now();
+    this._startCallTimer();
+    var self = this;
+    // Greet in the conversation language, then start listening.
+    this._speak(this._lastBotText).then(function () {
+      if (self._inCall) self._startListen();
+    });
+  };
+
+  Copilot.prototype.endCall = function () {
+    this._inCall = false;
+    this.root.classList.remove('lc-incall');
+    if (this._callTimer) { clearInterval(this._callTimer); this._callTimer = null; }
+    if (this.voice) this.voice.stop();
+    this._setPhase('idle');
+  };
+
+  Copilot.prototype._callMuteTap = function () {
+    if (this.phase === 'listening' || this.phase === 'speaking') {
+      if (this.voice) this.voice.stop();
+      this._setPhase('idle');           // paused
+    } else {
+      this._startListen();
+    }
+  };
+
+  Copilot.prototype._startCallTimer = function () {
+    var self = this;
+    if (this._callTimer) clearInterval(this._callTimer);
+    this._callTimer = setInterval(function () {
+      if (self.phase === 'idle' && self.callCap) {
+        var s = Math.floor((Date.now() - self._callStart) / 1000);
+        var mm = String(Math.floor(s / 60)).padStart(2, '0');
+        var ss = String(s % 60).padStart(2, '0');
+        self.callCap.textContent = mm + ':' + ss;
+      }
+    }, 1000);
+  };
+
+  var LANG_CYCLE = [
+    { code: 'en-IN', label: 'EN' }, { code: 'hi-IN', label: 'हिं' },
+    { code: 'ta-IN', label: 'த' }, { code: 'te-IN', label: 'తె' },
+    { code: 'bn-IN', label: 'বাং' }, { code: 'mr-IN', label: 'मरा' }
+  ];
+  Copilot.prototype._cycleLang = function () {
+    var idx = 0;
+    for (var i = 0; i < LANG_CYCLE.length; i++) if (LANG_CYCLE[i].code === this.convLang) { idx = i; break; }
+    var next = LANG_CYCLE[(idx + 1) % LANG_CYCLE.length];
+    this.convLang = next.code;
+    if (this.voice) this.voice.setLang(next.code);
+    this._reflectLangBtn();
+    // acknowledge in the newly chosen language
+    if (this._inCall) this._speak('Okay, let\'s continue.');
+  };
+  Copilot.prototype._reflectLangBtn = function () {
+    if (!this.callLangBtn) return;
+    var cur = LANG_CYCLE[0];
+    for (var i = 0; i < LANG_CYCLE.length; i++) if (LANG_CYCLE[i].code === this.convLang) cur = LANG_CYCLE[i];
+    this.callLangBtn.textContent = cur.label;
+  };
+
   Copilot.prototype._reflectVoiceBtn = function () {
     if (!this.voiceBtn) return;
     this.voiceBtn.textContent = this.voiceOn ? '🔊' : '🔇';
@@ -325,9 +436,16 @@
     this.phase = p;
     var r = this.root;
     r.classList.remove('lc-listening', 'lc-speaking', 'lc-thinking');
-    if (p === 'listening') { r.classList.add('lc-listening'); this.voiceCap.textContent = 'Listening…'; }
-    else if (p === 'speaking') { r.classList.add('lc-speaking'); this.voiceCap.textContent = 'Speaking…'; }
-    else if (p === 'thinking') { r.classList.add('lc-thinking'); this.voiceCap.textContent = 'Thinking…'; }
+    var cap = '';
+    if (p === 'listening') { r.classList.add('lc-listening'); cap = 'Listening…'; }
+    else if (p === 'speaking') { r.classList.add('lc-speaking'); cap = 'Speaking…'; }
+    else if (p === 'thinking') { r.classList.add('lc-thinking'); cap = 'Thinking…'; }
+    if (this.voiceCap && cap) this.voiceCap.textContent = cap;
+    // call bar caption: show live status, or fall back to the timer when idle
+    if (this.callCap) {
+      if (cap) this.callCap.textContent = cap;
+      this.callMuteBtn && this.callMuteBtn.classList.toggle('lc-muted', p === 'idle');
+    }
     if (p === 'listening' || p === 'speaking') this._startAmpLoop();
     else this._stopAmpLoop();
   };
@@ -381,13 +499,14 @@
     var keyIn = back.querySelector('.lc-k');
     var langIn = back.querySelector('.lc-lang');
     keyIn.value = this.voice.getKey();
-    langIn.value = (this.voice.getKey && this.brand.language) || 'en-IN';
+    langIn.value = this.convLang || 'en-IN';
     var close = function () { back.remove(); };
     back.addEventListener('click', function (e) { if (e.target === back) close(); });
     back.querySelector('.lc-cancel').addEventListener('click', close);
     back.querySelector('.lc-save').addEventListener('click', function () {
       self.voice.setKey(keyIn.value);
       self.voice.setLang(langIn.value);
+      self.convLang = langIn.value;
       self.voiceOn = self.voice.isSupported();
       self._reflectVoiceBtn();
       close();
@@ -395,8 +514,10 @@
   };
 
   // Public: feed text (from input or a quick chip) into the copilot.
-  Copilot.prototype.handle = function (text) {
-    this._say(text, 'user');
+  // `displayText` (optional) is what the user actually said in their language;
+  // `text` is always English for the NLU.
+  Copilot.prototype.handle = function (text, displayText) {
+    this._say(displayText || text, 'user');
     var res = this.nlu.parse(text);
     var filled = this._applyEntities(res.entities);
 

@@ -163,7 +163,7 @@
     var fd = new FormData();
     fd.append('file', wavBlob, 'audio.wav');
     fd.append('model', 'saarika:v2.5');
-    fd.append('language_code', 'unknown');
+    fd.append('language_code', 'unknown'); // auto-detect the spoken language
     return fetch('https://api.sarvam.ai/speech-to-text', {
       method: 'POST',
       headers: { 'api-subscription-key': getKey() },
@@ -171,16 +171,32 @@
     }).then(function (r) {
       if (!r.ok) throw new Error('STT ' + r.status);
       return r.json();
-    }).then(function (j) { return (j.transcript || '').trim(); });
+    }).then(function (j) {
+      return { transcript: (j.transcript || '').trim(), lang: j.language_code || LANG };
+    });
   }
 
-  function sarvamSynthesize(text) {
+  // Sarvam text translation — used to bridge any Indian language to the English
+  // NLU (understanding) and English replies back to the user's language (speech).
+  function translate(text, source, target) {
+    if (!text || !getKey() || source === target) return Promise.resolve(text);
+    return fetch('https://api.sarvam.ai/translate', {
+      method: 'POST',
+      headers: { 'api-subscription-key': getKey(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: text, source_language_code: source, target_language_code: target })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('translate ' + r.status);
+      return r.json();
+    }).then(function (j) { return j.translated_text || text; }).catch(function () { return text; });
+  }
+
+  function sarvamSynthesize(text, lang) {
     return fetch('https://api.sarvam.ai/text-to-speech', {
       method: 'POST',
       headers: { 'api-subscription-key': getKey(), 'Content-Type': 'application/json' },
       body: JSON.stringify({
         inputs: [text.slice(0, 480)],
-        target_language_code: LANG,
+        target_language_code: lang || LANG,
         speaker: SPEAKER,
         pitch: 0, pace: 1.0, loudness: 1.0,
         speech_sample_rate: 22050,
@@ -244,11 +260,11 @@
     } catch (e) { return null; }
   }
 
-  function webSpeak(text) {
+  function webSpeak(text, lang) {
     return new Promise(function (resolve) {
       if (!global.speechSynthesis) { resolve(); return; }
       var u = new SpeechSynthesisUtterance(text);
-      u.lang = bcp47(LANG);
+      u.lang = bcp47(lang || LANG);
       var v = pickVoice(u.lang); if (v) u.voice = v;
       var done = false;
       var finish = function () { if (done) return; done = true; resolve(); };
@@ -264,27 +280,42 @@
 
   /* ---------- public API ---------- */
 
-  // Returns a Promise<string|null> with the recognised utterance.
+  function isEnglish(lang) { return !lang || lang.indexOf('en') === 0; }
+
+  // Listen -> returns { display, text, lang }:
+  //   display = what the user said (their language, for the transcript)
+  //   text    = English text for the NLU (translated if needed)
+  //   lang    = detected/used language (so replies can match it)
   function listen() {
     if (getKey()) {
-      return recordUntilSilence().then(blobToWav).then(sarvamTranscribe).catch(function () {
-        // Sarvam failed (CORS/network) -> fall back to browser STT
+      return recordUntilSilence().then(blobToWav).then(sarvamTranscribe).then(function (res) {
+        var spoken = res.transcript;
+        var lang = res.lang || LANG;
+        if (!spoken) return { display: '', text: '', lang: lang };
+        if (isEnglish(lang)) return { display: spoken, text: spoken, lang: 'en-IN' };
+        return translate(spoken, lang, 'en-IN').then(function (en) {
+          return { display: spoken, text: en, lang: lang };
+        });
+      }).catch(function () {
         stopAmp();
-        return webSpeechListen();
+        return webSpeechListen().then(function (t) { return { display: t, text: t, lang: LANG }; });
       });
     }
-    return webSpeechListen();
+    return webSpeechListen().then(function (t) { return { display: t, text: t, lang: LANG }; });
   }
 
-  // Speaks text; resolves when finished. Falls back automatically.
-  function speak(text) {
+  // Speak English `text`, but voiced in `lang` (translating first if needed).
+  // Resolves when finished. Falls back automatically.
+  function speak(text, lang) {
     if (!text) return Promise.resolve();
+    lang = lang || LANG;
     if (getKey()) {
-      return sarvamSynthesize(text).then(playBase64Wav).catch(function () {
-        return webSpeak(text);
-      });
+      var prep = isEnglish(lang) ? Promise.resolve(text) : translate(text, 'en-IN', lang);
+      return prep.then(function (out) {
+        return sarvamSynthesize(out, lang).then(playBase64Wav);
+      }).catch(function () { return webSpeak(text, lang); });
     }
-    return webSpeak(text);
+    return webSpeak(text, lang);
   }
 
   function stop() {
@@ -306,6 +337,8 @@
     setKey: setKey,
     getKey: getKey,
     setLang: setLang,
-    setSpeaker: setSpeaker
+    getLang: function () { return LANG; },
+    setSpeaker: setSpeaker,
+    translate: translate
   };
 })(typeof window !== 'undefined' ? window : this);

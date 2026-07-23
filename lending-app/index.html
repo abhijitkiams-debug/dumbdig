@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setu Finance — Loans made simple</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="copilot-sdk/copilot.css" />
+</head>
+<body>
+  <!-- ===== HOST APP: the client's own UI (copilot never modifies this) ===== -->
+  <header class="app-bar">
+    <div class="logo">🪷</div>
+    <div>
+      <h1>Setu Finance</h1>
+      <div class="tag">Loans made simple</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="rbi">RBI-registered NBFC · Demo</div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-cta">
+        <span class="pill">⚡ Instant in-principle approval</span>
+        <h2>Apply for a loan in minutes</h2>
+        <p>Fill the form yourself — or tap the assistant at the bottom-right and just
+          <em>tell it what you need</em>. It fills the form, checks eligibility and finds your best product.</p>
+      </div>
+      <div class="stats">
+        <div><b>7</b><span>loan types</span></div>
+        <div><b>8.4%</b><span>rates from</span></div>
+        <div><b>&lt;5 min</b><span>to apply</span></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <div class="card">
+      <form id="loan-form" autocomplete="off"><!-- fields injected by host-app.js --></form>
+
+      <div class="assist-hint">
+        <span>💬</span>
+        <span>Prefer to chat? Open <b>Saathi</b>, your lending assistant (bottom-right), and say something like
+          <em>“I want a ₹5 lakh personal loan, I earn 60k a month, I'm salaried”</em>.</span>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="submit-btn" class="btn btn-primary">Submit application</button>
+        <button type="button" id="reset-btn" class="btn btn-ghost">Clear</button>
+        <span class="note">Your data stays in your browser — this is a demo, nothing is sent anywhere.</span>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Setu Finance is a fictional demo app. Rates, products and eligibility logic are illustrative only.
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- ===== dependencies first, then host app boots + mounts the copilot ===== -->
+  <script src="src/data/products.js"></script>
+  <script src="copilot-sdk/nlu.js"></script>
+  <script src="copilot-sdk/copilot.js"></script>
+  <script src="src/host-app.js"></script>
+</body>
+</html>

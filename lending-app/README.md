@@ -7,8 +7,38 @@ next action**, **drives the completion rate**, and **recommends the right lendin
 product** — all while rendering its own native UI **without touching the host
 app's UI**.
 
-No build step, no dependencies, no API keys, no network. Open `index.html` and it
-runs.
+No build step, no dependencies. Open `index.html` and it runs. It is
+**mobile-first responsive** and **voice-enabled** (talk to the assistant, it
+talks back).
+
+## Mobile & voice
+
+- **Responsive / mobile-first:** on phones the assistant becomes a full-screen
+  bottom sheet, inputs use 16px text (no iOS auto-zoom), tap targets are ≥44px,
+  the layout is single-column, and safe-area insets are respected. No horizontal
+  scroll at any width.
+- **Voice, Siri-style:** the assistant has an animated gradient **orb** that
+  reacts to your voice while listening and glows while speaking. Tap 🎙️ to talk;
+  it auto-starts a spoken greeting the first time you open it.
+- **Speech providers:** if you add a **Sarvam** API key it uses Sarvam STT
+  (`saarika`) + TTS (`bulbul`); otherwise it falls back to the browser's built-in
+  **Web Speech API** (works keyless on mobile Chrome). If Sarvam is unreachable
+  (e.g. CORS), it degrades to the browser engine automatically. There's always a
+  **type** fallback too.
+
+### Setting a Sarvam key (optional)
+
+The key is **never committed**. Two ways:
+
+1. **In-app:** open the assistant → tap ⚙ → paste the key (saved to your
+   browser's `localStorage`).
+2. **Local file:** `cp copilot-sdk/voice-config.local.js.example
+   copilot-sdk/voice-config.local.js` and put your key in it. That file is
+   git-ignored.
+
+> Voice STT and `speechSynthesis` need a secure context — serve over `https://`
+> or `http://localhost` (some browsers don't allow the mic on `file://`). A
+> quick local server: `python3 -m http.server` inside `lending-app/`.
 
 ```
 lending-app/

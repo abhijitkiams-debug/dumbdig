@@ -1,0 +1,11 @@
+/*
+ * Optional local voice config — copy this file to `voice-config.local.js`
+ * (same folder) and set your Sarvam API key. `voice-config.local.js` is
+ * git-ignored so your key is never committed.
+ *
+ *   cp voice-config.local.js.example voice-config.local.js
+ *
+ * You can also skip this file entirely and just paste your key in the
+ * assistant's ⚙ settings dialog (it's saved in your browser's localStorage).
+ */
+window.SARVAM_API_KEY = 'sk_your_sarvam_key_here';

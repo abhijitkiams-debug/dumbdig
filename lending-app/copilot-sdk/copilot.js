@@ -44,6 +44,18 @@
     this.schemaById = {};
     var self = this;
     this.schema.forEach(function (f) { self.schemaById[f.id] = f; });
+
+    // voice state
+    this.voice = (typeof LendVoice !== 'undefined') ? LendVoice : null;
+    this.voiceOn = !!(this.voice && this.voice.isSupported());
+    this.phase = 'idle';
+    this._firstOpen = true;
+    this._lastBotText = '';
+    this._speakBuffer = '';
+    this._collecting = false;
+    this._convDone = false;
+    if (this.voice && config.brand && config.brand.language) this.voice.setLang(config.brand.language);
+
     this._build();
     this._greet();
     // Keep the progress ring live if the user edits the client form directly.
@@ -99,10 +111,13 @@
     var panel = el('div', 'lc-panel');
     panel.innerHTML =
       '<div class="lc-head">' +
-        '<div class="lc-head-id"><span class="lc-avatar">🪙</span>' +
+        '<div class="lc-head-id">' +
+          '<span class="lc-orb"><span class="lc-orb-glow"></span><span class="lc-orb-core"></span></span>' +
           '<div><div class="lc-head-name">' + esc(this.brand.name) + '</div>' +
           '<div class="lc-head-sub">Your lending assistant</div></div>' +
         '</div>' +
+        '<button class="lc-icobtn lc-voicebtn" title="Voice on/off">🔊</button>' +
+        '<button class="lc-icobtn lc-setbtn" title="Voice settings">⚙</button>' +
         '<div class="lc-ring" aria-label="application completion"><svg viewBox="0 0 44 44">' +
           '<circle class="lc-ring-bg" cx="22" cy="22" r="18"/>' +
           '<circle class="lc-ring-fg" cx="22" cy="22" r="18"/></svg>' +
@@ -114,12 +129,14 @@
         '<div class="lc-chat"></div>' +
       '</div>' +
       '<div class="lc-composer">' +
+        '<div class="lc-voice-status"><span class="lc-dot"></span><span class="lc-voice-cap">Listening…</span></div>' +
         '<div class="lc-chips"></div>' +
         '<div class="lc-input-row">' +
-          '<input class="lc-input" type="text" placeholder="Tell me what you need… e.g. ‘5 lakh personal loan’" />' +
+          '<input class="lc-input" type="text" placeholder="Tell me what you need…" />' +
           '<button class="lc-send" title="Send">➤</button>' +
+          '<button class="lc-mic" title="Tap to talk">🎙️</button>' +
         '</div>' +
-        '<div class="lc-foot">Native copilot layer · your app UI is untouched</div>' +
+        '<div class="lc-foot">Voice-enabled · your app UI is untouched</div>' +
       '</div>';
     this.panel = panel;
     this.chatEl = panel.querySelector('.lc-chat');
@@ -128,10 +145,23 @@
     this.inputEl = panel.querySelector('.lc-input');
     this.ringFg = panel.querySelector('.lc-ring-fg');
     this.ringNum = panel.querySelector('.lc-ring-num');
+    this.micBtn = panel.querySelector('.lc-mic');
+    this.voiceBtn = panel.querySelector('.lc-voicebtn');
+    this.voiceCap = panel.querySelector('.lc-voice-cap');
 
     panel.querySelector('.lc-close').addEventListener('click', function () { self.toggle(false); });
     panel.querySelector('.lc-send').addEventListener('click', function () { self._submit(); });
     this.inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') self._submit(); });
+    this.micBtn.addEventListener('click', function () { self._micTap(); });
+    this.voiceBtn.addEventListener('click', function () { self._toggleVoice(); });
+    panel.querySelector('.lc-setbtn').addEventListener('click', function () { self._openSettings(); });
+
+    // hide voice affordances entirely if the browser can't do voice at all
+    if (!this.voice || !this.voice.isSupported()) {
+      this.micBtn.style.display = 'none';
+      this.voiceBtn.style.display = 'none';
+    }
+    this._reflectVoiceBtn();
 
     root.appendChild(panel);
     root.appendChild(fab);
@@ -146,7 +176,23 @@
   Copilot.prototype.toggle = function (force) {
     this.open = force == null ? !this.open : force;
     this.root.classList.toggle('lc-open', this.open);
-    if (this.open) { this._refreshStatus(); this.inputEl.focus(); this._scroll(); }
+    if (this.open) {
+      this._refreshStatus();
+      this._scroll();
+      // First open is a user gesture — safe to auto-start the voice greeting.
+      if (this._firstOpen) {
+        this._firstOpen = false;
+        if (this.voiceOn && this.voice) {
+          var self = this;
+          this._speak(this._lastBotText).then(function () { self._startListen(); });
+        } else {
+          this.inputEl.focus();
+        }
+      }
+    } else {
+      if (this.voice) this.voice.stop();
+      this._setPhase('idle');
+    }
   };
 
   /* ================= chat rendering ================= */
@@ -156,7 +202,26 @@
     msg.innerHTML = who === 'user' ? esc(html) : html;
     this.chatEl.appendChild(msg);
     this._scroll();
+    if (who !== 'user') {
+      var plain = this._plainText(html);
+      this._lastBotText = plain;
+      if (this._collecting) {
+        this._speakBuffer += (this._speakBuffer ? ' ' : '') + plain;
+      } else if (this.voiceOn && this.open) {
+        this._speak(plain);
+      }
+    }
     return msg;
+  };
+
+  // Strip HTML tags + emoji so TTS reads clean text.
+  Copilot.prototype._plainText = function (html) {
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    var t = d.textContent || d.innerText || '';
+    // drop emoji / pictographs and collapse whitespace
+    t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, '');
+    return t.replace(/\s+/g, ' ').trim();
   };
   Copilot.prototype._scroll = function () {
     var b = this.panel.querySelector('.lc-body');
@@ -177,7 +242,156 @@
     var text = this.inputEl.value.trim();
     if (!text) return;
     this.inputEl.value = '';
+    this._turn(text, false);
+  };
+
+  /* ================= voice ================= */
+
+  // One conversational turn: process input, then (in voice mode) speak the
+  // reply and — if it came from voice — listen again.
+  Copilot.prototype._turn = function (text, fromVoice) {
+    var self = this;
+    this._collecting = true;
+    this._speakBuffer = '';
     this.handle(text);
+    this._collecting = false;
+    var toSpeak = this._speakBuffer.trim();
+    this._speakBuffer = '';
+    if (this.voiceOn && this.voice && this.open && toSpeak) {
+      this._speak(toSpeak).then(function () {
+        if (fromVoice && self.open && self.voiceOn && !self._convDone) self._startListen();
+      });
+    } else {
+      this._setPhase('idle');
+    }
+  };
+
+  Copilot.prototype._speak = function (text) {
+    if (!text || !this.voice || !this.voiceOn) return Promise.resolve();
+    this._setPhase('speaking');
+    var self = this;
+    return this.voice.speak(text).then(function () {
+      if (self.phase === 'speaking') self._setPhase('idle');
+    }).catch(function () { self._setPhase('idle'); });
+  };
+
+  Copilot.prototype._startListen = function () {
+    if (!this.voice || !this.voiceOn || !this.voice.canListen()) {
+      this._setPhase('idle');
+      this.inputEl.focus();
+      return;
+    }
+    var self = this;
+    this._setPhase('listening');
+    this.voice.listen().then(function (text) {
+      if (!self.open) { self._setPhase('idle'); return; }
+      if (text && text.trim()) {
+        self._setPhase('thinking');
+        self._turn(text.trim(), true);
+      } else {
+        self._setPhase('idle');
+        self.voiceCap.textContent = 'Didn\'t catch that — tap 🎙️ to retry';
+        self.root.classList.add('lc-thinking'); // keep the status bar visible briefly
+        setTimeout(function () { if (self.phase === 'idle') self.root.classList.remove('lc-thinking'); }, 1800);
+      }
+    }).catch(function () { self._setPhase('idle'); });
+  };
+
+  Copilot.prototype._micTap = function () {
+    if (!this.voice) return;
+    if (this.phase === 'listening' || this.phase === 'speaking') {
+      this.voice.stop();
+      this._setPhase('idle');
+    } else {
+      if (!this.voiceOn) { this.voiceOn = true; this._reflectVoiceBtn(); }
+      this._startListen();
+    }
+  };
+
+  Copilot.prototype._toggleVoice = function () {
+    this.voiceOn = !this.voiceOn;
+    this._reflectVoiceBtn();
+    if (!this.voiceOn) { if (this.voice) this.voice.stop(); this._setPhase('idle'); }
+  };
+
+  Copilot.prototype._reflectVoiceBtn = function () {
+    if (!this.voiceBtn) return;
+    this.voiceBtn.textContent = this.voiceOn ? '🔊' : '🔇';
+    this.voiceBtn.classList.toggle('lc-on', this.voiceOn);
+    this.voiceBtn.title = this.voiceOn ? 'Voice on' : 'Voice off';
+  };
+
+  Copilot.prototype._setPhase = function (p) {
+    this.phase = p;
+    var r = this.root;
+    r.classList.remove('lc-listening', 'lc-speaking', 'lc-thinking');
+    if (p === 'listening') { r.classList.add('lc-listening'); this.voiceCap.textContent = 'Listening…'; }
+    else if (p === 'speaking') { r.classList.add('lc-speaking'); this.voiceCap.textContent = 'Speaking…'; }
+    else if (p === 'thinking') { r.classList.add('lc-thinking'); this.voiceCap.textContent = 'Thinking…'; }
+    if (p === 'listening' || p === 'speaking') this._startAmpLoop();
+    else this._stopAmpLoop();
+  };
+
+  Copilot.prototype._startAmpLoop = function () {
+    if (this._ampRaf) return;
+    var self = this;
+    var loop = function () {
+      var amp = self.voice ? self.voice.getAmplitude() : 0;
+      if (self.phase === 'speaking' && amp < 0.02) {
+        // speechSynthesis gives no amplitude — synthesise a gentle pulse
+        amp = 0.25 + 0.2 * Math.abs(Math.sin(Date.now() / 180));
+      }
+      self.root.style.setProperty('--lc-amp', amp.toFixed(3));
+      self._ampRaf = requestAnimationFrame(loop);
+    };
+    loop();
+  };
+
+  Copilot.prototype._stopAmpLoop = function () {
+    if (this._ampRaf) cancelAnimationFrame(this._ampRaf);
+    this._ampRaf = null;
+    this.root.style.setProperty('--lc-amp', '0');
+  };
+
+  Copilot.prototype._openSettings = function () {
+    if (!this.voice) return;
+    var self = this;
+    var back = el('div', 'lc-modal-back');
+    back.innerHTML =
+      '<div class="lc-modal">' +
+        '<div class="lc-modal-t">Voice settings</div>' +
+        '<label class="lc-modal-l">Sarvam API key (optional — enables Sarvam STT/TTS)</label>' +
+        '<input class="lc-modal-in lc-k" type="password" placeholder="sk_…" />' +
+        '<label class="lc-modal-l">Language</label>' +
+        '<select class="lc-modal-in lc-lang">' +
+          '<option value="en-IN">English (India)</option>' +
+          '<option value="hi-IN">Hindi</option>' +
+          '<option value="ta-IN">Tamil</option>' +
+          '<option value="te-IN">Telugu</option>' +
+          '<option value="bn-IN">Bengali</option>' +
+          '<option value="mr-IN">Marathi</option>' +
+          '<option value="kn-IN">Kannada</option>' +
+          '<option value="gu-IN">Gujarati</option>' +
+        '</select>' +
+        '<div class="lc-modal-note">Stored only in this browser. Without a key, voice uses your browser\'s built-in speech.</div>' +
+        '<div class="lc-modal-row"><button class="lc-btn lc-btn-ghost lc-cancel">Cancel</button>' +
+        '<button class="lc-btn lc-btn-primary lc-save">Save</button></div>' +
+      '</div>';
+    this.root.appendChild(back);
+    var keyIn = back.querySelector('.lc-k');
+    var langIn = back.querySelector('.lc-lang');
+    keyIn.value = this.voice.getKey();
+    langIn.value = (this.voice.getKey && this.brand.language) || 'en-IN';
+    var close = function () { back.remove(); };
+    back.addEventListener('click', function (e) { if (e.target === back) close(); });
+    back.querySelector('.lc-cancel').addEventListener('click', close);
+    back.querySelector('.lc-save').addEventListener('click', function () {
+      self.voice.setKey(keyIn.value);
+      self.voice.setLang(langIn.value);
+      self.voiceOn = self.voice.isSupported();
+      self._reflectVoiceBtn();
+      close();
+    });
   };
 
   // Public: feed text (from input or a quick chip) into the copilot.
@@ -436,7 +650,7 @@
     }
     chips.forEach(function (c) {
       var b = el('button', 'lc-chip', esc(c[0]));
-      b.addEventListener('click', function () { self.handle(c[1]); });
+      b.addEventListener('click', function () { self._turn(c[1], false); });
       self.chipsEl.appendChild(b);
     });
   };
@@ -523,6 +737,8 @@
       return;
     }
     if (this.adapter.submit) this.adapter.submit();
+    this._convDone = true;
+    if (this.voice) this.voice.stop();
     this._say('🎉 <b>Submitted!</b> Your application is in. A credit officer will reach out on your mobile shortly. Reference: <b>LC-' +
       Math.random().toString(36).slice(2, 8).toUpperCase() + '</b>');
   };

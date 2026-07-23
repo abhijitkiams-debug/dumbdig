@@ -19,3 +19,6 @@ captures/
 # Keystore (never commit signing material)
 *.jks
 *.keystore
+
+# Local voice config (contains API key, never commit)
+lending-app/copilot-sdk/voice-config.local.js

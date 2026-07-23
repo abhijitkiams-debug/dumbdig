@@ -192,7 +192,94 @@
 .lc-send:hover { filter: brightness(1.08); }
 .lc-foot { text-align: center; font-size: 10.5px; color: #9aa1b5; margin-top: 7px; }
 
-@media (max-width: 480px) {
-  .lc-panel { right: 8px; left: 8px; width: auto; bottom: 88px; height: calc(100vh - 110px); }
-  .lc-fab { right: 16px; bottom: 16px; }
+/* ===== Siri-style voice orb ===== */
+.lc-orb {
+  position: relative; width: 38px; height: 38px; border-radius: 50%;
+  transform: scale(calc(1 + var(--lc-amp, 0) * 0.28));
+  transition: transform .09s ease-out;
+  flex: none;
+}
+.lc-orb-glow {
+  position: absolute; inset: -3px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #6366f1, #22d3ee, #ec4899, #8b5cf6, #6366f1);
+  filter: blur(5px); opacity: .85;
+  animation: lc-spin 6s linear infinite;
+}
+.lc-orb-core {
+  position: absolute; inset: 5px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff, rgba(255,255,255,.35) 55%, rgba(255,255,255,0) 72%);
+}
+@keyframes lc-spin { to { transform: rotate(360deg); } }
+.lc-root.lc-speaking .lc-orb-glow { animation-duration: 1.6s; opacity: 1; }
+.lc-root.lc-listening .lc-orb-glow { animation-duration: 3s; }
+
+/* header voice + settings toggles */
+.lc-icobtn {
+  background: rgba(255,255,255,.18); color: #fff; border: none;
+  width: 30px; height: 30px; min-width: 30px; border-radius: 8px; cursor: pointer;
+  font-size: 15px; display: grid; place-items: center;
+}
+.lc-icobtn:hover { background: rgba(255,255,255,.32); }
+.lc-icobtn.lc-on { background: #fff; color: var(--lc-accent); }
+
+/* voice status + mic */
+.lc-voice-status {
+  display: none; align-items: center; gap: 8px; justify-content: center;
+  font-size: 12px; color: var(--lc-sub); margin-bottom: 8px;
+}
+.lc-root.lc-listening .lc-voice-status,
+.lc-root.lc-speaking .lc-voice-status,
+.lc-root.lc-thinking .lc-voice-status { display: flex; }
+.lc-voice-status .lc-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--lc-accent);
+  animation: lc-blink 1s ease-in-out infinite;
+}
+@keyframes lc-blink { 50% { opacity: .3; } }
+
+.lc-mic {
+  width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; flex: none;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-size: 17px;
+  display: grid; place-items: center; touch-action: manipulation;
+}
+.lc-mic:hover { filter: brightness(1.08); }
+.lc-root.lc-listening .lc-mic { background: linear-gradient(135deg, #ec4899, #f43f5e); animation: lc-pulse 1.1s ease-in-out infinite; }
+@keyframes lc-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(236,72,153,.5); } 50% { box-shadow: 0 0 0 8px rgba(236,72,153,0); } }
+.lc-mic[disabled] { opacity: .4; cursor: default; }
+
+/* settings modal */
+.lc-modal-back {
+  position: absolute; inset: 0; background: rgba(15,23,42,.45);
+  display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 5;
+  pointer-events: auto; /* re-enable: parent .lc-root sets pointer-events:none */
+}
+.lc-modal {
+  background: #fff; border-radius: 16px; padding: 18px; width: 100%; max-width: 320px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+}
+.lc-modal-t { font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+.lc-modal-l { display: block; font-size: 12px; color: var(--lc-sub); margin: 8px 0 4px; }
+.lc-modal-in {
+  width: 100%; border: 1px solid var(--lc-line); border-radius: 9px;
+  padding: 10px 12px; font-size: 16px; outline: none; font-family: inherit;
+}
+.lc-modal-in:focus { border-color: var(--lc-accent); }
+.lc-modal-note { font-size: 11px; color: var(--lc-sub); margin: 10px 0 14px; line-height: 1.4; }
+.lc-modal-row { display: flex; gap: 8px; }
+.lc-modal-row .lc-btn { flex: 1; min-height: 44px; }
+
+@media (max-width: 640px) {
+  .lc-panel {
+    right: 0; left: 0; bottom: 0; width: 100%;
+    max-width: 100%;  /* override base max-width: calc(100vw - 32px) */
+    height: 90vh; height: 90dvh; max-height: 90dvh;
+    border-radius: 20px 20px 0 0;
+  }
+  .lc-composer { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .lc-fab { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 58px; height: 58px; }
+  .lc-open .lc-fab { display: none; }  /* full-screen sheet has its own close button */
+  .lc-input { font-size: 16px; padding: 12px 15px; }   /* 16px prevents iOS zoom */
+  .lc-chip { padding: 9px 13px; font-size: 13px; }
+  .lc-send, .lc-mic { width: 46px; height: 46px; }
+  .lc-msg { max-width: 90%; font-size: 14px; }
+  .lc-prod-btn, .lc-nudge .lc-btn { min-height: 46px; }
 }

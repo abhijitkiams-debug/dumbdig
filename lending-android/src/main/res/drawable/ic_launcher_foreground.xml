@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A simple, original "setu" (bridge) mark drawn from primitives. -->
+    <group android:scaleX="1.0" android:scaleY="1.0" android:translateX="0" android:translateY="0">
+        <!-- bridge arch -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M30,66 C30,48 78,48 78,66" />
+        <!-- deck -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M28,66 L80,66" />
+        <!-- suspension cables -->
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:pathData="M42,55 L42,66" />
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:pathData="M54,51 L54,66" />
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:pathData="M66,55 L66,66" />
+        <!-- rupee spark -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M50,40 h9 v2.6 h-3.2 a3.2,3.2 0 0 1 0,6.4 h-1.5 l4.7,4.2 h-3.6 l-4.6,-4.2 v-2.4 h2.9 a1.6,1.6 0 0 0 0,-3.2 h-2.8 v-2.6 h5.9 a3.2,3.2 0 0 0 -2.9,-1.8 h-3 z" />
+    </group>
+</vector>

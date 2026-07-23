@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Compose owns the UI; this base theme just gives us a no-action-bar,
+         edge-to-edge friendly window. Uses framework Material so we don't need
+         the Material Components view library. -->
+    <style name="Theme.SetuFinance" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_dark</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:windowBackground">@color/white</item>
+    </style>
+</resources>

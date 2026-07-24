@@ -440,6 +440,7 @@
 
   Copilot.prototype._micTap = function () {
     if (!this.voice) return;
+    if (this.voice.unlockAudio) this.voice.unlockAudio(); // iOS: unlock in the gesture
     if (this.phase === 'listening' || this.phase === 'speaking') {
       this.voice.stop();
       this._setPhase('idle');
@@ -465,6 +466,7 @@
 
   Copilot.prototype.startCall = function () {
     if (!this.voice || !this.voice.isSupported()) { this.toggle(true); return; }
+    if (this.voice.unlockAudio) this.voice.unlockAudio(); // iOS: unlock in the gesture
     if (this._inCall) return;
     this._inCall = true;
     this._firstOpen = false;
@@ -518,10 +520,14 @@
 
     var begin = function () {
       if (self._started || !self._inCall) return;
+      // Unlock audio SYNCHRONOUSLY within this tap (required by iOS Safari).
+      if (self.voice && self.voice.unlockAudio) self.voice.unlockAudio();
       self._started = true;
       if (self._startCatch) { self._startCatch.remove(); self._startCatch = null; }
       if (self.voice) self.voice.stop();
-      self._speak(self._welcomeSpeech()).then(function () {
+      var heard = false;
+      self._speak(self._welcomeSpeech(), function () { heard = true; }).then(function () {
+        if (!heard) { self._voiceTrouble(); return; } // greeting produced no sound — surface why
         if (self._inCall && self.voiceOn) self._startListen();
       });
     };
@@ -544,7 +550,22 @@
     });
   };
 
+  // The greeting produced no audio — tell the user exactly why, right on the bar.
+  Copilot.prototype._voiceTrouble = function () {
+    var err = (this.voice && this.voice.getLastError && this.voice.getLastError()) || '';
+    var keyIssue = /key|403|missing|rejected/i.test(err);
+    if (this.callCap) {
+      this.callCap.textContent = '🔊 ' + (err ? err.slice(0, 44) : 'Voice unavailable — tap to fix');
+    }
+    if (keyIssue) {
+      this._openSettings();   // let them see/fix the API key immediately
+    } else if (this._inCall && this.voiceOn) {
+      this._startListen();    // no audio but STT may work — keep the conversation going
+    }
+  };
+
   Copilot.prototype._callMuteTap = function () {
+    if (this.voice && this.voice.unlockAudio) this.voice.unlockAudio(); // iOS unlock
     if (this.phase === 'listening' || this.phase === 'speaking') {
       if (this.voice) this.voice.stop();
       this._setPhase('idle');           // paused

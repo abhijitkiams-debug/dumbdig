@@ -19,6 +19,25 @@
   var SPEAKER = 'anushka';
 
   var lastError = '';
+  // One reusable <audio> element for all TTS. iOS Safari only lets audio play if
+  // it was "unlocked" synchronously inside a user gesture; because our TTS fetch
+  // is async, we unlock this element on the first tap and then reuse it.
+  var SILENT_WAV = 'data:audio/wav;base64,UklGRuQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YcADAAAAAAA=';
+  var ttsAudio = null;
+  var audioUnlocked = false;
+  function getTtsAudio() {
+    if (!ttsAudio) { ttsAudio = new Audio(); ttsAudio.setAttribute('playsinline', ''); }
+    return ttsAudio;
+  }
+  // Call this SYNCHRONOUSLY inside a click/touch handler.
+  function unlockAudio() {
+    var a = getTtsAudio();
+    try {
+      a.src = SILENT_WAV;
+      var p = a.play();
+      if (p && p.then) p.then(function () { audioUnlocked = true; }).catch(function () {});
+    } catch (e) {}
+  }
   var analyser = null;
   var rafId = null;
   var currentAmp = 0;
@@ -126,7 +145,8 @@
   // Make sure any of Arya's own speech is fully stopped before we open the mic,
   // so the recording can't capture the TTS tail (the "dual voice" echo).
   function stopPlayback() {
-    if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+    if (ttsAudio) { try { ttsAudio.pause(); } catch (e) {} }
+    currentAudio = null;
     if (global.speechSynthesis) { try { global.speechSynthesis.cancel(); } catch (e) {} }
   }
 
@@ -252,13 +272,18 @@
   // fires only when audio actually begins, so callers can tell it wasn't blocked.
   function playBase64Wav(b64, onStart) {
     return new Promise(function (resolve) {
-      var audio = new Audio('data:audio/wav;base64,' + b64);
+      var audio = getTtsAudio();     // reuse the (possibly iOS-unlocked) element
       currentAudio = audio;
+      var done = false;
+      var finish = function () { if (done) return; done = true; currentAudio = null; resolve(); };
       audio.onplaying = function () { if (onStart) { try { onStart(); } catch (e) {} } };
-      audio.onended = function () { currentAudio = null; resolve(); };
-      audio.onerror = function () { currentAudio = null; resolve(); };
-      var p = audio.play();
-      if (p && p.catch) p.catch(function () { currentAudio = null; resolve(); });
+      audio.onended = finish;
+      audio.onerror = finish;
+      try {
+        audio.src = 'data:audio/wav;base64,' + b64;
+        var p = audio.play();
+        if (p && p.catch) p.catch(function (err) { lastError = 'Audio blocked: ' + (err && err.name || err); finish(); });
+      } catch (e) { finish(); }
     });
   }
 
@@ -382,7 +407,8 @@
   function stop() {
     if (recognition) { try { recognition.abort(); } catch (e) {} recognition = null; }
     if (global.speechSynthesis) { try { global.speechSynthesis.cancel(); } catch (e) {} }
-    if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+    if (ttsAudio) { try { ttsAudio.pause(); } catch (e) {} }
+    currentAudio = null;
     if (activeStream) { activeStream.getTracks().forEach(function (t) { t.stop(); }); activeStream = null; }
     stopAmp();
   }
@@ -404,6 +430,7 @@
     setSpeaker: setSpeaker,
     translate: translate,
     getLastError: function () { return lastError; },
+    unlockAudio: unlockAudio,
     // Speaks a short phrase and resolves with a diagnostic result.
     test: function () {
       var startedAt = false;

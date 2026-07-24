@@ -140,6 +140,10 @@
     this.awaitingProductPick = false;
     this.awaitingSubmit = false;
     this._cibilAsked = false;
+    // Add ?debug=1 to the URL to see, after each voice turn, exactly what STT
+    // heard, the detected language, the English the NLU received, and whether a
+    // field was filled — so a "captured but not recognised" case is diagnosable.
+    this._debug = /[?&]debug=1\b/.test((global.location && global.location.search) || '');
     if (this.voice) this.voice.setLang(this.convLang);
 
     this._build();
@@ -361,6 +365,18 @@
     return msg;
   };
 
+  // A muted, never-spoken diagnostic line (only shown in ?debug=1 mode).
+  Copilot.prototype._sayDebug = function (text) {
+    var msg = el('div', 'lc-msg lc-debug');
+    msg.style.cssText = 'align-self:center;max-width:92%;background:#111827;color:#9ca3af;' +
+      'font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:6px 10px;border-radius:8px;' +
+      'white-space:pre-wrap;word-break:break-word;opacity:.9';
+    msg.textContent = text;
+    this.chatEl.appendChild(msg);
+    this._scroll();
+    return msg;
+  };
+
   // Strip HTML tags + emoji so TTS reads clean text.
   Copilot.prototype._plainText = function (html) {
     var d = document.createElement('div');
@@ -447,7 +463,17 @@
       if (english) {
         self._emptyListens = 0;
         self._setPhase('thinking');
+        var dbgId = self.pendingField && self.pendingField.id;
+        var dbgBefore = dbgId ? self.adapter.getValue(dbgId) : null;
         self._turn(english, true, shown);
+        if (self._debug) {
+          var dbgAfter = dbgId ? self.adapter.getValue(dbgId) : null;
+          var matched = (dbgId && dbgAfter && dbgAfter !== dbgBefore)
+            ? '✓ ' + dbgId + ' = ' + dbgAfter
+            : '✗ no field matched';
+          self._sayDebug('🎤 heard: ' + shown + '\n🌐 lang: ' + (res.lang || '?') +
+            '   → NLU: “' + english + '”\n' + matched);
+        }
       } else {
         var lastErr = (self.voice.getLastError && self.voice.getLastError()) || '';
         // A hard error (mic blocked / insecure page) is not worth retrying — show it.

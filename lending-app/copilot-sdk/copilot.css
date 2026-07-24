@@ -261,6 +261,8 @@
 }
 .lc-root.lc-incall .lc-callbar { display: flex; animation: lc-callin .28s ease; }
 .lc-root.lc-incall .lc-fab { display: none; }
+/* When the chat panel is open, hide the call bar so it doesn't cover the composer. */
+.lc-root.lc-open .lc-callbar { display: none; }
 @keyframes lc-callin { from { opacity: 0; transform: translateX(-50%) translateY(28px); } }
 .lc-orb-lg { width: 46px; height: 46px; cursor: pointer; }
 .lc-call-mid { flex: 1; min-width: 0; color: #fff; }

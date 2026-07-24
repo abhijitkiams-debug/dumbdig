@@ -242,7 +242,7 @@
     adapter: adapter,
     catalog: window.LendingCatalog,
     nlu: window.LendCopilotNLU,
-    brand: { name: 'Saathi', accent: '#4f46e5' },
+    brand: { name: 'Arya', accent: '#4f46e5', language: 'hi-IN' },
     autostart: true  // greet the user by voice on landing
   });
 })();

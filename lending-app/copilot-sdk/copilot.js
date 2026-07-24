@@ -32,6 +32,76 @@
     });
   }
 
+  /*
+   * Prompt sets. The default is Hinglish (Hindi in Devanagari with the natural
+   * English financial terms Indians actually use) — spoken via Sarvam hi-IN TTS.
+   * English is authored too. Other languages fall back to English + translation.
+   */
+  var PROMPTS = {
+    hi: {
+      brandName: 'आर्या',
+      welcome: 'नमस्ते! मैं आर्या हूँ, Setu Finance की loan assistant। आप मुझसे बात कर सकते हैं — mic दबाकर बोलिए, या keyboard से type कीजिए। बताइए, आपको किस चीज़ के लिए loan चाहिए?',
+      greet: 'नमस्ते! 👋 मैं <b>आर्या</b> हूँ, आपकी loan assistant। आप मुझसे <b>बात</b> कर सकते हैं (mic दबाइए) या <b>type</b> कर सकते हैं। पहले कुछ छोटे सवाल पूछूँगी, फिर आपके लिए सही loan suggest करूँगी। बताइए, आपको किस चीज़ के लिए loan चाहिए?',
+      help: 'कोई बात नहीं — बस अपनी ज़रूरत बताइए। Loan का type, amount, और monthly income बता दीजिए, बाकी मैं देख लूँगी।',
+      gotIt: function (labels) { return 'ठीक है, ' + labels + ' note कर लिया। '; },
+      askMore: 'थोड़ा और बताइए — जैसे loan type, amount, या income।',
+      ask: {
+        loanType: 'आपको कौन सा loan चाहिए — personal, home, gold, business, car, two-wheeler या education?',
+        monthlyIncome: 'आपकी monthly income कितनी है? जैसे, साठ हज़ार रुपये महीना।',
+        employment: 'आप salaried हैं, self-employed, या business owner?',
+        amount: 'आपको कितने का loan चाहिए? जैसे, पाँच लाख।',
+        fullName: 'आपका पूरा नाम क्या है, PAN card के अनुसार?',
+        mobile: 'आपका दस अंकों का mobile number बताइए।',
+        age: 'आपकी उम्र कितनी है?',
+        pan: 'आपका PAN number क्या है?',
+        city: 'आप किस city में रहते हैं?',
+        consent: 'आख़िरी step — क्या आप अपनी details verify करने और credit report check करने की अनुमति देते हैं? हाँ बोलिए तो मैं submit कर दूँ।'
+      },
+      labels: { loanType: 'loan type', monthlyIncome: 'income', employment: 'employment', amount: 'amount', fullName: 'नाम', mobile: 'mobile number', age: 'उम्र', pan: 'PAN', city: 'city', consent: 'consent' },
+      recommendIntro: 'आपकी जानकारी के अनुसार, ये रहे आपके सबसे अच्छे options:',
+      recommendTop: function (name, amt, rate, emi) {
+        return name + ' आपके लिए सबसे अच्छा है — ' + amt + ' तक, ' + rate + ' percent पर, EMI लगभग ' + emi + ' महीना। क्या मैं इसके लिए आपकी application शुरू करूँ? हाँ बोलिए।';
+      },
+      afterPick: function (name) { return 'बढ़िया! मैंने आपको ' + name + ' के लिए select कर लिया। अब बस कुछ details चाहिए। '; },
+      submitAsk: 'बस हो गया! क्या मैं आपकी application submit कर दूँ? हाँ बोलिए।',
+      submitted: function (ref) { return 'हो गया! आपकी application submit हो गई। Reference ' + ref + '। एक credit officer आपको जल्दी call करेगा। Setu Finance चुनने के लिए धन्यवाद!'; },
+      didntCatch: 'माफ़ कीजिए, समझ नहीं आया। दोबारा बोलिए या नीचे type कीजिए।',
+      changeWhat: 'कोई बात नहीं। आप क्या बदलना चाहते हैं?',
+      switched: 'ठीक है, मैं हिंदी में बात करती हूँ।'
+    },
+    en: {
+      brandName: 'Arya',
+      welcome: 'Namaste! I\'m Arya, your loan assistant at Setu Finance. You can talk to me — tap the mic — or type. I\'ll ask a couple of quick questions and then suggest the right loan. To begin, what do you need the loan for?',
+      greet: 'Namaste! 👋 I\'m <b>Arya</b>, your loan assistant. You can <b>talk</b> (tap the mic) or <b>type</b>. I\'ll ask a couple of quick questions, then suggest the best loan for you. To start, what do you need the loan for?',
+      help: 'Sure — just describe your situation. Tell me the loan type, amount and monthly income, and I\'ll do the rest.',
+      gotIt: function (labels) { return 'Got it — updated ' + labels + '. '; },
+      askMore: 'Tell me a bit more — loan type, amount, or income works great.',
+      ask: {
+        loanType: 'Which loan are you after — personal, home, gold, business, car, two-wheeler or education?',
+        monthlyIncome: 'What\'s your monthly income? (say “60k a month” or “12 LPA”)',
+        employment: 'Are you salaried, self-employed or a business owner?',
+        amount: 'How much would you like to borrow? (e.g. “5 lakh”)',
+        fullName: 'What\'s your full name as per PAN?',
+        mobile: 'What\'s your 10-digit mobile number?',
+        age: 'How old are you?',
+        pan: 'Could you share your PAN? (format ABCDE1234F)',
+        city: 'Which city are you in?',
+        consent: 'Last step — do you allow us to verify your details and check your credit report? Say yes and I\'ll submit.'
+      },
+      labels: { loanType: 'loan type', monthlyIncome: 'income', employment: 'employment', amount: 'amount', fullName: 'full name', mobile: 'mobile number', age: 'age', pan: 'PAN', city: 'city', consent: 'consent' },
+      recommendIntro: 'Based on what you told me, here are your best options:',
+      recommendTop: function (name, amt, rate, emi) {
+        return 'A ' + name + ' looks best for you — up to ' + amt + ' at ' + rate + ' percent, EMI around ' + emi + ' a month. Shall I start your application for it? Say yes.';
+      },
+      afterPick: function (name) { return 'Great choice! I\'ve set you up for a ' + name + '. Now I just need a few details. '; },
+      submitAsk: 'That\'s everything! Shall I submit your application now? Say yes.',
+      submitted: function (ref) { return 'Done! Your application is submitted. Reference ' + ref + '. A credit officer will call you shortly. Thank you for choosing Setu Finance!'; },
+      didntCatch: 'Sorry, I didn\'t catch that. Please say it again or type below.',
+      changeWhat: 'No problem. What would you like to change?',
+      switched: 'Sure, I\'ll continue in English.'
+    }
+  };
+
   function Copilot(config) {
     this.schema = config.schema || [];
     this.adapter = config.adapter;
@@ -58,7 +128,11 @@
     this._callConnected = false;
     this._audioObserved = false;
     this.autostart = !!config.autostart;
-    this.convLang = (config.brand && config.brand.language) || 'en-IN';
+    this.convLang = (config.brand && config.brand.language) || 'hi-IN'; // default Hindi
+    this.langLocked = true;   // stick to one language unless the user asks to switch
+    this.stage = 'discovery'; // discovery -> recommend -> application
+    this.awaitingProductPick = false;
+    this.awaitingSubmit = false;
     if (this.voice) this.voice.setLang(this.convLang);
 
     this._build();
@@ -71,6 +145,20 @@
       setTimeout(function () { self._welcome(); }, 400);
     }
   }
+
+  /* ================= i18n ================= */
+
+  Copilot.prototype._uiLang = function () {
+    return this.convLang === 'hi-IN' ? 'hi' : 'en';
+  };
+  Copilot.prototype._P = function () { return PROMPTS[this._uiLang()] || PROMPTS.en; };
+  // Fetch a prompt string (or call a prompt function) for the current language.
+  Copilot.prototype._t = function (key) {
+    var p = this._P();
+    var v = p[key];
+    if (typeof v === 'function') return v.apply(null, Array.prototype.slice.call(arguments, 1));
+    return v != null ? v : (PROMPTS.en[key] || '');
+  };
 
   /* ================= profile derived from the live form ================= */
 
@@ -269,20 +357,10 @@
     requestAnimationFrame(function () { b.scrollTop = b.scrollHeight; });
   };
 
-  Copilot.prototype._greet = function () {
-    this._say(
-      'Namaste! 👋 I\'m Saathi, your lending assistant. You can <b>talk to me</b> — tap the ' +
-      'mic and speak in English or Hindi — or <b>type</b> using the keyboard. Just tell me what ' +
-      'you need, like <em>“I want a ₹5 lakh personal loan, I earn 60k a month”</em>, and I\'ll ' +
-      'fill the form, check eligibility and suggest the right product.'
-    );
-  };
+  Copilot.prototype._greet = function () { this._say(this._t('greet')); };
 
   // Spoken welcome — kept short and natural for TTS.
-  Copilot.prototype._welcomeSpeech = function () {
-    return 'Namaste! I\'m Saathi, your lending assistant. You can talk to me by tapping the ' +
-      'microphone, or tap the keyboard to type — in English or Hindi. To begin, what kind of loan do you need?';
-  };
+  Copilot.prototype._welcomeSpeech = function () { return this._t('welcome'); };
 
   /* ================= the conversation turn ================= */
 
@@ -319,8 +397,12 @@
     if (!text || !this.voice || !this.voiceOn) return Promise.resolve();
     this._setPhase('speaking');
     var self = this;
-    // Speak in the conversation language (auto-set to whatever the user spoke).
-    return this.voice.speak(text, this.convLang || 'en-IN', onStart).then(function () {
+    var lang = this.convLang || 'hi-IN';
+    // Authored prompts are already in the target language. Only translate when
+    // the text is plain English but the conversation language isn't English.
+    var hasDevanagari = /[ऀ-ॿ]/.test(text);
+    var skip = (lang === 'en-IN') || (lang === 'hi-IN' && hasDevanagari);
+    return this.voice.speak(text, lang, onStart, skip).then(function () {
       if (self.phase === 'speaking') self._setPhase('idle');
     }).catch(function () { self._setPhase('idle'); });
   };
@@ -339,7 +421,8 @@
       res = res || {};
       var english = (res.text || '').trim();     // for the NLU
       var shown = (res.display || res.text || '').trim(); // what they actually said
-      if (res.lang) self.convLang = res.lang;    // reply in the same language
+      // NOTE: we do NOT switch convLang to the detected language — Arya sticks to
+      // one language (default Hindi) unless the customer explicitly asks to change.
       if (english) {
         self._setPhase('thinking');
         self._turn(english, true, shown);
@@ -403,7 +486,9 @@
     this._setPhase('idle');
   };
 
-  Copilot.prototype._welcomeHint = function () { return 'Tap 🎙 to talk · ⌨ to type'; };
+  Copilot.prototype._welcomeHint = function () {
+    return this._uiLang() === 'hi' ? '🎙 बोलिए · ⌨ type कीजिए' : 'Tap 🎙 to talk · ⌨ to type';
+  };
 
   // Auto-welcome on landing: show the call bar and greet by voice. Because
   // browsers block autoplay without a gesture, we try immediately and also
@@ -479,7 +564,7 @@
   };
 
   var LANG_CYCLE = [
-    { code: 'en-IN', label: 'EN' }, { code: 'hi-IN', label: 'हिं' },
+    { code: 'hi-IN', label: 'हिं' }, { code: 'en-IN', label: 'EN' },
     { code: 'ta-IN', label: 'த' }, { code: 'te-IN', label: 'తె' },
     { code: 'bn-IN', label: 'বাং' }, { code: 'mr-IN', label: 'मरा' }
   ];
@@ -490,8 +575,11 @@
     this.convLang = next.code;
     if (this.voice) this.voice.setLang(next.code);
     this._reflectLangBtn();
-    // acknowledge in the newly chosen language
-    if (this._inCall) this._speak('Okay, let\'s continue.');
+    // acknowledge + re-ask the current question in the newly chosen language
+    var line = this._t('switched');
+    var nx = this._pendingOrNext();
+    if (nx) line += ' ' + nx;
+    this._say(line);
   };
   Copilot.prototype._reflectLangBtn = function () {
     if (!this.callLangBtn) return;
@@ -629,32 +717,137 @@
   // `text` is always English for the NLU.
   Copilot.prototype.handle = function (text, displayText) {
     this._say(displayText || text, 'user');
+
+    // Language switch — only when the user explicitly asks (otherwise we stick).
+    var sw = this._detectLangSwitch(text);
+    if (sw && sw !== this.convLang) {
+      this.convLang = sw;
+      if (this.voice) this.voice.setLang(sw);
+      this._reflectLangBtn();
+      var ack = this._t('switched');
+      var nx = this._pendingOrNext();
+      if (nx) ack += ' ' + nx;
+      this._say(ack);
+      this._renderChips();
+      return;
+    }
+
     var res = this.nlu.parse(text);
     var filled = this._applyEntities(res.entities);
 
-    // If we were waiting for a specific field and the user gave a bare value,
-    // try to slot it in — but NOT when the message is really a command/question
-    // (e.g. "recommend a product"), which must not land in a text field.
     var actionIntents = ['recommend', 'eligibility', 'emi', 'documents', 'help', 'greet', 'affirm', 'deny'];
     var isAction = res.intents.some(function (i) { return actionIntents.indexOf(i) !== -1; });
-    if (!filled.length && this.pendingField && !isAction) {
+    var consentAffirm = this.pendingField &&
+      (this.pendingField.type === 'checkbox' || this.pendingField.id === 'consent') &&
+      /^(yes|yeah|yep|sure|ok|okay|agree|accept|confirm|done|haan|ji|theek|thik)\b/i.test(text);
+    if (!filled.length && this.pendingField && (!isAction || consentAffirm)) {
       var slotted = this._fillPending(text);
       if (slotted) filled = [slotted];
     }
 
-    var reply = this._composeReply(res, filled);
+    this._refreshStatus();
+    var reply = this._advance(res, filled);
     if (reply) this._say(reply);
 
-    this._refreshStatus();
     this._renderSuggestions();
     this._renderChips();
 
-    // If the user explicitly asked for products / eligibility / emi, surface them.
-    if (res.intents.indexOf('recommend') !== -1 || res.intents.indexOf('eligibility') !== -1) {
-      this._renderProducts();
-    }
     if (res.intents.indexOf('emi') !== -1) this._renderEmi();
     if (res.intents.indexOf('documents') !== -1) this._renderDocs();
+  };
+
+  // Detect an explicit "switch language" request. Returns a lang code or null.
+  Copilot.prototype._detectLangSwitch = function (text) {
+    var t = text.toLowerCase();
+    if (/\b(english|angrezi|angreji)\b|अंग्रे|इंग्लिश/.test(t)) {
+      if (/(in english|english me|english mein|angrezi me|switch to english|speak english|talk in english|अंग्रे)/.test(t) || /^english$/.test(t.trim())) return 'en-IN';
+    }
+    if (/\b(hindi)\b|हिंदी|हिन्दी/.test(t)) {
+      if (/(in hindi|hindi me|hindi mein|switch to hindi|speak hindi|हिंदी में|हिन्दी में)/.test(t) || /^hindi$/.test(t.trim())) return 'hi-IN';
+    }
+    return null;
+  };
+
+  // The current question to (re-)ask, e.g. after a language switch.
+  Copilot.prototype._pendingOrNext = function () {
+    var P = this._P();
+    if (this.awaitingSubmit) return P.submitAsk;
+    if (this.stage === 'recommend' && this.awaitingProductPick) return this._recommendText();
+    var f = this.pendingField || this._nextBestField();
+    if (f && P.ask[f.id]) { this.pendingField = f; return P.ask[f.id]; }
+    return '';
+  };
+
+  // The stage machine: discovery -> recommend -> application -> submit.
+  Copilot.prototype._advance = function (res, filled) {
+    var P = this._P();
+    var gotIt = filled.length ? P.gotIt(this._joinLabels(filled)) : '';
+
+    if (res.intents.indexOf('help') !== -1) return P.help;
+
+    if (this.awaitingSubmit) {
+      if (this._isAffirm(res)) { this._doSubmit(); return ''; }
+      if (res.intents.indexOf('deny') !== -1) { this.awaitingSubmit = false; this.stage = 'application'; return P.changeWhat; }
+    }
+
+    // Recommend stage: waiting for a product choice.
+    if (this.stage === 'recommend' && this.awaitingProductPick) {
+      var picked = this._resolvePick(res);
+      if (picked) return gotIt + this._pickProduct(picked);
+      if (filled.length) { this._renderProducts(); return gotIt + this._recommendText(); } // new info -> re-rank
+      return this._recommendText(); // just re-ask, no duplicate cards
+    }
+
+    // Discovery stage: ask the couple of questions.
+    if (this.stage === 'discovery') {
+      var nextD = this._nextBestField();
+      if (nextD) { this.pendingField = nextD; return gotIt + P.ask[nextD.id]; }
+      // discovery complete -> move to recommendations
+      this.stage = 'recommend';
+      this.awaitingProductPick = true;
+      this._renderProducts();
+      return gotIt + this._recommendText();
+    }
+
+    // Application stage: collect the remaining details, then submit.
+    var nextA = this._nextBestField();
+    if (nextA) { this.pendingField = nextA; return gotIt + P.ask[nextA.id]; }
+    this.awaitingSubmit = true;
+    return gotIt + P.submitAsk;
+  };
+
+  Copilot.prototype._isAffirm = function (res) {
+    return res.intents.indexOf('affirm') !== -1 || res.intents.indexOf('apply') !== -1;
+  };
+
+  // Localised, comma-joined field labels for the "got it" confirmation.
+  Copilot.prototype._joinLabels = function (filled) {
+    var P = this._P();
+    var names = filled.map(function (f) { return P.labels[f.id] || f.label; });
+    var and = this._uiLang() === 'hi' ? ' और ' : ' and ';
+    if (names.length === 1) return names[0];
+    return names.slice(0, -1).join(', ') + and + names[names.length - 1];
+  };
+
+  // Spoken recommendation: intro + the top pick with an apply prompt.
+  Copilot.prototype._recommendText = function () {
+    var recs = this._recs || this.catalog.recommend(this._profile()).slice(0, 3);
+    this._recs = recs;
+    var top = recs[0];
+    if (!top) return this._P().askMore;
+    var elig = this.catalog.inrShort(top.maxEligible);
+    return this._t('recommendIntro') + ' ' +
+      this._t('recommendTop', top.product.name, elig, top.rate.toFixed(2), this.catalog.inr(top.emi));
+  };
+
+  // Resolve which product the user chose in the recommend stage.
+  Copilot.prototype._resolvePick = function (res) {
+    var recs = this._recs || [];
+    if (res.entities && res.entities.loanType) {
+      for (var i = 0; i < recs.length; i++) if (recs[i].product.id === res.entities.loanType) return recs[i];
+    }
+    if (this._isAffirm(res)) return recs[0] || null;
+    return null;
   };
 
   /* ---- write extracted entities into the host form via the adapter ---- */
@@ -721,57 +914,19 @@
     return true;
   };
 
-  /* ---- craft a natural reply ---- */
-
-  Copilot.prototype._composeReply = function (res, filled) {
-    var parts = [];
-    if (filled.length) {
-      var names = filled.map(function (f) {
-        var v = f.value;
-        return '<b>' + esc(f.label) + '</b>';
-      });
-      parts.push('Got it — updated ' + this._joinList(names) + '. ');
-    }
-    if (res.intents.indexOf('greet') !== -1 && !filled.length) {
-      return 'Hi! What do you need funds for? You can say something like <em>“2 lakh for a bike”</em> or <em>“home loan”</em>.';
-    }
-    if (res.intents.indexOf('help') !== -1) {
-      return 'Sure — just describe your situation and I\'ll do the paperwork. Try: your loan type, amount, monthly income and employment. I\'ll compute eligibility & EMI and pick the best product for you.';
-    }
-    if (res.intents.indexOf('deny') !== -1 && !filled.length) {
-      return 'No problem. What would you like to change or add?';
-    }
-
-    // Otherwise, drive completion: ask for the next best missing field.
-    var next = this._nextBestField();
-    if (next) {
-      this.pendingField = next;
-      parts.push(this._askFor(next));
-    } else if (filled.length) {
-      parts.push('That\'s everything I need. 🎉 Tap <b>Review & submit</b> whenever you\'re ready — or ask me to check your best product.');
-    } else if (!res.intents.length) {
-      parts.push('Tell me a bit more — your loan type, amount, or income works great.');
-    }
-    return parts.join('');
-  };
-
-  Copilot.prototype._joinList = function (arr) {
-    if (arr.length === 1) return arr[0];
-    return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
-  };
-
-  // Choose the highest-value missing field, prioritising the ones that unlock
-  // eligibility (loan type -> amount -> income -> employment) then KYC.
+  // Next question to ask — scoped to the current stage so discovery only asks
+  // the couple of qualifying questions before recommending products.
+  var DISCOVERY_ORDER = ['loanType', 'monthlyIncome', 'employment'];
+  var APPLICATION_ORDER = ['amount', 'fullName', 'mobile', 'age', 'pan', 'city', 'consent'];
   Copilot.prototype._nextBestField = function () {
-    var priority = ['loanType', 'amount', 'monthlyIncome', 'employment', 'fullName',
-      'mobile', 'age', 'pan', 'city', 'pincode', 'email', 'aadhaar', 'cibil', 'tenure', 'consent'];
+    var order = this.stage === 'discovery' ? DISCOVERY_ORDER : APPLICATION_ORDER;
     var st = this._status();
     var missingIds = {};
     st.missing.forEach(function (f) { missingIds[f.id] = f; });
-    for (var i = 0; i < priority.length; i++) {
-      if (missingIds[priority[i]]) return missingIds[priority[i]];
+    for (var i = 0; i < order.length; i++) {
+      if (missingIds[order[i]]) return missingIds[order[i]];
     }
-    return st.missing[0] || null;
+    return null;
   };
 
   Copilot.prototype._askFor = function (f) {
@@ -893,8 +1048,9 @@
     var self = this;
     var profile = this._profile();
     var recs = this.catalog.recommend(profile).slice(0, 3);
+    this._recs = recs;
     var wrap = el('div', 'lc-msg lc-bot lc-products');
-    wrap.innerHTML = '<div class="lc-prod-h">Best matches for you</div>';
+    wrap.innerHTML = '<div class="lc-prod-h">' + esc(this._t('recommendIntro')) + '</div>';
 
     recs.forEach(function (r, i) {
       var p = r.product;
@@ -913,8 +1069,9 @@
           '<div><span>Est. EMI</span><b>' + self.catalog.inr(r.emi) + '/mo</b></div>' +
           '<div><span>Tenure</span><b>' + Math.round(r.tenureMonths / 12 * 10) / 10 + ' yr</b></div>' +
         '</div>';
-      var pick = el('button', 'lc-btn lc-btn-primary lc-prod-btn', 'Apply for ' + p.name);
-      pick.addEventListener('click', function () { self._pickProduct(r); });
+      var pick = el('button', 'lc-btn lc-btn-primary lc-prod-btn',
+        (self._uiLang() === 'hi' ? 'Apply करें: ' : 'Apply for ') + p.name);
+      pick.addEventListener('click', function () { self._pickFromCard(r); });
       card.appendChild(pick);
       wrap.appendChild(card);
     });
@@ -922,6 +1079,17 @@
     this._scroll();
   };
 
+  // One-tap apply from a product card -> move into the application stage.
+  Copilot.prototype._pickFromCard = function (r) {
+    var text = this._pickProduct(r);
+    this._say(text);
+    this._refreshStatus();
+    this._renderSuggestions();
+    this._renderChips();
+    if (this.voiceOn && (this._inCall || this.open) && this.voice) this._startListen();
+  };
+
+  // Set the chosen product, switch to application stage, return the next prompt.
   Copilot.prototype._pickProduct = function (r) {
     this.adapter.setValue('loanType', r.productId);
     if (this.adapter.flashField) this.adapter.flashField('loanType');
@@ -932,11 +1100,14 @@
     if (this.schemaById.tenure && !this.adapter.getValue('tenure')) {
       this.adapter.setValue('tenure', r.tenureMonths);
     }
-    this._say('Great choice — I\'ve set you up for a <b>' + esc(r.product.name) + '</b> at <b>' + r.rate.toFixed(2) +
-      '% p.a.</b> Let\'s finish the remaining details.');
+    this.stage = 'application';
+    this.awaitingProductPick = false;
     this._refreshStatus();
-    this._renderSuggestions();
-    this._renderChips();
+    var P = this._P();
+    var next = this._nextBestField();
+    if (next) { this.pendingField = next; return P.afterPick(r.product.name) + P.ask[next.id]; }
+    this.awaitingSubmit = true;
+    return P.afterPick(r.product.name) + P.submitAsk;
   };
 
   Copilot.prototype._renderEmi = function () {
@@ -965,14 +1136,16 @@
   Copilot.prototype._doSubmit = function () {
     var st = this._status();
     if (st.pct < 100) {
-      this._say('Almost — we still need <b>' + esc((this._nextBestField() || {}).label || 'a few fields') + '</b>.');
+      this.stage = 'application';
+      var nf = this._nextBestField();
+      this._say(nf ? this._P().ask[nf.id] : this._t('askMore'));
       return;
     }
     if (this.adapter.submit) this.adapter.submit();
     this._convDone = true;
-    if (this.voice) this.voice.stop();
-    this._say('🎉 <b>Submitted!</b> Your application is in. A credit officer will reach out on your mobile shortly. Reference: <b>LC-' +
-      Math.random().toString(36).slice(2, 8).toUpperCase() + '</b>');
+    this.awaitingSubmit = false;
+    var ref = 'LC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    this._say(this._t('submitted', ref));
   };
 
   /* ================= public factory ================= */

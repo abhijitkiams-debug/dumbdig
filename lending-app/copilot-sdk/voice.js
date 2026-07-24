@@ -338,13 +338,13 @@
   // Speak English `text`, but voiced in `lang` (translating first if needed).
   // Resolves when finished. `onStart` fires when audio actually begins.
   // Falls back automatically.
-  function speak(text, lang, onStart) {
+  function speak(text, lang, onStart, skipTranslate) {
     if (!text) return Promise.resolve();
     lang = lang || LANG;
     var started = false;
     var wrap = function () { started = true; if (onStart) { try { onStart(); } catch (e) {} } };
     if (getKey()) {
-      var prep = isEnglish(lang) ? Promise.resolve(text) : translate(text, 'en-IN', lang);
+      var prep = (skipTranslate || isEnglish(lang)) ? Promise.resolve(text) : translate(text, 'en-IN', lang);
       return prep.then(function (out) {
         return sarvamSynthesize(out, lang).then(function (b64) { return playBase64Wav(b64, wrap); });
       }).then(function () {
@@ -387,7 +387,7 @@
     // Speaks a short phrase and resolves with a diagnostic result.
     test: function () {
       var startedAt = false;
-      return speak('Namaste! This is a voice test from Saathi.', LANG, function () { startedAt = true; })
+      return speak('Namaste! This is a voice test from Arya.', LANG, function () { startedAt = true; })
         .then(function () {
           if (startedAt) return { ok: true, provider: getKey() ? 'Sarvam' : 'browser' };
           return { ok: false, error: lastError || 'No audio was produced.' };

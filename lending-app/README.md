@@ -1,11 +1,16 @@
 # Setu Finance — a sample Indian lending app with an embedded copilot
 
 A self-contained demo of a lending application for the **Indian market**, with an
-in-app AI-style assistant (**"Saathi"**) that talks to the customer in plain
-language, **understands** them, **fills the application form**, **suggests the
-next action**, **drives the completion rate**, and **recommends the right lending
-product** — all while rendering its own native UI **without touching the host
-app's UI**.
+in-app voice assistant (**"Arya"**) that talks to the customer in **Hinglish**,
+**understands** them, first asks a **couple of qualifying questions**, then
+**recommends the right loan product**, and — once the customer picks one —
+**fills the application form** and drives it to submission, all while rendering
+its own native UI **without touching the host app's UI**.
+
+**Conversation flow:** greet → 2–3 discovery questions (loan purpose, income,
+employment) → **product suggestions** (one-tap apply) → application details →
+submit. Arya defaults to **Hindi/Hinglish** and **sticks to one language** unless
+the customer explicitly asks to switch (e.g. says "English").
 
 No build step, no dependencies. Open `index.html` and it runs. It is
 **mobile-first responsive** and **voice-enabled** (talk to the assistant, it
@@ -24,7 +29,7 @@ talks back).
 - **Multilingual (Hindi & more):** speak in **Hindi** (or Tamil, Telugu, Bengali,
   Marathi…) — Sarvam STT auto-detects the language, the app translates it to
   English for understanding, fills the form, and then **replies back in the same
-  language** via Sarvam translate + TTS. So you talk in Hindi and Saathi answers
+  language** via Sarvam translate + TTS. So you talk in Hindi and Arya answers
   in Hindi. Tap the language chip (EN / हिं / த …) to set it explicitly.
 - **Speech providers:** with a **Sarvam** API key it uses Sarvam STT (`saarika`),
   translate, and TTS (`bulbul`). Without a key it falls back to the browser's
@@ -120,7 +125,7 @@ client's own UI**. It achieves that two ways:
      adapter,    // { getValue, setValue, focusField, flashField, onChange, submit }
      catalog,    // product / eligibility engine
      nlu,        // language understanding engine
-     brand: { name: 'Saathi', accent: '#4f46e5' }
+     brand: { name: 'Arya', accent: '#4f46e5' }
    });
    ```
 
@@ -145,4 +150,4 @@ completion ring stays in sync either way.
 
 This is an illustrative demo. Rates, eligibility rules and the EMI/FOIR logic are
 representative of the Indian market but simplified, and **nothing is sent anywhere
-— all data stays in your browser.** "Setu Finance" and "Saathi" are fictional.
+— all data stays in your browser.** "Setu Finance" and "Arya" are fictional.

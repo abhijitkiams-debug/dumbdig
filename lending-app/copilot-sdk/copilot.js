@@ -20,6 +20,10 @@
 (function (global) {
   'use strict';
 
+  // Build stamp — shown in the call bar so the live bundle is verifiable at a
+  // glance. Bump this together with the ?v= query in index.html on each change.
+  var BUILD = 'v18';
+
   function el(tag, cls, html) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -288,7 +292,9 @@
     callbar.innerHTML =
       '<span class="lc-orb lc-orb-lg" title="Open chat"><span class="lc-orb-glow"></span><span class="lc-orb-core"></span></span>' +
       '<div class="lc-call-mid">' +
-        '<div class="lc-call-name">' + esc(this.brand.name) + '</div>' +
+        '<div class="lc-call-name">' + esc(this.brand.name) +
+          ' <span class="lc-build" style="font-size:9px;font-weight:600;opacity:.6;vertical-align:super;">' + BUILD + '</span>' +
+        '</div>' +
         '<div class="lc-call-cap">00:00</div>' +
       '</div>' +
       '<button class="lc-call-lang" title="Language">EN</button>' +

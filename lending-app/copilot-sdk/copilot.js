@@ -55,6 +55,9 @@
     this._collecting = false;
     this._convDone = false;
     this._inCall = false;
+    this._callConnected = false;
+    this._audioObserved = false;
+    this.autostart = !!config.autostart;
     this.convLang = (config.brand && config.brand.language) || 'en-IN';
     if (this.voice) this.voice.setLang(this.convLang);
 
@@ -62,6 +65,11 @@
     this._greet();
     // Keep the progress ring live if the user edits the client form directly.
     if (this.adapter.onChange) this.adapter.onChange(function () { self._refreshStatus(); });
+
+    // Welcome the user by voice as soon as they land.
+    if (this.autostart && this.voice && this.voice.isSupported()) {
+      setTimeout(function () { self._welcome(); }, 400);
+    }
   }
 
   /* ================= profile derived from the live form ================= */
@@ -174,7 +182,8 @@
         '<div class="lc-call-cap">00:00</div>' +
       '</div>' +
       '<button class="lc-call-lang" title="Language">EN</button>' +
-      '<button class="lc-call-mute" title="Mute / speak">🎙️</button>' +
+      '<button class="lc-call-kb" title="Type instead">⌨️</button>' +
+      '<button class="lc-call-mute" title="Tap to talk">🎙️</button>' +
       '<button class="lc-call-end" title="End">✕</button>';
     this.callbar = callbar;
     this.callName = callbar.querySelector('.lc-call-name');
@@ -182,6 +191,7 @@
     this.callLangBtn = callbar.querySelector('.lc-call-lang');
     this.callMuteBtn = callbar.querySelector('.lc-call-mute');
     callbar.querySelector('.lc-orb-lg').addEventListener('click', function () { self.toggle(true); });
+    callbar.querySelector('.lc-call-kb').addEventListener('click', function () { self.toggle(true); });
     callbar.querySelector('.lc-call-end').addEventListener('click', function () { self.endCall(); });
     this.callMuteBtn.addEventListener('click', function () { self._callMuteTap(); });
     this.callLangBtn.addEventListener('click', function () { self._cycleLang(); });
@@ -258,10 +268,17 @@
 
   Copilot.prototype._greet = function () {
     this._say(
-      'Namaste! 👋 I\'m your lending assistant. Tell me what you need in plain language — ' +
-      'like <em>“I want a ₹5 lakh personal loan, I earn 60k a month”</em> — and I\'ll fill the ' +
-      'form for you, check eligibility and suggest the right product.'
+      'Namaste! 👋 I\'m Saathi, your lending assistant. You can <b>talk to me</b> — tap the ' +
+      'mic and speak in English or Hindi — or <b>type</b> using the keyboard. Just tell me what ' +
+      'you need, like <em>“I want a ₹5 lakh personal loan, I earn 60k a month”</em>, and I\'ll ' +
+      'fill the form, check eligibility and suggest the right product.'
     );
+  };
+
+  // Spoken welcome — kept short and natural for TTS.
+  Copilot.prototype._welcomeSpeech = function () {
+    return 'Namaste! I\'m Saathi, your lending assistant. You can talk to me by tapping the ' +
+      'microphone, or tap the keyboard to type — in English or Hindi. To begin, what kind of loan do you need?';
   };
 
   /* ================= the conversation turn ================= */
@@ -312,6 +329,7 @@
       return;
     }
     var self = this;
+    this._callConnected = true; // the call is now active; timer runs
     this._setPhase('listening');
     this.voice.listen().then(function (res) {
       if (!self.open && !self._inCall) { self._setPhase('idle'); return; }
@@ -368,17 +386,49 @@
     this._startCallTimer();
     var self = this;
     // Greet in the conversation language, then start listening.
-    this._speak(this._lastBotText).then(function () {
+    this._speak(this._welcomeSpeech()).then(function () {
       if (self._inCall) self._startListen();
     });
   };
 
   Copilot.prototype.endCall = function () {
     this._inCall = false;
+    this._callConnected = false;
     this.root.classList.remove('lc-incall');
     if (this._callTimer) { clearInterval(this._callTimer); this._callTimer = null; }
     if (this.voice) this.voice.stop();
     this._setPhase('idle');
+  };
+
+  Copilot.prototype._welcomeHint = function () { return 'Tap 🎙 to talk · ⌨ to type'; };
+
+  // Auto-welcome on landing: show the call bar and greet by voice. Because
+  // browsers block autoplay without a gesture, we try immediately and also
+  // re-greet on the very first tap/keypress if nothing was heard.
+  Copilot.prototype._welcome = function () {
+    if (this._inCall) return;
+    this._inCall = true;
+    this._firstOpen = false;
+    this._callConnected = false;
+    this._audioObserved = false;
+    this.voiceOn = true;
+    this._reflectVoiceBtn();
+    this.root.classList.add('lc-incall');
+    this._callStart = Date.now();
+    this._startCallTimer();
+    this._setPhase('idle');            // shows the welcome hint caption
+    var self = this;
+    this._speak(this._welcomeSpeech()); // best effort (may be blocked)
+    var unlock = function () {
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('keydown', unlock);
+      if (!self._audioObserved && self._inCall) {
+        if (self.voice) self.voice.stop();
+        self._speak(self._welcomeSpeech());
+      }
+    };
+    document.addEventListener('pointerdown', unlock);
+    document.addEventListener('keydown', unlock);
   };
 
   Copilot.prototype._callMuteTap = function () {
@@ -394,7 +444,7 @@
     var self = this;
     if (this._callTimer) clearInterval(this._callTimer);
     this._callTimer = setInterval(function () {
-      if (self.phase === 'idle' && self.callCap) {
+      if (self._callConnected && self.phase === 'idle' && self.callCap) {
         var s = Math.floor((Date.now() - self._callStart) / 1000);
         var mm = String(Math.floor(s / 60)).padStart(2, '0');
         var ss = String(s % 60).padStart(2, '0');
@@ -441,9 +491,10 @@
     else if (p === 'speaking') { r.classList.add('lc-speaking'); cap = 'Speaking…'; }
     else if (p === 'thinking') { r.classList.add('lc-thinking'); cap = 'Thinking…'; }
     if (this.voiceCap && cap) this.voiceCap.textContent = cap;
-    // call bar caption: show live status, or fall back to the timer when idle
+    // call bar caption: live status, then timer once connected, else a hint
     if (this.callCap) {
       if (cap) this.callCap.textContent = cap;
+      else if (p === 'idle' && this._inCall && !this._callConnected) this.callCap.textContent = this._welcomeHint();
       this.callMuteBtn && this.callMuteBtn.classList.toggle('lc-muted', p === 'idle');
     }
     if (p === 'listening' || p === 'speaking') this._startAmpLoop();
@@ -455,6 +506,7 @@
     var self = this;
     var loop = function () {
       var amp = self.voice ? self.voice.getAmplitude() : 0;
+      if (amp > 0.05) self._audioObserved = true; // TTS/mic actually producing sound
       if (self.phase === 'speaking' && amp < 0.02) {
         // speechSynthesis gives no amplitude — synthesise a gentle pulse
         amp = 0.25 + 0.2 * Math.abs(Math.sin(Date.now() / 180));

@@ -493,9 +493,11 @@
     return this._uiLang() === 'hi' ? '🎙 बोलिए · ⌨ type कीजिए' : 'Tap 🎙 to talk · ⌨ to type';
   };
 
-  // Auto-welcome on landing: show the call bar and greet by voice. Because
-  // browsers block autoplay without a gesture, we try immediately and also
-  // re-greet on the very first tap/keypress if nothing was heard.
+  // Auto-welcome on landing: show the call bar and greet by voice. Browsers block
+  // audio until the first user gesture, so we (a) try to autoplay immediately for
+  // browsers that allow it, and (b) put a transparent "Tap to start" catcher over
+  // the screen so the very first tap reliably starts Arya (and can't be swallowed
+  // by a control button). Once started, it greets and then listens.
   Copilot.prototype._welcome = function () {
     if (this._inCall) return;
     this._inCall = true;
@@ -507,41 +509,39 @@
     this.root.classList.add('lc-incall');
     this._callStart = Date.now();
     this._startCallTimer();
-    this._setPhase('idle');            // shows the welcome hint caption
+    this._setPhase('idle');
     var self = this;
-    // If there's no key AND no browser speech, tell the user how to enable voice.
-    if (!this.voice.hasKey() && !this.voice.canListen()) {
-      this.callCap.textContent = '🔊 Tap here to enable voice';
-    }
-    this._welcomeDone = false;
-    var greet = function () {
-      self._speak(self._welcomeSpeech(), function () { self._welcomeDone = true; });
-      // surface a voice error a moment later if nothing played
-      setTimeout(function () {
-        if (!self._welcomeDone && self.callCap && self.voice.getLastError()) {
-          self.callCap.textContent = '🔊 Tap to fix voice';
-        }
-      }, 2500);
+    this._started = false;
+
+    var hint = this._uiLang() === 'hi' ? 'शुरू करने के लिए tap करें' : 'Tap to start';
+    if (this.callCap) this.callCap.textContent = '🔊 ' + hint;
+
+    var begin = function () {
+      if (self._started || !self._inCall) return;
+      self._started = true;
+      if (self._startCatch) { self._startCatch.remove(); self._startCatch = null; }
+      if (self.voice) self.voice.stop();
+      self._speak(self._welcomeSpeech()).then(function () {
+        if (self._inCall && self.voiceOn) self._startListen();
+      });
     };
-    greet(); // best effort — plays now if the browser allows autoplay
-    // Browsers block audio until a gesture: greet on the very first interaction
-    // if the autoplay attempt above didn't actually start.
-    var unlock = function (e) {
-      document.removeEventListener('pointerdown', unlock);
-      document.removeEventListener('keydown', unlock);
-      document.removeEventListener('touchstart', unlock);
-      // If the first tap was on a voice control, let that control act (the
-      // gesture still unblocks audio so later replies are audible).
-      var onControl = e && e.target && e.target.closest &&
-        e.target.closest('.lc-callbar button, .lc-fab, .lc-mic, .lc-send, .lc-input, .lc-composer');
-      if (!onControl && !self._welcomeDone && self._inCall) {
-        if (self.voice) self.voice.stop();
-        greet();
-      }
-    };
-    document.addEventListener('pointerdown', unlock);
-    document.addEventListener('keydown', unlock);
-    document.addEventListener('touchstart', unlock);
+
+    // Transparent full-screen catcher: guarantees the first tap starts Arya.
+    var catcher = el('div', 'lc-startcatch',
+      '<div class="lc-startcatch-pill">🔊 ' + esc(hint) + '</div>');
+    catcher.addEventListener('click', begin);
+    catcher.addEventListener('touchstart', function (e) { if (e.cancelable) e.preventDefault(); begin(); }, { passive: false });
+    this.root.appendChild(catcher);
+    this._startCatch = catcher;
+
+    // Best-effort autoplay for browsers/contexts that allow it (returning users,
+    // PWAs). If it actually starts, drop the catcher and go straight to listening.
+    this._speak(this._welcomeSpeech(), function () {
+      self._started = true;
+      if (self._startCatch) { self._startCatch.remove(); self._startCatch = null; }
+    }).then(function () {
+      if (self._started && self._inCall && self.voiceOn) self._startListen();
+    });
   };
 
   Copilot.prototype._callMuteTap = function () {

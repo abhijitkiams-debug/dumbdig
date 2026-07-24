@@ -295,6 +295,21 @@
 .lc-root.lc-listening .lc-callbar { box-shadow: 0 16px 46px rgba(236,72,153,.5); }
 .lc-root.lc-speaking .lc-callbar { box-shadow: 0 16px 46px rgba(139,92,246,.55); }
 
+/* ===== "Tap to start" catcher (guarantees a first gesture for audio) ===== */
+.lc-startcatch {
+  position: fixed; inset: 0; z-index: 7; pointer-events: auto; cursor: pointer;
+  background: rgba(12,10,30,.04);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: calc(98px + env(safe-area-inset-bottom));
+}
+.lc-startcatch-pill {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+  padding: 12px 22px; border-radius: 30px; font-weight: 700; font-size: 15px;
+  box-shadow: 0 12px 30px rgba(99,102,241,.5);
+  animation: lc-startpulse 1.3s ease-in-out infinite;
+}
+@keyframes lc-startpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
 /* ===== native recommendation overlay (quotes-style) ===== */
 .lc-reco {
   position: fixed; inset: 0; z-index: 8; pointer-events: auto;

@@ -61,21 +61,17 @@
   var browse = document.createElement('div');
   browse.className = 'screen screen-browse';
   browse.innerHTML =
-    '<section class="hero-banner">' +
-      '<div class="hb-inner">' +
-        '<span class="pill light">⚡ Instant in-principle approval</span>' +
-        '<h2>On the journey towards your aspirations</h2>' +
-        '<p>Always by your side. Tap the <b>assistant</b> and Arya will understand your need, ' +
-          'check your CIBIL score and show your <b>personalised rate</b> in minutes.</p>' +
-        '<div class="hb-cue">🎙️ Tap the glowing button, bottom-right, to talk to Arya</div>' +
+    '<section class="fibe-hero">' +
+      '<h2 class="fibe-title">Lightning-fast loans with<br><span class="fibe-hl" id="hero-rot">Personal Loans</span></h2>' +
+      '<p class="fibe-sub">Setu Finance — making finance simpler</p>' +
+      '<div class="fibe-feats">' +
+        '<span>Cash-in-bank in minutes</span>' +
+        '<span>Fast loan processing</span>' +
+        '<span>Borrow and repay at your convenience</span>' +
+        '<span>One-time application for multiple loans</span>' +
       '</div>' +
     '</section>' +
     '<div class="rate-note wrap-note">💡 Your interest rate depends on your <b>CIBIL score</b> — a higher score means a lower rate.</div>' +
-    '<div class="steps">' +
-      '<div class="step"><span>1</span>Tell Arya what you need</div>' +
-      '<div class="step"><span>2</span>Get personalised rates</div>' +
-      '<div class="step"><span>3</span>Apply in minutes</div>' +
-    '</div>' +
     '<div class="browse-head"><h3 class="browse-h">Our loan products</h3>' +
       '<span class="browse-hint">Tap any product — Arya finds your best rate</span></div>' +
     '<div class="loan-grid" id="loan-grid"></div>' +
@@ -99,6 +95,20 @@
     card.addEventListener('click', function () { selectLoan(p.id); });
     grid.appendChild(card);
   });
+
+  // Rotating highlighted product name in the hero (Fibe-style).
+  (function () {
+    var rot = browse.querySelector('#hero-rot');
+    if (!rot) return;
+    var names = ['Personal Loans', 'Two-Wheeler Loans', 'Used Car Loans', 'Home Loans',
+      'Gold Loans', 'Business Loans', 'Consumer Durable Loans'];
+    var i = 0;
+    setInterval(function () {
+      i = (i + 1) % names.length;
+      rot.style.opacity = '0';
+      setTimeout(function () { rot.textContent = names[i]; rot.style.opacity = '1'; }, 240);
+    }, 2400);
+  })();
 
   /* ==================== SCREEN 2: application form ==================== */
 

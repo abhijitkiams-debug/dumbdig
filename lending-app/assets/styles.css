@@ -131,24 +131,36 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ---- TVS-style green hero banner ---- */
-.hero-banner {
-  background: linear-gradient(120deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%);
-  color: #fff; padding: 26px 20px 30px; position: relative; overflow: hidden;
+/* ---- Fibe-style hero ---- */
+.fibe-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #f4fbf9 100%);
+  text-align: center; padding: 34px 20px 26px;
 }
-.hero-banner::after {
-  content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px;
-  background: radial-gradient(circle, rgba(255,255,255,.16), transparent 70%); border-radius: 50%;
+.fibe-title {
+  font-size: 34px; line-height: 1.12; font-weight: 800; letter-spacing: -.5px;
+  color: var(--ink); margin: 0 auto; max-width: 820px;
 }
-.hb-inner { max-width: 900px; margin: 0 auto; position: relative; }
-.hb-inner h2 { font-size: 24px; margin: 12px 0 8px; line-height: 1.2; }
-.hb-inner p { font-size: 14px; margin: 0; color: rgba(255,255,255,.92); max-width: 560px; }
-.pill.light { background: rgba(255,255,255,.18); color: #fff; }
-.hb-cue {
-  margin-top: 14px; display: inline-block; background: rgba(255,255,255,.14);
-  border: 1px solid rgba(255,255,255,.25); border-radius: 20px; padding: 8px 14px; font-size: 12.5px;
+.fibe-hl { color: #f7941d; transition: opacity .24s ease; display: inline-block; }
+.fibe-sub { font-size: 17px; color: var(--ink); margin: 16px 0 0; font-weight: 600; }
+.fibe-feats {
+  max-width: 980px; margin: 22px auto 0; display: flex; flex-wrap: wrap;
+  justify-content: center; align-items: center; gap: 0;
+}
+.fibe-feats span {
+  font-size: 13px; color: var(--sub); padding: 4px 16px; position: relative; white-space: nowrap;
+}
+.fibe-feats span:not(:last-child)::after {
+  content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 1px; height: 16px; background: var(--line);
 }
 .wrap-note { max-width: 900px; margin: 14px auto 0; }
+
+@media (max-width: 620px) {
+  .fibe-title { font-size: 26px; }
+  .fibe-sub { font-size: 15px; }
+  .fibe-feats span::after { display: none; }
+  .fibe-feats span { padding: 4px 10px; }
+}
 
 /* ---- screens / router ---- */
 .screen.hidden { display: none; }

@@ -204,8 +204,10 @@
     root.style.setProperty('--lc-accent', this.brand.accent);
     this.root = root;
 
-    // Floating launcher button
-    var fab = el('button', 'lc-fab', '<span class="lc-fab-dot"></span>💬');
+    // Floating launcher button — a Siri-style orb
+    var fab = el('button', 'lc-fab',
+      '<span class="lc-orb lc-orb-fab"><span class="lc-orb-glow"></span><span class="lc-orb-core"></span></span>' +
+      '<span class="lc-fab-dot"></span>');
     fab.title = 'Talk to ' + this.brand.name;
     fab.addEventListener('click', function () { self._fabTap(); });
     this.fab = fab;
@@ -275,16 +277,14 @@
         '<div class="lc-call-cap">00:00</div>' +
       '</div>' +
       '<button class="lc-call-lang" title="Language">EN</button>' +
-      '<button class="lc-call-kb" title="Type instead">⌨️</button>' +
       '<button class="lc-call-mute" title="Tap to talk">🎙️</button>' +
-      '<button class="lc-call-end" title="End">✕</button>';
+      '<button class="lc-call-end" title="Disconnect Arya">⏻<span>Disconnect</span></button>';
     this.callbar = callbar;
     this.callName = callbar.querySelector('.lc-call-name');
     this.callCap = callbar.querySelector('.lc-call-cap');
     this.callLangBtn = callbar.querySelector('.lc-call-lang');
     this.callMuteBtn = callbar.querySelector('.lc-call-mute');
     callbar.querySelector('.lc-orb-lg').addEventListener('click', function () { self.toggle(true); });
-    callbar.querySelector('.lc-call-kb').addEventListener('click', function () { self.toggle(true); });
     this.callCap.style.cursor = 'pointer';
     this.callCap.title = 'Voice settings';
     this.callCap.addEventListener('click', function () { self._openSettings(); });
@@ -847,15 +847,22 @@
     return names.slice(0, -1).join(', ') + and + names[names.length - 1];
   };
 
-  // Spoken recommendation: intro + the top pick with an apply prompt.
+  // Spoken recommendation: a crisp one-line summary of EACH of the top products,
+  // then an apply prompt. (Arya speaks each product, briefly.)
   Copilot.prototype._recommendText = function () {
-    var recs = this._recs || this.catalog.recommend(this._profile()).slice(0, 3);
+    var recs = (this._recs && this._recs.length) ? this._recs : this.catalog.recommend(this._profile()).slice(0, 3);
     this._recs = recs;
-    var top = recs[0];
-    if (!top) return this._P().askMore;
-    var elig = this.catalog.inrShort(top.maxEligible);
-    return this._t('recommendIntro') + ' ' +
-      this._t('recommendTop', top.product.name, elig, top.rate.toFixed(2), this.catalog.inr(top.emi));
+    if (!recs.length) return this._P().askMore;
+    var C = this.catalog, hi = this._uiLang() === 'hi';
+    var ord = hi ? ['पहला', 'दूसरा', 'तीसरा'] : ['First', 'Second', 'Third'];
+    var lines = recs.slice(0, 3).map(function (r, i) {
+      var n = r.product.name;
+      return hi
+        ? ord[i] + ', ' + n + ' — ' + C.inrShort(r.maxEligible) + ' तक, ' + r.rate.toFixed(1) + '% पर, EMI लगभग ' + C.inr(r.emi) + ' महीना।'
+        : ord[i] + ', ' + n + ' — up to ' + C.inrShort(r.maxEligible) + ' at ' + r.rate.toFixed(1) + '%, EMI about ' + C.inr(r.emi) + ' a month.';
+    });
+    var ask = hi ? 'कौन सा पसंद है? नाम बोलिए, या "पहला" बोलिए।' : 'Which one would you like? Say its name, or say "first".';
+    return this._t('recommendIntro') + ' ' + lines.join(' ') + ' ' + ask;
   };
 
   // Resolve which product the user chose in the recommend stage.
@@ -864,6 +871,10 @@
     if (res.entities && res.entities.loanType) {
       for (var i = 0; i < recs.length; i++) if (recs[i].product.id === res.entities.loanType) return recs[i];
     }
+    var t = (res.text || '').toLowerCase();
+    if (/\b(first|1st|top|number one|this one)\b/.test(t)) return recs[0] || null;
+    if (/\b(second|2nd)\b/.test(t)) return recs[1] || null;
+    if (/\b(third|3rd)\b/.test(t)) return recs[2] || null;
     if (this._isAffirm(res)) return recs[0] || null;
     return null;
   };

@@ -63,6 +63,7 @@
     {
       id: 'personal',
       name: 'Personal Loan',
+      tagline: 'Cash for any need',
       emoji: '💰',
       blurb: 'Unsecured cash for any need — weddings, travel, medical, debt consolidation.',
       minAmount: 50000, maxAmount: 4000000,
@@ -74,6 +75,7 @@
     {
       id: 'home',
       name: 'Home Loan',
+      tagline: 'Your dream home',
       emoji: '🏠',
       blurb: 'Buy, build or renovate your home. Long tenure, lowest rates, tax benefits.',
       minAmount: 500000, maxAmount: 50000000,
@@ -85,6 +87,7 @@
     {
       id: 'gold',
       name: 'Gold Loan',
+      tagline: 'Instant cash on gold',
       emoji: '🥇',
       blurb: 'Instant funds against gold jewellery. Minimal paperwork, quick disbursal.',
       minAmount: 25000, maxAmount: 5000000,
@@ -96,6 +99,7 @@
     {
       id: 'business',
       name: 'Business Loan',
+      tagline: 'Fuel your business',
       emoji: '💼',
       blurb: 'Working capital & growth funding for MSMEs and self-employed professionals.',
       minAmount: 100000, maxAmount: 5000000,
@@ -107,6 +111,7 @@
     {
       id: 'twowheeler',
       name: 'Two-Wheeler Loan',
+      tagline: 'Ride home today',
       emoji: '🏍️',
       blurb: 'Ride home your bike or scooter with up to 100% on-road financing.',
       minAmount: 30000, maxAmount: 300000,
@@ -117,9 +122,10 @@
     },
     {
       id: 'car',
-      name: 'Car Loan',
+      name: 'Used Car Loan',
       emoji: '🚗',
-      blurb: 'New or used car financing with flexible tenure and competitive rates.',
+      tagline: 'Drive home your dream car',
+      blurb: 'Finance a new or pre-owned car with up to 90% funding and flexible tenure.',
       minAmount: 100000, maxAmount: 10000000,
       minRate: 9, maxRate: 14,
       minMonths: 12, maxMonths: 84, defaultMonths: 60,
@@ -127,9 +133,82 @@
       docs: ['PAN', 'Aadhaar', 'Income proof', 'Car quotation']
     },
     {
+      id: 'consumer',
+      name: 'Consumer Durable Loan',
+      emoji: '📺',
+      tagline: 'Easy EMIs on appliances',
+      blurb: 'No-cost & easy EMIs on TVs, fridges, washing machines and laptops.',
+      minAmount: 5000, maxAmount: 500000,
+      minRate: 10, maxRate: 24,
+      minMonths: 3, maxMonths: 24, defaultMonths: 9,
+      secured: false, minIncome: 12000, minAge: 21, maxAge: 60,
+      docs: ['PAN', 'Aadhaar', 'Bank statement']
+    },
+    {
+      id: 'mobile',
+      name: 'Mobile Loan',
+      emoji: '📱',
+      tagline: 'The latest phone on EMI',
+      blurb: 'Buy the newest smartphone on easy EMIs with instant approval.',
+      minAmount: 5000, maxAmount: 200000,
+      minRate: 12, maxRate: 26,
+      minMonths: 3, maxMonths: 24, defaultMonths: 12,
+      secured: false, minIncome: 10000, minAge: 18, maxAge: 60,
+      docs: ['PAN', 'Aadhaar']
+    },
+    {
+      id: 'tractor',
+      name: 'Tractor Loan',
+      emoji: '🚜',
+      tagline: 'Power up your farm',
+      blurb: 'Finance a new or used tractor with flexible, harvest-friendly EMIs.',
+      minAmount: 100000, maxAmount: 1500000,
+      minRate: 12, maxRate: 20,
+      minMonths: 12, maxMonths: 60, defaultMonths: 48,
+      secured: true, minIncome: 0, minAge: 21, maxAge: 65,
+      docs: ['PAN', 'Aadhaar', 'Land records', 'RC book']
+    },
+    {
+      id: 'threewheeler',
+      name: 'Three-Wheeler Loan',
+      emoji: '🛺',
+      tagline: 'Own it, start earning',
+      blurb: 'Own an auto or e-rickshaw with up to 95% funding and start earning.',
+      minAmount: 50000, maxAmount: 500000,
+      minRate: 13, maxRate: 24,
+      minMonths: 12, maxMonths: 48, defaultMonths: 36,
+      secured: true, minIncome: 0, minAge: 21, maxAge: 60,
+      docs: ['PAN', 'Aadhaar', 'Income proof', 'Vehicle quotation']
+    },
+    {
+      id: 'lap',
+      name: 'Loan Against Property',
+      emoji: '🏢',
+      tagline: 'Unlock your property\'s value',
+      blurb: 'Big-ticket funds against your home or shop, at low rates and long tenure.',
+      minAmount: 500000, maxAmount: 20000000,
+      minRate: 9, maxRate: 14,
+      minMonths: 36, maxMonths: 180, defaultMonths: 120,
+      secured: true, minIncome: 30000, minAge: 24, maxAge: 65,
+      docs: ['PAN', 'Aadhaar', 'Property papers', 'Income proof']
+    },
+    {
+      id: 'ucv',
+      name: 'Commercial Vehicle Loan',
+      emoji: '🚛',
+      tagline: 'Grow your transport business',
+      blurb: 'Finance a new or used truck / commercial vehicle to grow your business.',
+      minAmount: 100000, maxAmount: 5000000,
+      minRate: 14, maxRate: 22,
+      minMonths: 12, maxMonths: 60, defaultMonths: 48,
+      secured: true, minIncome: 0, minAge: 21, maxAge: 65,
+      docs: ['PAN', 'Aadhaar', 'RC book', 'Business proof']
+    },
+    {
       id: 'education',
       name: 'Education Loan',
       emoji: '🎓',
+      tagline: 'Invest in your future',
       blurb: 'Fund higher studies in India or abroad. Moratorium during the course.',
       minAmount: 50000, maxAmount: 7500000,
       minRate: 8.5, maxRate: 14,

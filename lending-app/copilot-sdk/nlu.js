@@ -19,7 +19,13 @@
     { id: 'gold', words: ['gold', 'jewel', 'jewellery', 'jewelry', 'ornament'] },
     { id: 'business', words: ['business', 'working capital', 'msme', 'shop', 'enterprise', 'startup', 'inventory'] },
     { id: 'twowheeler', words: ['two wheeler', 'two-wheeler', 'bike', 'scooter', 'scooty', 'motorcycle', 'activa'] },
-    { id: 'car', words: ['car', 'auto loan', 'vehicle', 'four wheeler', 'four-wheeler', 'suv', 'sedan'] },
+    { id: 'car', words: ['car', 'used car', 'auto loan', 'four wheeler', 'four-wheeler', 'suv', 'sedan'] },
+    { id: 'consumer', words: ['consumer durable', 'appliance', 'television', ' tv ', 'fridge', 'refrigerator', 'washing machine', 'laptop', 'electronics'] },
+    { id: 'mobile', words: ['mobile loan', 'mobile phone', 'smartphone', 'iphone', 'phone loan'] },
+    { id: 'tractor', words: ['tractor', 'farm', 'farming', 'agriculture', 'agri'] },
+    { id: 'threewheeler', words: ['three wheeler', 'three-wheeler', 'auto rickshaw', 'rickshaw', 'e-rickshaw', 'tempo'] },
+    { id: 'lap', words: ['loan against property', 'against property', 'lap', 'mortgage'] },
+    { id: 'ucv', words: ['commercial vehicle', 'truck', 'lorry', 'pickup', 'transport'] },
     { id: 'education', words: ['education', 'study', 'studies', 'college', 'university', 'course', 'tuition', 'abroad', 'mba'] }
   ];
 

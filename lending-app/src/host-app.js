@@ -64,9 +64,9 @@
     '<section class="hero">' +
       '<div class="hero-inner">' +
         '<span class="pill">⚡ Instant in-principle approval</span>' +
-        '<h2>The right loan, at your best rate</h2>' +
-        '<p>Talk to <b>Arya</b>, our voice assistant — she\'ll understand your need, ' +
-          'check your CIBIL score and show your <b>personalised interest rate</b> in minutes.</p>' +
+        '<h2>On the journey towards your aspirations</h2>' +
+        '<p>Always by your side. Talk to <b>Arya</b>, our voice assistant — she understands ' +
+          'your need, checks your CIBIL score and shows your <b>personalised rate</b> in minutes.</p>' +
         '<button class="btn btn-primary hero-cta-btn" id="talk-arya">🎙️ Talk to Arya</button>' +
         '<div class="rate-note">💡 Your interest rate depends on your <b>CIBIL score</b> — a higher score means a lower rate.</div>' +
       '</div>' +
@@ -76,8 +76,12 @@
       '<div class="step"><span>2</span>Get personalised rates</div>' +
       '<div class="step"><span>3</span>Apply in minutes</div>' +
     '</div>' +
-    '<h3 class="browse-h">Choose a loan</h3>' +
+    '<div class="browse-head"><h3 class="browse-h">Our loan products</h3>' +
+      '<span class="browse-hint">Tap any product — Arya finds your best rate</span></div>' +
     '<div class="loan-grid" id="loan-grid"></div>' +
+    '<div class="why"><div class="why-item">⚡<b>Instant approval</b><span>in principle in minutes</span></div>' +
+      '<div class="why-item">📄<b>Minimal documents</b><span>paperless, Aadhaar-based</span></div>' +
+      '<div class="why-item">🔒<b>Safe & RBI-compliant</b><span>fair-practice code</span></div></div>' +
     '<p class="browse-foot">Prefer to fill the form yourself? <a href="#" id="manual-link">Apply directly ›</a></p>';
   app.appendChild(browse);
 
@@ -88,15 +92,10 @@
     card.setAttribute('data-loan', p.id);
     card.innerHTML =
       '<div class="loan-emoji">' + p.emoji + '</div>' +
-      '<div class="loan-body">' +
-        '<div class="loan-name">' + p.name + '</div>' +
-        '<div class="loan-blurb">' + p.blurb + '</div>' +
-        '<div class="loan-meta">' +
-          '<span class="loan-rate">from <b>' + p.minRate.toFixed(2) + '%</b> p.a.</span>' +
-          '<span class="loan-amt">up to ' + Cat.inrShort(p.maxAmount) + '</span>' +
-        '</div>' +
-      '</div>' +
-      '<span class="loan-go">Check my rate ›</span>';
+      '<div class="loan-name">' + p.name + '</div>' +
+      '<div class="loan-tag">' + (p.tagline || p.blurb) + '</div>' +
+      '<div class="loan-meta"><span class="loan-rate">from <b>' + p.minRate.toFixed(2) + '%</b> p.a.</span></div>' +
+      '<span class="loan-go">Apply Now ›</span>';
     card.addEventListener('click', function () { selectLoan(p.id); });
     grid.appendChild(card);
   });

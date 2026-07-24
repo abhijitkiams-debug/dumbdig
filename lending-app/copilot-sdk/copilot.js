@@ -68,6 +68,7 @@
       submitAsk: 'बस हो गया! क्या मैं आपकी application submit कर दूँ? हाँ बोलिए।',
       submitted: function (ref) { return 'हो गया! आपकी application submit हो गई। Reference ' + ref + '। एक credit officer आपको जल्दी call करेगा। Setu Finance चुनने के लिए धन्यवाद!'; },
       didntCatch: 'माफ़ कीजिए, समझ नहीं आया। दोबारा बोलिए या नीचे type कीजिए।',
+      notCaught: 'माफ़ कीजिए, मैं ठीक से समझ नहीं पाई।',
       changeWhat: 'कोई बात नहीं। आप क्या बदलना चाहते हैं?',
       switched: 'ठीक है, मैं हिंदी में बात करती हूँ।'
     },
@@ -101,6 +102,7 @@
       submitAsk: 'That\'s everything! Shall I submit your application now? Say yes.',
       submitted: function (ref) { return 'Done! Your application is submitted. Reference ' + ref + '. A credit officer will call you shortly. Thank you for choosing Setu Finance!'; },
       didntCatch: 'Sorry, I didn\'t catch that. Please say it again or type below.',
+      notCaught: 'Sorry, I didn\'t quite get that.',
       changeWhat: 'No problem. What would you like to change?',
       switched: 'Sure, I\'ll continue in English.'
     }
@@ -204,9 +206,12 @@
     root.style.setProperty('--lc-accent', this.brand.accent);
     this.root = root;
 
-    // Floating launcher button — a Siri-style orb
+    // Floating launcher — a Siri-style orb with a clear white mic glyph on top.
     var fab = el('button', 'lc-fab',
-      '<span class="lc-orb lc-orb-fab"><span class="lc-orb-glow"></span><span class="lc-orb-core"></span></span>' +
+      '<span class="lc-orb-glow lc-fab-glow"></span>' +
+      '<span class="lc-fab-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="#fff" aria-hidden="true">' +
+        '<path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z"/>' +
+        '<path d="M19 12a7 7 0 0 1-14 0H3a9 9 0 0 0 8 8.94V24h2v-3.06A9 9 0 0 0 21 12h-2z"/></svg></span>' +
       '<span class="lc-fab-dot"></span>');
     fab.title = 'Talk to ' + this.brand.name;
     fab.addEventListener('click', function () { self._fabTap(); });
@@ -277,14 +282,16 @@
         '<div class="lc-call-cap">00:00</div>' +
       '</div>' +
       '<button class="lc-call-lang" title="Language">EN</button>' +
+      '<button class="lc-call-kb" title="Type instead">⌨️</button>' +
       '<button class="lc-call-mute" title="Tap to talk">🎙️</button>' +
-      '<button class="lc-call-end" title="Disconnect Arya">⏻<span>Disconnect</span></button>';
+      '<button class="lc-call-end" title="Disconnect Arya">⏻<span class="lc-end-txt">Disconnect</span></button>';
     this.callbar = callbar;
     this.callName = callbar.querySelector('.lc-call-name');
     this.callCap = callbar.querySelector('.lc-call-cap');
     this.callLangBtn = callbar.querySelector('.lc-call-lang');
     this.callMuteBtn = callbar.querySelector('.lc-call-mute');
     callbar.querySelector('.lc-orb-lg').addEventListener('click', function () { self.toggle(true); });
+    callbar.querySelector('.lc-call-kb').addEventListener('click', function () { self.toggle(true); });
     this.callCap.style.cursor = 'pointer';
     this.callCap.title = 'Voice settings';
     this.callCap.addEventListener('click', function () { self._openSettings(); });
@@ -721,6 +728,7 @@
   // `displayText` (optional) is what the user actually said in their language;
   // `text` is always English for the NLU.
   Copilot.prototype.handle = function (text, displayText) {
+    var self = this;
     this._say(displayText || text, 'user');
 
     // Language switch — only when the user explicitly asks (otherwise we stick).
@@ -738,17 +746,43 @@
     }
 
     var res = this.nlu.parse(text);
-    var filled = this._applyEntities(res.entities);
-
     var actionIntents = ['recommend', 'eligibility', 'emi', 'documents', 'help', 'greet', 'affirm', 'deny'];
     var isAction = res.intents.some(function (i) { return actionIntents.indexOf(i) !== -1; });
     var consentAffirm = this.pendingField &&
       (this.pendingField.type === 'checkbox' || this.pendingField.id === 'consent') &&
       /^(yes|yeah|yep|sure|ok|okay|agree|accept|confirm|done|haan|ji|theek|thik)\b/i.test(text);
-    if (!filled.length && this.pendingField && (!isAction || consentAffirm)) {
-      var slotted = this._fillPending(text);
-      if (slotted) filled = [slotted];
+
+    // Fill logic, grounded to avoid mis-reading the customer:
+    //  - a SHORT reply is treated as the answer to the current question first
+    //    (so "5 lakh" fills the field Arya just asked, not a random amount slot);
+    //  - longer sentences go through full multi-field extraction.
+    var wordCount = text.trim().split(/\s+/).length;
+    var shortAnswer = wordCount <= 6;
+    var filled = [];
+    if (this.pendingField && shortAnswer && (!isAction || consentAffirm)) {
+      // Short reply = the answer to the current question. Try to slot it there.
+      var slot = this._fillPending(text);
+      if (slot) filled = [slot];
+      else {
+        // It didn't fit. Only extract STRONG, unambiguous entities (loan type,
+        // employment, PAN…) — NEVER repurpose a bare number into another field.
+        var strong = {};
+        ['loanType', 'employment', 'pan', 'email', 'mobile', 'city', 'fullName', 'pincode', 'aadhaar']
+          .forEach(function (k) { if (res.entities[k] != null) strong[k] = res.entities[k]; });
+        filled = this._applyEntities(strong);
+      }
+    } else {
+      // Longer / free-form utterance: full multi-field extraction.
+      filled = this._applyEntities(res.entities);
+      if (!filled.length && this.pendingField && (!isAction || consentAffirm)) {
+        var slot2 = this._fillPending(text);
+        if (slot2) filled = [slot2];
+      }
     }
+    // remember whether this turn actually captured the field we asked for
+    this._answeredPending = filled.some(function (f) {
+      return self.pendingField && f.id === self.pendingField.id;
+    });
 
     this._refreshStatus();
     var reply = this._advance(res, filled);
@@ -786,7 +820,10 @@
   // The stage machine: discovery -> recommend -> application -> submit.
   Copilot.prototype._advance = function (res, filled) {
     var P = this._P();
-    var gotIt = filled.length ? P.gotIt(this._joinLabels(filled)) : '';
+    var gotIt = filled.length ? P.gotIt(this._confirmText(filled)) : '';
+    // When we asked a question and got no usable answer, say so (don't fake it).
+    var lead = gotIt;
+    if (!filled.length && this.pendingField && res.intents.length === 0) lead = (P.notCaught || '') + ' ';
 
     if (res.intents.indexOf('help') !== -1) return P.help;
 
@@ -818,7 +855,7 @@
       if (nextD) {
         if (nextD.id === 'cibil') this._cibilAsked = true; // ask CIBIL exactly once
         this.pendingField = nextD;
-        return gotIt + P.ask[nextD.id];
+        return lead + P.ask[nextD.id];
       }
       // discovery complete -> move to recommendations
       this.stage = 'recommend';
@@ -829,9 +866,29 @@
 
     // Application stage: collect the remaining details, then submit.
     var nextA = this._nextBestField();
-    if (nextA) { this.pendingField = nextA; return gotIt + P.ask[nextA.id]; }
+    if (nextA) { this.pendingField = nextA; return lead + P.ask[nextA.id]; }
     this.awaitingSubmit = true;
     return gotIt + P.submitAsk;
+  };
+
+  // Confirm the ACTUAL captured value(s) so the customer can catch a mishearing.
+  Copilot.prototype._confirmText = function (filled) {
+    var self = this, C = this.catalog;
+    var parts = filled.map(function (f) {
+      var v = self.adapter.getValue(f.id);
+      if (f.id === 'loanType') { var p = C.byId(v); return p ? p.name : v; }
+      if (f.id === 'employment') {
+        var opts = (self.schemaById.employment && self.schemaById.employment.options) || [];
+        for (var i = 0; i < opts.length; i++) if (opts[i].value === v) return opts[i].label;
+        return v;
+      }
+      if (['amount', 'monthlyIncome', 'existingEmi'].indexOf(f.id) !== -1) {
+        return C.inr(parseFloat(String(v).replace(/[^\d.]/g, '')));
+      }
+      if (f.id === 'cibil') return 'CIBIL ' + v;
+      return v;
+    });
+    return parts.join(', ');
   };
 
   Copilot.prototype._isAffirm = function (res) {
@@ -893,6 +950,7 @@
       if (entities[k] == null) return;
       var fieldId = map[k];
       if (!self.schemaById[fieldId]) return;
+      if (!self._plausible(fieldId, entities[k])) return; // ignore implausible values
       var prev = self.adapter.getValue(fieldId);
       self.adapter.setValue(fieldId, entities[k]);
       if (self.adapter.flashField) self.adapter.flashField(fieldId);
@@ -921,6 +979,7 @@
       var amt = this.nlu.parseAmount(text);
       var n = amt != null ? amt : parseFloat(val.replace(/[^\d.]/g, ''));
       if (isNaN(n)) return null;
+      if (!this._plausible(f.id, n)) return null; // reject implausible -> re-ask
       val = n;
     } else if (!this._validText(f.id, val)) {
       return null; // don't drop a stray question into a name/city field
@@ -931,6 +990,18 @@
     this.lastFilled = [{ id: f.id, label: f.label, value: val, prev: prev }];
     this.pendingField = null;
     return { id: f.id, label: f.label, value: val, prev: prev };
+  };
+
+  // Numeric plausibility so a mis-heard number never silently fills a field.
+  Copilot.prototype._plausible = function (id, v) {
+    var n = parseFloat(String(v).replace(/[^\d.]/g, ''));
+    if (isNaN(n)) return false;
+    if (id === 'monthlyIncome') return n >= 3000 && n <= 5000000;
+    if (id === 'amount') return n >= 1000 && n <= 100000000;
+    if (id === 'age') return n >= 18 && n <= 75;
+    if (id === 'cibil') return n >= 300 && n <= 900;
+    if (id === 'existingEmi') return n >= 0 && n <= 5000000;
+    return true;
   };
 
   // Light plausibility check so free text answers only fill fields they fit.

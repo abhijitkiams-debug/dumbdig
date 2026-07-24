@@ -61,16 +61,16 @@
   var browse = document.createElement('div');
   browse.className = 'screen screen-browse';
   browse.innerHTML =
-    '<section class="hero">' +
-      '<div class="hero-inner">' +
-        '<span class="pill">⚡ Instant in-principle approval</span>' +
+    '<section class="hero-banner">' +
+      '<div class="hb-inner">' +
+        '<span class="pill light">⚡ Instant in-principle approval</span>' +
         '<h2>On the journey towards your aspirations</h2>' +
-        '<p>Always by your side. Talk to <b>Arya</b>, our voice assistant — she understands ' +
-          'your need, checks your CIBIL score and shows your <b>personalised rate</b> in minutes.</p>' +
-        '<button class="btn btn-primary hero-cta-btn" id="talk-arya">🎙️ Talk to Arya</button>' +
-        '<div class="rate-note">💡 Your interest rate depends on your <b>CIBIL score</b> — a higher score means a lower rate.</div>' +
+        '<p>Always by your side. Tap the <b>assistant</b> and Arya will understand your need, ' +
+          'check your CIBIL score and show your <b>personalised rate</b> in minutes.</p>' +
+        '<div class="hb-cue">🎙️ Tap the glowing button, bottom-right, to talk to Arya</div>' +
       '</div>' +
     '</section>' +
+    '<div class="rate-note wrap-note">💡 Your interest rate depends on your <b>CIBIL score</b> — a higher score means a lower rate.</div>' +
     '<div class="steps">' +
       '<div class="step"><span>1</span>Tell Arya what you need</div>' +
       '<div class="step"><span>2</span>Get personalised rates</div>' +
@@ -262,9 +262,6 @@
     if (copilot && copilot.startFromBrowse) copilot.startFromBrowse(id);
     else if (copilot && copilot.startCall) copilot.startCall();
   }
-  browse.querySelector('#talk-arya').addEventListener('click', function () {
-    if (copilot && copilot.startCall) copilot.startCall();
-  });
   browse.querySelector('#manual-link').addEventListener('click', function (e) {
     e.preventDefault(); showScreen('apply');
   });

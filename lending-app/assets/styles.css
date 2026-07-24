@@ -131,6 +131,25 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---- TVS-style green hero banner ---- */
+.hero-banner {
+  background: linear-gradient(120deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%);
+  color: #fff; padding: 26px 20px 30px; position: relative; overflow: hidden;
+}
+.hero-banner::after {
+  content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(255,255,255,.16), transparent 70%); border-radius: 50%;
+}
+.hb-inner { max-width: 900px; margin: 0 auto; position: relative; }
+.hb-inner h2 { font-size: 24px; margin: 12px 0 8px; line-height: 1.2; }
+.hb-inner p { font-size: 14px; margin: 0; color: rgba(255,255,255,.92); max-width: 560px; }
+.pill.light { background: rgba(255,255,255,.18); color: #fff; }
+.hb-cue {
+  margin-top: 14px; display: inline-block; background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.25); border-radius: 20px; padding: 8px 14px; font-size: 12.5px;
+}
+.wrap-note { max-width: 900px; margin: 14px auto 0; }
+
 /* ---- screens / router ---- */
 .screen.hidden { display: none; }
 .app-back {

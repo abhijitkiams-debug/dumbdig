@@ -179,16 +179,29 @@
       rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       var stopped = new Promise(function (res) { rec.onstop = res; });
       rec.start();
-      var started = performance.now(), lastVoice = started, speech = false;
+      // Endpointing tuned to avoid two failure modes:
+      //  - GRACE: ignore the mic for the first moments so the tail/echo of Arya's
+      //    own TTS can't be mistaken for the customer speaking (which used to end
+      //    the capture ~1.3 s later, before the customer had even started — the
+      //    "stuck, heard nothing" bug).
+      //  - VOICE_TICKS: require a couple of consecutive voiced frames before we
+      //    latch "speech", so a single click/echo blip doesn't trigger a stop.
+      var GRACE = 450, THRESH = 0.06, VOICE_TICKS = 2, NO_SPEECH_MS = 7000;
+      var started = performance.now(), lastVoice = started, speech = false, voiceRun = 0;
       return new Promise(function (resolve) {
         var tick = function () {
           if (rec.state !== 'recording') { resolve(); return; }
-          var now = performance.now();
-          if (currentAmp > 0.05) { speech = true; lastHeardSpeech = true; lastVoice = now; }
-          if (now - started > maxMs || (speech && now - lastVoice > silenceMs)) {
-            try { rec.stop(); } catch (e) {}
-            resolve(); return;
+          var now = performance.now(), elapsed = now - started;
+          if (elapsed > GRACE && currentAmp > THRESH) {
+            voiceRun++;
+            if (voiceRun >= VOICE_TICKS) { speech = true; lastHeardSpeech = true; lastVoice = now; }
+          } else if (currentAmp <= THRESH) {
+            voiceRun = 0;
           }
+          var done = elapsed > maxMs ||
+            (speech && now - lastVoice > silenceMs) ||   // trailing silence after speech
+            (!speech && elapsed > NO_SPEECH_MS);          // customer never spoke -> give up
+          if (done) { try { rec.stop(); } catch (e) {} resolve(); return; }
           setTimeout(tick, 100);
         };
         tick();

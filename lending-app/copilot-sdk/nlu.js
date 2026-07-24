@@ -13,27 +13,31 @@
 
   /* ---------- small dictionaries ---------- */
 
+  // Each entry carries English keywords plus Hindi/Devanagari and common
+  // romanized-Hinglish cues, so the field still resolves even when the spoken
+  // reply reaches the NLU un-translated (Sarvam translate skipped or failed) or
+  // as Hinglish the translator left partly in Hindi.
   var LOAN_TYPES = [
-    { id: 'personal', words: ['personal', 'cash', 'urgent money', 'wedding', 'marriage', 'medical', 'travel', 'consolidat'] },
-    { id: 'home', words: ['home', 'house', 'housing', 'flat', 'apartment', 'property', 'plot', 'renovat'] },
-    { id: 'gold', words: ['gold', 'jewel', 'jewellery', 'jewelry', 'ornament'] },
-    { id: 'business', words: ['business', 'working capital', 'msme', 'shop', 'enterprise', 'startup', 'inventory'] },
-    { id: 'twowheeler', words: ['two wheeler', 'two-wheeler', 'bike', 'scooter', 'scooty', 'motorcycle', 'activa'] },
-    { id: 'car', words: ['car', 'used car', 'auto loan', 'four wheeler', 'four-wheeler', 'suv', 'sedan'] },
-    { id: 'consumer', words: ['consumer durable', 'appliance', 'television', ' tv ', 'fridge', 'refrigerator', 'washing machine', 'laptop', 'electronics'] },
-    { id: 'mobile', words: ['mobile loan', 'mobile phone', 'smartphone', 'iphone', 'phone loan'] },
-    { id: 'tractor', words: ['tractor', 'farm', 'farming', 'agriculture', 'agri'] },
-    { id: 'threewheeler', words: ['three wheeler', 'three-wheeler', 'auto rickshaw', 'rickshaw', 'e-rickshaw', 'tempo'] },
-    { id: 'lap', words: ['loan against property', 'against property', 'lap', 'mortgage'] },
-    { id: 'ucv', words: ['commercial vehicle', 'truck', 'lorry', 'pickup', 'transport'] },
-    { id: 'education', words: ['education', 'study', 'studies', 'college', 'university', 'course', 'tuition', 'abroad', 'mba'] }
+    { id: 'personal', words: ['personal', 'cash', 'urgent money', 'wedding', 'marriage', 'medical', 'travel', 'consolidat', 'पर्सनल', 'व्यक्तिगत', 'shaadi', 'shadi', 'byah'] },
+    { id: 'home', words: ['home', 'house', 'housing', 'flat', 'apartment', 'property', 'plot', 'renovat', 'होम', 'घर', 'मकान', 'makaan', 'makan', 'ghar'] },
+    { id: 'gold', words: ['gold', 'jewel', 'jewellery', 'jewelry', 'ornament', 'गोल्ड', 'सोना', 'सोने', 'gehna', 'zewar', 'sona'] },
+    { id: 'business', words: ['business', 'working capital', 'msme', 'shop', 'enterprise', 'startup', 'inventory', 'बिज़नेस', 'बिजनेस', 'कारोबार', 'दुकान', 'vyapar', 'vyaapar', 'dhandha', 'dukaan', 'dukan'] },
+    { id: 'twowheeler', words: ['two wheeler', 'two-wheeler', 'bike', 'scooter', 'scooty', 'motorcycle', 'activa', 'बाइक', 'स्कूटर', 'दोपहिया', 'gaadi bike'] },
+    { id: 'car', words: ['car', 'used car', 'auto loan', 'four wheeler', 'four-wheeler', 'suv', 'sedan', 'कार', 'गाड़ी', 'गाडी', 'gaadi', 'gaari'] },
+    { id: 'consumer', words: ['consumer durable', 'appliance', 'television', ' tv ', 'fridge', 'refrigerator', 'washing machine', 'laptop', 'electronics', 'टीवी', 'फ्रिज', 'वॉशिंग'] },
+    { id: 'mobile', words: ['mobile loan', 'mobile phone', 'smartphone', 'iphone', 'phone loan', 'मोबाइल', 'फोन', 'फ़ोन'] },
+    { id: 'tractor', words: ['tractor', 'farm', 'farming', 'agriculture', 'agri', 'ट्रैक्टर', 'खेती', 'kheti', 'kisan'] },
+    { id: 'threewheeler', words: ['three wheeler', 'three-wheeler', 'auto rickshaw', 'rickshaw', 'e-rickshaw', 'tempo', 'रिक्शा', 'ऑटो', 'तिपहिया'] },
+    { id: 'lap', words: ['loan against property', 'against property', 'lap', 'mortgage', 'प्रॉपर्टी पर', 'गिरवी'] },
+    { id: 'ucv', words: ['commercial vehicle', 'truck', 'lorry', 'pickup', 'transport', 'ट्रक', 'लॉरी', 'gaadi commercial'] },
+    { id: 'education', words: ['education', 'study', 'studies', 'college', 'university', 'course', 'tuition', 'abroad', 'mba', 'एजुकेशन', 'पढ़ाई', 'पढाई', 'शिक्षा', 'padhai', 'padhaai'] }
   ];
 
   var EMPLOYMENT = [
-    { id: 'salaried', words: ['salaried', 'salary', 'employee', 'employed', 'job', 'private company', 'govt', 'government', 'working in', 'work at', 'ctc'] },
-    { id: 'self-employed', words: ['self employed', 'self-employed', 'freelanc', 'consultant', 'professional', 'doctor', 'lawyer', 'ca ', 'architect'] },
-    { id: 'business', words: ['business owner', 'businessman', 'proprietor', 'trader', 'shop owner', 'entrepreneur', 'own business', 'own a business'] },
-    { id: 'student', words: ['student', 'studying', 'no income', 'unemployed'] }
+    { id: 'salaried', words: ['salaried', 'salary', 'employee', 'employed', 'job', 'private company', 'govt', 'government', 'working in', 'work at', 'ctc', 'सैलरी', 'नौकरी', 'नौकरीपेशा', 'naukri', 'nokri', 'naukari'] },
+    { id: 'self-employed', words: ['self employed', 'self-employed', 'freelanc', 'consultant', 'professional', 'doctor', 'lawyer', 'ca ', 'architect', 'सेल्फ', 'फ्रीलांस', 'पेशेवर'] },
+    { id: 'business', words: ['business owner', 'businessman', 'proprietor', 'trader', 'shop owner', 'entrepreneur', 'own business', 'own a business', 'बिज़नेस', 'व्यापारी', 'दुकानदार', 'कारोबारी', 'vyapari', 'dukaandaar'] },
+    { id: 'student', words: ['student', 'studying', 'no income', 'unemployed', 'छात्र', 'विद्यार्थी', 'student hoon'] }
   ];
   // NOTE: dictionaries share substrings ("employed" ⊂ "self employed"), so
   // matching uses LONGEST-keyword-wins, not first-in-list, to disambiguate.

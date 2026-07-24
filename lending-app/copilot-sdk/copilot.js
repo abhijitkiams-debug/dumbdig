@@ -312,12 +312,12 @@
     }
   };
 
-  Copilot.prototype._speak = function (text) {
+  Copilot.prototype._speak = function (text, onStart) {
     if (!text || !this.voice || !this.voiceOn) return Promise.resolve();
     this._setPhase('speaking');
     var self = this;
     // Speak in the conversation language (auto-set to whatever the user spoke).
-    return this.voice.speak(text, this.convLang || 'en-IN').then(function () {
+    return this.voice.speak(text, this.convLang || 'en-IN', onStart).then(function () {
       if (self.phase === 'speaking') self._setPhase('idle');
     }).catch(function () { self._setPhase('idle'); });
   };
@@ -418,17 +418,29 @@
     this._startCallTimer();
     this._setPhase('idle');            // shows the welcome hint caption
     var self = this;
-    this._speak(this._welcomeSpeech()); // best effort (may be blocked)
-    var unlock = function () {
+    this._welcomeDone = false;
+    var greet = function () {
+      self._speak(self._welcomeSpeech(), function () { self._welcomeDone = true; });
+    };
+    greet(); // best effort — plays now if the browser allows autoplay
+    // Browsers block audio until a gesture: greet on the very first interaction
+    // if the autoplay attempt above didn't actually start.
+    var unlock = function (e) {
       document.removeEventListener('pointerdown', unlock);
       document.removeEventListener('keydown', unlock);
-      if (!self._audioObserved && self._inCall) {
+      document.removeEventListener('touchstart', unlock);
+      // If the first tap was on a voice control, let that control act (the
+      // gesture still unblocks audio so later replies are audible).
+      var onControl = e && e.target && e.target.closest &&
+        e.target.closest('.lc-callbar button, .lc-fab, .lc-mic, .lc-send, .lc-input, .lc-composer');
+      if (!onControl && !self._welcomeDone && self._inCall) {
         if (self.voice) self.voice.stop();
-        self._speak(self._welcomeSpeech());
+        greet();
       }
     };
     document.addEventListener('pointerdown', unlock);
     document.addEventListener('keydown', unlock);
+    document.addEventListener('touchstart', unlock);
   };
 
   Copilot.prototype._callMuteTap = function () {

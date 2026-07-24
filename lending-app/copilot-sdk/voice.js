@@ -213,22 +213,19 @@
     });
   }
 
-  function playBase64Wav(b64) {
+  // Play the TTS clip directly on an <audio> element. We deliberately do NOT
+  // route it through a WebAudio graph — that graph starts suspended under the
+  // autoplay policy and would stay SILENT even after a user gesture. `onStart`
+  // fires only when audio actually begins, so callers can tell it wasn't blocked.
+  function playBase64Wav(b64, onStart) {
     return new Promise(function (resolve) {
       var audio = new Audio('data:audio/wav;base64,' + b64);
       currentAudio = audio;
-      // best-effort amplitude off the playing element
-      try {
-        var Ctx = global.AudioContext || global.webkitAudioContext;
-        ampCtx = new Ctx();
-        var src = ampCtx.createMediaElementSource(audio);
-        var an = ampCtx.createAnalyser(); an.fftSize = 512;
-        src.connect(an); an.connect(ampCtx.destination);
-        analyser = an; runAmpLoop();
-      } catch (e) {}
-      audio.onended = function () { stopAmp(); currentAudio = null; resolve(); };
-      audio.onerror = function () { stopAmp(); currentAudio = null; resolve(); };
-      audio.play().catch(function () { stopAmp(); currentAudio = null; resolve(); });
+      audio.onplaying = function () { if (onStart) { try { onStart(); } catch (e) {} } };
+      audio.onended = function () { currentAudio = null; resolve(); };
+      audio.onerror = function () { currentAudio = null; resolve(); };
+      var p = audio.play();
+      if (p && p.catch) p.catch(function () { currentAudio = null; resolve(); });
     });
   }
 
@@ -260,7 +257,7 @@
     } catch (e) { return null; }
   }
 
-  function webSpeak(text, lang) {
+  function webSpeak(text, lang, onStart) {
     return new Promise(function (resolve) {
       if (!global.speechSynthesis) { resolve(); return; }
       var u = new SpeechSynthesisUtterance(text);
@@ -268,6 +265,7 @@
       var v = pickVoice(u.lang); if (v) u.voice = v;
       var done = false;
       var finish = function () { if (done) return; done = true; resolve(); };
+      u.onstart = function () { if (onStart) { try { onStart(); } catch (e) {} } };
       u.onend = finish;
       u.onerror = finish;
       // Safety net: some browsers never fire onend — resolve on an estimated cap.
@@ -305,17 +303,18 @@
   }
 
   // Speak English `text`, but voiced in `lang` (translating first if needed).
-  // Resolves when finished. Falls back automatically.
-  function speak(text, lang) {
+  // Resolves when finished. `onStart` fires when audio actually begins.
+  // Falls back automatically.
+  function speak(text, lang, onStart) {
     if (!text) return Promise.resolve();
     lang = lang || LANG;
     if (getKey()) {
       var prep = isEnglish(lang) ? Promise.resolve(text) : translate(text, 'en-IN', lang);
       return prep.then(function (out) {
-        return sarvamSynthesize(out, lang).then(playBase64Wav);
-      }).catch(function () { return webSpeak(text, lang); });
+        return sarvamSynthesize(out, lang).then(function (b64) { return playBase64Wav(b64, onStart); });
+      }).catch(function () { return webSpeak(text, lang, onStart); });
     }
-    return webSpeak(text, lang);
+    return webSpeak(text, lang, onStart);
   }
 
   function stop() {

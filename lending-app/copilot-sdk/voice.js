@@ -121,9 +121,24 @@
 
   /* ---------- recording with silence endpointing ---------- */
 
+  var recording = false;
+
+  // Make sure any of Arya's own speech is fully stopped before we open the mic,
+  // so the recording can't capture the TTS tail (the "dual voice" echo).
+  function stopPlayback() {
+    if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+    if (global.speechSynthesis) { try { global.speechSynthesis.cancel(); } catch (e) {} }
+  }
+
   function recordUntilSilence(maxMs, silenceMs) {
     maxMs = maxMs || 12000; silenceMs = silenceMs || 1300;
-    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+    if (recording) return Promise.resolve(new Blob([], { type: 'audio/webm' })); // guard against overlap
+    recording = true;
+    stopPlayback();
+    // Browser echo cancellation + noise suppression so the mic doesn't pick up
+    // the phone speaker (Arya's voice) alongside the customer.
+    var constraints = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } };
+    return navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
       activeStream = stream;
       startAmpFromStream(stream);
       var chunks = [];
@@ -150,8 +165,13 @@
         stopAmp();
         stream.getTracks().forEach(function (t) { t.stop(); });
         activeStream = null;
+        recording = false;
         return new Blob(chunks, { type: (chunks[0] && chunks[0].type) || 'audio/webm' });
       });
+    }).catch(function (e) {
+      recording = false;
+      stopAmp();
+      throw e;
     });
   }
 

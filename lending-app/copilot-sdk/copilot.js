@@ -413,10 +413,13 @@
       this.inputEl.focus();
       return;
     }
+    if (this._listening || this.phase === 'listening') return; // no overlapping captures
     var self = this;
+    this._listening = true;
     this._callConnected = true; // the call is now active; timer runs
     this._setPhase('listening');
     this.voice.listen().then(function (res) {
+      self._listening = false;
       if (!self.open && !self._inCall) { self._setPhase('idle'); return; }
       res = res || {};
       var english = (res.text || '').trim();     // for the NLU
@@ -432,7 +435,7 @@
         self.root.classList.add('lc-thinking');
         setTimeout(function () { if (self.phase === 'idle') self.root.classList.remove('lc-thinking'); }, 1800);
       }
-    }).catch(function () { self._setPhase('idle'); });
+    }).catch(function () { self._listening = false; self._setPhase('idle'); });
   };
 
   Copilot.prototype._micTap = function () {
@@ -790,11 +793,20 @@
       if (res.intents.indexOf('deny') !== -1) { this.awaitingSubmit = false; this.stage = 'application'; return P.changeWhat; }
     }
 
+    // Explicit "recommend / show options" at any time -> open the reco screen.
+    if ((res.intents.indexOf('recommend') !== -1 || res.intents.indexOf('eligibility') !== -1) &&
+        this._profile().loanType) {
+      this.stage = 'recommend';
+      this.awaitingProductPick = true;
+      this._offerProducts();
+      return gotIt + this._recommendText();
+    }
+
     // Recommend stage: waiting for a product choice.
     if (this.stage === 'recommend' && this.awaitingProductPick) {
       var picked = this._resolvePick(res);
       if (picked) return gotIt + this._pickProduct(picked);
-      if (filled.length) { this._renderProducts(); return gotIt + this._recommendText(); } // new info -> re-rank
+      if (filled.length) { this._offerProducts(); return gotIt + this._recommendText(); } // new info -> re-rank
       return this._recommendText(); // just re-ask, no duplicate cards
     }
 
@@ -805,7 +817,7 @@
       // discovery complete -> move to recommendations
       this.stage = 'recommend';
       this.awaitingProductPick = true;
-      this._renderProducts();
+      this._offerProducts();
       return gotIt + this._recommendText();
     }
 
@@ -1077,6 +1089,100 @@
     });
     this.chatEl.appendChild(wrap);
     this._scroll();
+  };
+
+  /* ---- native full-screen recommendation overlay (quotes-style) ---- */
+
+  Copilot.prototype._offerProducts = function () {
+    var recs = this.catalog.recommend(this._profile()).slice(0, 4);
+    this._recs = recs;
+    this._renderProducts();     // cards in the chat panel too
+    this._showRecoScreen(recs); // the native overlay screen
+  };
+
+  Copilot.prototype._recoLabels = function () {
+    if (this._uiLang() === 'hi') {
+      return { title: 'आपके लिए Best Loans', sub: 'Arya की सलाह — आपकी profile के हिसाब से',
+        eligible: 'Eligible amount', rate: 'ब्याज दर', emi: 'EMI', tenure: 'अवधि', month: '/महीना',
+        apply: 'Apply करें', talk: 'Arya से बात करें', best: 'Best Match', fast: 'तुरंत approval',
+        low: 'सबसे कम rate', yr: 'साल', perAnnum: '% सालाना', totalInt: 'कुल ब्याज', close: 'बंद करें' };
+    }
+    return { title: 'Recommended for you', sub: 'Arya’s picks based on your profile',
+      eligible: 'Eligible amount', rate: 'Interest rate', emi: 'EMI', tenure: 'Tenure', month: '/mo',
+      apply: 'Apply', talk: 'Talk to Arya', best: 'Best Match', fast: 'Fast approval',
+      low: 'Lowest rate', yr: 'yr', perAnnum: '% p.a.', totalInt: 'Total interest', close: 'Close' };
+  };
+
+  Copilot.prototype._showRecoScreen = function (recs) {
+    var self = this, C = this.catalog, L = this._recoLabels();
+    if (this._reco) this._reco.remove();
+    var reco = el('div', 'lc-reco');
+
+    // header
+    var head = '<div class="lc-reco-head">' +
+      '<button class="lc-reco-back" title="' + esc(L.close) + '">‹</button>' +
+      '<div><div class="lc-reco-title">' + esc(L.title) + '</div>' +
+      '<div class="lc-reco-sub">' + esc(L.sub) + '</div></div></div>';
+
+    // profile summary chips
+    var p = this._profile();
+    var chips = [];
+    if (p.loanType) { var lp = C.byId(p.loanType); if (lp) chips.push(lp.emoji + ' ' + lp.name); }
+    if (p.monthlyIncome) chips.push('💰 ' + C.inrShort(p.monthlyIncome) + L.month);
+    if (p.employment) chips.push('💼 ' + p.employment);
+    if (p.cibil) chips.push('📊 CIBIL ' + p.cibil);
+    var strip = '<div class="lc-reco-strip">' + chips.map(function (c) { return '<span class="lc-reco-chip">' + esc(c) + '</span>'; }).join('') + '</div>';
+
+    // cards
+    var cards = recs.map(function (r, i) {
+      var pr = r.product;
+      var tags = [];
+      if (i === 0) tags.push('<span class="lc-reco-tag lc-tag-best">' + esc(L.best) + '</span>');
+      if (!pr.secured) tags.push('<span class="lc-reco-tag lc-tag-fast">' + esc(L.fast) + '</span>');
+      var yrs = Math.round(r.tenureMonths / 12 * 10) / 10;
+      return '<div class="lc-reco-card' + (i === 0 ? ' lc-reco-top' : '') + '" data-idx="' + i + '">' +
+        '<div class="lc-reco-crow">' +
+          '<span class="lc-reco-emoji">' + pr.emoji + '</span>' +
+          '<div class="lc-reco-name">Setu ' + esc(pr.name) + '<div class="lc-reco-tags">' + tags.join('') + '</div></div>' +
+        '</div>' +
+        '<div class="lc-reco-grid">' +
+          '<div><span>' + esc(L.eligible) + '</span><b>' + C.inrShort(r.maxEligible) + '</b></div>' +
+          '<div><span>' + esc(L.rate) + '</span><b>' + r.rate.toFixed(2) + esc(L.perAnnum) + '</b></div>' +
+          '<div><span>' + esc(L.tenure) + '</span><b>' + yrs + ' ' + esc(L.yr) + '</b></div>' +
+        '</div>' +
+        '<div class="lc-reco-foot">' +
+          '<div class="lc-reco-emi"><span>' + esc(L.emi) + '</span><b>' + C.inr(r.emi) + '<i>' + esc(L.month) + '</i></b></div>' +
+          '<button class="lc-reco-apply" data-idx="' + i + '">' + esc(L.apply) + ' ›</button>' +
+        '</div>' +
+        '<div class="lc-reco-note">' + esc(pr.blurb) + '</div>' +
+      '</div>';
+    }).join('');
+
+    reco.innerHTML = head + strip + '<div class="lc-reco-list">' + cards + '</div>' +
+      '<div class="lc-reco-bar"><button class="lc-reco-talk">🎙️ ' + esc(L.talk) + '</button></div>';
+
+    reco.querySelector('.lc-reco-back').addEventListener('click', function () { self._hideRecoScreen(); });
+    reco.querySelector('.lc-reco-talk').addEventListener('click', function () {
+      self._hideRecoScreen();
+      if (self.voiceOn && self.voice) self._startListen();
+    });
+    reco.querySelectorAll('.lc-reco-apply').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.getAttribute('data-idx'), 10);
+        var r = recs[idx];
+        self._hideRecoScreen();
+        self._pickFromCard(r);
+      });
+    });
+
+    this.root.appendChild(reco);
+    this._reco = reco;
+    this.root.classList.add('lc-reco-open');
+  };
+
+  Copilot.prototype._hideRecoScreen = function () {
+    this.root.classList.remove('lc-reco-open');
+    if (this._reco) { this._reco.remove(); this._reco = null; }
   };
 
   // One-tap apply from a product card -> move into the application stage.

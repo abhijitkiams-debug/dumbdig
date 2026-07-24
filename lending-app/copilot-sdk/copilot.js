@@ -192,6 +192,9 @@
     this.callMuteBtn = callbar.querySelector('.lc-call-mute');
     callbar.querySelector('.lc-orb-lg').addEventListener('click', function () { self.toggle(true); });
     callbar.querySelector('.lc-call-kb').addEventListener('click', function () { self.toggle(true); });
+    this.callCap.style.cursor = 'pointer';
+    this.callCap.title = 'Voice settings';
+    this.callCap.addEventListener('click', function () { self._openSettings(); });
     callbar.querySelector('.lc-call-end').addEventListener('click', function () { self.endCall(); });
     this.callMuteBtn.addEventListener('click', function () { self._callMuteTap(); });
     this.callLangBtn.addEventListener('click', function () { self._cycleLang(); });
@@ -418,9 +421,19 @@
     this._startCallTimer();
     this._setPhase('idle');            // shows the welcome hint caption
     var self = this;
+    // If there's no key AND no browser speech, tell the user how to enable voice.
+    if (!this.voice.hasKey() && !this.voice.canListen()) {
+      this.callCap.textContent = '🔊 Tap here to enable voice';
+    }
     this._welcomeDone = false;
     var greet = function () {
       self._speak(self._welcomeSpeech(), function () { self._welcomeDone = true; });
+      // surface a voice error a moment later if nothing played
+      setTimeout(function () {
+        if (!self._welcomeDone && self.callCap && self.voice.getLastError()) {
+          self.callCap.textContent = '🔊 Tap to fix voice';
+        }
+      }, 2500);
     };
     greet(); // best effort — plays now if the browser allows autoplay
     // Browsers block audio until a gesture: greet on the very first interaction
@@ -556,24 +569,41 @@
           '<option value="gu-IN">Gujarati</option>' +
         '</select>' +
         '<div class="lc-modal-note">Stored only in this browser. Without a key, voice uses your browser\'s built-in speech.</div>' +
-        '<div class="lc-modal-row"><button class="lc-btn lc-btn-ghost lc-cancel">Cancel</button>' +
+        '<div class="lc-modal-row"><button class="lc-btn lc-btn-ghost lc-test">🔊 Test voice</button>' +
         '<button class="lc-btn lc-btn-primary lc-save">Save</button></div>' +
+        '<div class="lc-test-result"></div>' +
+        '<div class="lc-modal-row" style="margin-top:8px"><button class="lc-btn lc-btn-ghost lc-cancel" style="flex:1">Close</button></div>' +
       '</div>';
     this.root.appendChild(back);
     var keyIn = back.querySelector('.lc-k');
     var langIn = back.querySelector('.lc-lang');
     keyIn.value = this.voice.getKey();
     langIn.value = this.convLang || 'en-IN';
+    var resultEl = back.querySelector('.lc-test-result');
     var close = function () { back.remove(); };
     back.addEventListener('click', function (e) { if (e.target === back) close(); });
     back.querySelector('.lc-cancel').addEventListener('click', close);
-    back.querySelector('.lc-save').addEventListener('click', function () {
+    var applySettings = function () {
       self.voice.setKey(keyIn.value);
       self.voice.setLang(langIn.value);
       self.convLang = langIn.value;
       self.voiceOn = self.voice.isSupported();
       self._reflectVoiceBtn();
-      close();
+    };
+    back.querySelector('.lc-save').addEventListener('click', function () { applySettings(); close(); });
+    back.querySelector('.lc-test').addEventListener('click', function () {
+      applySettings();
+      resultEl.textContent = 'Testing… (make sure your volume is up)';
+      resultEl.className = 'lc-test-result';
+      self.voice.test().then(function (r) {
+        if (r.ok) {
+          resultEl.textContent = '✓ Voice is working (' + r.provider + '). You should have heard it.';
+          resultEl.className = 'lc-test-result lc-ok';
+        } else {
+          resultEl.textContent = '✕ ' + (r.error || 'No audio.');
+          resultEl.className = 'lc-test-result lc-err';
+        }
+      });
     });
   };
 

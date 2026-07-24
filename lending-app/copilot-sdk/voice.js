@@ -18,6 +18,7 @@
   var LANG = 'en-IN';
   var SPEAKER = 'anushka';
 
+  var lastError = '';
   var analyser = null;
   var rafId = null;
   var currentAmp = 0;
@@ -257,23 +258,43 @@
     } catch (e) { return null; }
   }
 
+  // Chrome loads voices asynchronously; wait briefly so a voice is available.
+  function voicesReady() {
+    return new Promise(function (res) {
+      if (!global.speechSynthesis) return res();
+      var v = global.speechSynthesis.getVoices();
+      if (v && v.length) return res();
+      var done = false;
+      var finish = function () { if (done) return; done = true; res(); };
+      global.speechSynthesis.onvoiceschanged = finish;
+      setTimeout(finish, 600);
+    });
+  }
+
   function webSpeak(text, lang, onStart) {
     return new Promise(function (resolve) {
-      if (!global.speechSynthesis) { resolve(); return; }
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = bcp47(lang || LANG);
-      var v = pickVoice(u.lang); if (v) u.voice = v;
-      var done = false;
-      var finish = function () { if (done) return; done = true; resolve(); };
-      u.onstart = function () { if (onStart) { try { onStart(); } catch (e) {} } };
-      u.onend = finish;
-      u.onerror = finish;
-      // Safety net: some browsers never fire onend — resolve on an estimated cap.
-      var capMs = Math.min(20000, 1200 + text.length * 70);
-      setTimeout(finish, capMs);
-      try { global.speechSynthesis.cancel(); global.speechSynthesis.speak(u); }
-      catch (e) { finish(); }
+      if (!global.speechSynthesis) {
+        lastError = 'This browser has no speech engine and no Sarvam key.';
+        resolve(); return;
+      }
+      voicesReady().then(function () { doWebSpeak(text, lang, onStart, resolve); });
     });
+  }
+
+  function doWebSpeak(text, lang, onStart, resolve) {
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = bcp47(lang || LANG);
+    var v = pickVoice(u.lang); if (v) u.voice = v;
+    var done = false;
+    var finish = function () { if (done) return; done = true; resolve(); };
+    u.onstart = function () { if (onStart) { try { onStart(); } catch (e) {} } };
+    u.onend = finish;
+    u.onerror = finish;
+    // Safety net: some browsers never fire onend — resolve on an estimated cap.
+    var capMs = Math.min(20000, 1200 + text.length * 70);
+    setTimeout(finish, capMs);
+    try { global.speechSynthesis.cancel(); global.speechSynthesis.speak(u); }
+    catch (e) { finish(); }
   }
 
   /* ---------- public API ---------- */
@@ -308,13 +329,22 @@
   function speak(text, lang, onStart) {
     if (!text) return Promise.resolve();
     lang = lang || LANG;
+    var started = false;
+    var wrap = function () { started = true; if (onStart) { try { onStart(); } catch (e) {} } };
     if (getKey()) {
       var prep = isEnglish(lang) ? Promise.resolve(text) : translate(text, 'en-IN', lang);
       return prep.then(function (out) {
-        return sarvamSynthesize(out, lang).then(function (b64) { return playBase64Wav(b64, onStart); });
-      }).catch(function () { return webSpeak(text, lang, onStart); });
+        return sarvamSynthesize(out, lang).then(function (b64) { return playBase64Wav(b64, wrap); });
+      }).then(function () {
+        if (!started) lastError = 'Sarvam returned audio but the browser did not play it (autoplay / audio output).';
+        else lastError = '';
+      }).catch(function (err) {
+        lastError = 'Sarvam TTS failed: ' + (err && err.message ? err.message : err) + ' — using browser voice.';
+        return webSpeak(text, lang, wrap);
+      });
     }
-    return webSpeak(text, lang, onStart);
+    lastError = 'No Sarvam API key set — using the browser voice (tap ⚙ to add your key).';
+    return webSpeak(text, lang, wrap);
   }
 
   function stop() {
@@ -338,6 +368,16 @@
     setLang: setLang,
     getLang: function () { return LANG; },
     setSpeaker: setSpeaker,
-    translate: translate
+    translate: translate,
+    getLastError: function () { return lastError; },
+    // Speaks a short phrase and resolves with a diagnostic result.
+    test: function () {
+      var startedAt = false;
+      return speak('Namaste! This is a voice test from Saathi.', LANG, function () { startedAt = true; })
+        .then(function () {
+          if (startedAt) return { ok: true, provider: getKey() ? 'Sarvam' : 'browser' };
+          return { ok: false, error: lastError || 'No audio was produced.' };
+        });
+    }
   };
 })(typeof window !== 'undefined' ? window : this);

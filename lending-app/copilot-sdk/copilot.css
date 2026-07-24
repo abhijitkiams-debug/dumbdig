@@ -313,6 +313,9 @@
 .lc-modal-note { font-size: 11px; color: var(--lc-sub); margin: 10px 0 14px; line-height: 1.4; }
 .lc-modal-row { display: flex; gap: 8px; }
 .lc-modal-row .lc-btn { flex: 1; min-height: 44px; }
+.lc-test-result { font-size: 12px; margin-top: 10px; line-height: 1.4; color: var(--lc-sub); min-height: 16px; }
+.lc-test-result.lc-ok { color: #16a34a; }
+.lc-test-result.lc-err { color: #dc2626; }
 
 @media (max-width: 640px) {
   .lc-panel {

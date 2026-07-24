@@ -15,6 +15,7 @@
 <body>
   <!-- ===== HOST APP: the client's own UI (copilot never modifies this) ===== -->
   <header class="app-bar">
+    <button class="app-back" id="app-back" hidden>‹</button>
     <div class="logo">🪷</div>
     <div>
       <h1>Setu Finance</h1>
@@ -24,48 +25,12 @@
     <div class="rbi">RBI-registered NBFC · Demo</div>
   </header>
 
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-cta">
-        <span class="pill">⚡ Instant in-principle approval</span>
-        <h2>Apply for a loan in minutes</h2>
-        <p>Fill the form yourself — or tap the assistant at the bottom-right and just
-          <em>tell it what you need</em>. It fills the form, checks eligibility and finds your best product.</p>
-      </div>
-      <div class="stats">
-        <div><b>7</b><span>loan types</span></div>
-        <div><b>8.4%</b><span>rates from</span></div>
-        <div><b>&lt;5 min</b><span>to apply</span></div>
-      </div>
-    </div>
-  </section>
-
-  <main class="wrap">
-    <div class="card">
-      <form id="loan-form" autocomplete="off"><!-- fields injected by host-app.js --></form>
-
-      <div class="assist-hint">
-        <span>💬</span>
-        <span>Prefer to chat? Open <b>Saathi</b>, your lending assistant (bottom-right), and say something like
-          <em>“I want a ₹5 lakh personal loan, I earn 60k a month, I'm salaried”</em>.</span>
-      </div>
-
-      <div class="actions">
-        <button type="button" id="submit-btn" class="btn btn-primary">Submit application</button>
-        <button type="button" id="reset-btn" class="btn btn-ghost">Clear</button>
-        <span class="note">Your data stays in your browser — this is a demo, nothing is sent anywhere.</span>
-      </div>
-    </div>
-  </main>
-
-  <footer>
-    Setu Finance is a fictional demo app. Rates, products and eligibility logic are illustrative only.
-  </footer>
+  <!-- Screens (browse + apply) are rendered here by host-app.js -->
+  <main id="app"></main>
 
   <div id="toast" class="toast"></div>
 
-  <!-- Optional local voice config (git-ignored, never committed). No-op if absent.
-       Alternatively, paste your key in the assistant's ⚙ settings on any device. -->
+  <!-- Optional local voice config (git-ignored, never committed). No-op if absent. -->
   <script>
     (function () {
       var s = document.createElement('script');

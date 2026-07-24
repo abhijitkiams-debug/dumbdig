@@ -49,6 +49,7 @@
         loanType: 'आपको कौन सा loan चाहिए — personal, home, gold, business, car, two-wheeler या education?',
         monthlyIncome: 'आपकी monthly income कितनी है? जैसे, साठ हज़ार रुपये महीना।',
         employment: 'आप salaried हैं, self-employed, या business owner?',
+        cibil: 'आपका CIBIL score कितना है? इससे आपका interest rate तय होता है। अगर पता नहीं, तो "skip" बोलिए।',
         amount: 'आपको कितने का loan चाहिए? जैसे, पाँच लाख।',
         fullName: 'आपका पूरा नाम क्या है, PAN card के अनुसार?',
         mobile: 'आपका दस अंकों का mobile number बताइए।',
@@ -63,6 +64,7 @@
         return name + ' आपके लिए सबसे अच्छा है — ' + amt + ' तक, ' + rate + ' percent पर, EMI लगभग ' + emi + ' महीना। क्या मैं इसके लिए आपकी application शुरू करूँ? हाँ बोलिए।';
       },
       afterPick: function (name) { return 'बढ़िया! मैंने आपको ' + name + ' के लिए select कर लिया। अब बस कुछ details चाहिए। '; },
+      pickedIntro: function (name) { return 'बढ़िया choice! ' + name + ' के लिए, आपका best rate जानने के लिए मुझे थोड़ी जानकारी चाहिए। आपकी monthly income कितनी है?'; },
       submitAsk: 'बस हो गया! क्या मैं आपकी application submit कर दूँ? हाँ बोलिए।',
       submitted: function (ref) { return 'हो गया! आपकी application submit हो गई। Reference ' + ref + '। एक credit officer आपको जल्दी call करेगा। Setu Finance चुनने के लिए धन्यवाद!'; },
       didntCatch: 'माफ़ कीजिए, समझ नहीं आया। दोबारा बोलिए या नीचे type कीजिए।',
@@ -80,6 +82,7 @@
         loanType: 'Which loan are you after — personal, home, gold, business, car, two-wheeler or education?',
         monthlyIncome: 'What\'s your monthly income? (say “60k a month” or “12 LPA”)',
         employment: 'Are you salaried, self-employed or a business owner?',
+        cibil: 'What\'s your CIBIL score? It decides your interest rate. If you don\'t know, just say “skip”.',
         amount: 'How much would you like to borrow? (e.g. “5 lakh”)',
         fullName: 'What\'s your full name as per PAN?',
         mobile: 'What\'s your 10-digit mobile number?',
@@ -94,6 +97,7 @@
         return 'A ' + name + ' looks best for you — up to ' + amt + ' at ' + rate + ' percent, EMI around ' + emi + ' a month. Shall I start your application for it? Say yes.';
       },
       afterPick: function (name) { return 'Great choice! I\'ve set you up for a ' + name + '. Now I just need a few details. '; },
+      pickedIntro: function (name) { return 'Great choice! For a ' + name + ', I need a few details to get your best rate. What\'s your monthly income?'; },
       submitAsk: 'That\'s everything! Shall I submit your application now? Say yes.',
       submitted: function (ref) { return 'Done! Your application is submitted. Reference ' + ref + '. A credit officer will call you shortly. Thank you for choosing Setu Finance!'; },
       didntCatch: 'Sorry, I didn\'t catch that. Please say it again or type below.',
@@ -133,6 +137,7 @@
     this.stage = 'discovery'; // discovery -> recommend -> application
     this.awaitingProductPick = false;
     this.awaitingSubmit = false;
+    this._cibilAsked = false;
     if (this.voice) this.voice.setLang(this.convLang);
 
     this._build();
@@ -495,58 +500,34 @@
     return this._uiLang() === 'hi' ? '🎙 बोलिए · ⌨ type कीजिए' : 'Tap 🎙 to talk · ⌨ to type';
   };
 
-  // Auto-welcome on landing: show the call bar and greet by voice. Browsers block
-  // audio until the first user gesture, so we (a) try to autoplay immediately for
-  // browsers that allow it, and (b) put a transparent "Tap to start" catcher over
-  // the screen so the very first tap reliably starts Arya (and can't be swallowed
-  // by a control button). Once started, it greets and then listens.
+  // On landing we show the loan-listing (browse) screen — NOT a blocking call
+  // overlay. We prime audio on the first interaction and try a soft autoplay
+  // greeting; if the browser allows it, Arya promotes herself to a live call.
+  // Otherwise the customer starts her explicitly via "Talk to Arya" / a loan card.
   Copilot.prototype._welcome = function () {
-    if (this._inCall) return;
-    this._inCall = true;
-    this._firstOpen = false;
-    this._callConnected = false;
-    this._audioObserved = false;
-    this.voiceOn = true;
-    this._reflectVoiceBtn();
-    this.root.classList.add('lc-incall');
-    this._callStart = Date.now();
-    this._startCallTimer();
-    this._setPhase('idle');
     var self = this;
-    this._started = false;
-
-    var hint = this._uiLang() === 'hi' ? 'शुरू करने के लिए tap करें' : 'Tap to start';
-    if (this.callCap) this.callCap.textContent = '🔊 ' + hint;
-
-    var begin = function () {
-      if (self._started || !self._inCall) return;
-      // Unlock audio SYNCHRONOUSLY within this tap (required by iOS Safari).
+    // Unlock audio on the first user interaction anywhere (non-blocking).
+    var unlock = function () {
       if (self.voice && self.voice.unlockAudio) self.voice.unlockAudio();
-      self._started = true;
-      if (self._startCatch) { self._startCatch.remove(); self._startCatch = null; }
-      if (self.voice) self.voice.stop();
-      var heard = false;
-      self._speak(self._welcomeSpeech(), function () { heard = true; }).then(function () {
-        if (!heard) { self._voiceTrouble(); return; } // greeting produced no sound — surface why
-        if (self._inCall && self.voiceOn) self._startListen();
-      });
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('touchstart', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
     };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('touchstart', unlock, true);
+    document.addEventListener('keydown', unlock, true);
 
-    // Transparent full-screen catcher: guarantees the first tap starts Arya.
-    var catcher = el('div', 'lc-startcatch',
-      '<div class="lc-startcatch-pill">🔊 ' + esc(hint) + '</div>');
-    catcher.addEventListener('click', begin);
-    catcher.addEventListener('touchstart', function (e) { if (e.cancelable) e.preventDefault(); begin(); }, { passive: false });
-    this.root.appendChild(catcher);
-    this._startCatch = catcher;
-
-    // Best-effort autoplay for browsers/contexts that allow it (returning users,
-    // PWAs). If it actually starts, drop the catcher and go straight to listening.
+    // Best-effort autoplay greeting (returning users / PWAs). If audio actually
+    // starts, open the call bar and begin listening; if blocked, stay silent and
+    // let the browse-screen CTAs start the voice.
     this._speak(this._welcomeSpeech(), function () {
-      self._started = true;
-      if (self._startCatch) { self._startCatch.remove(); self._startCatch = null; }
+      if (!self._inCall) {
+        self._inCall = true; self._firstOpen = false; self.voiceOn = true; self._reflectVoiceBtn();
+        self.root.classList.add('lc-incall'); self._callStart = Date.now();
+        self._callConnected = true; self._startCallTimer();
+      }
     }).then(function () {
-      if (self._started && self._inCall && self.voiceOn) self._startListen();
+      if (self._inCall && self.voiceOn) self._startListen();
     });
   };
 
@@ -834,7 +815,11 @@
     // Discovery stage: ask the couple of questions.
     if (this.stage === 'discovery') {
       var nextD = this._nextBestField();
-      if (nextD) { this.pendingField = nextD; return gotIt + P.ask[nextD.id]; }
+      if (nextD) {
+        if (nextD.id === 'cibil') this._cibilAsked = true; // ask CIBIL exactly once
+        this.pendingField = nextD;
+        return gotIt + P.ask[nextD.id];
+      }
       // discovery complete -> move to recommendations
       this.stage = 'recommend';
       this.awaitingProductPick = true;
@@ -949,15 +934,20 @@
 
   // Next question to ask — scoped to the current stage so discovery only asks
   // the couple of qualifying questions before recommending products.
-  var DISCOVERY_ORDER = ['loanType', 'monthlyIncome', 'employment'];
+  // Discovery includes CIBIL (optional but rate-defining) — asked once.
+  var DISCOVERY_ORDER = ['loanType', 'monthlyIncome', 'employment', 'cibil'];
   var APPLICATION_ORDER = ['amount', 'fullName', 'mobile', 'age', 'pan', 'city', 'consent'];
   Copilot.prototype._nextBestField = function () {
     var order = this.stage === 'discovery' ? DISCOVERY_ORDER : APPLICATION_ORDER;
-    var st = this._status();
-    var missingIds = {};
-    st.missing.forEach(function (f) { missingIds[f.id] = f; });
     for (var i = 0; i < order.length; i++) {
-      if (missingIds[order[i]]) return missingIds[order[i]];
+      var id = order[i];
+      var f = this.schemaById[id];
+      if (!f) continue;
+      var v = this.adapter.getValue(id);
+      var empty = v == null || String(v).trim() === '';
+      if (!empty) continue;
+      if (id === 'cibil' && this._cibilAsked) continue; // optional — ask only once
+      return f;
     }
     return null;
   };
@@ -1230,11 +1220,38 @@
     this.stage = 'application';
     this.awaitingProductPick = false;
     this._refreshStatus();
+    // Take the user from the browse/reco screen to the application form.
+    if (this.adapter.showApplication) this.adapter.showApplication();
     var P = this._P();
     var next = this._nextBestField();
     if (next) { this.pendingField = next; return P.afterPick(r.product.name) + P.ask[next.id]; }
     this.awaitingSubmit = true;
     return P.afterPick(r.product.name) + P.submitAsk;
+  };
+
+  // Called by the host when a loan card is tapped on the browse screen: set the
+  // loan type and start the voice flow straight at the requirement questions.
+  Copilot.prototype.startFromBrowse = function (productId) {
+    this.adapter.setValue('loanType', productId);
+    this.stage = 'discovery';
+    var name = (this.catalog.byId(productId) || {}).name || '';
+    if (!this.voice || !this.voice.isSupported()) { this.toggle(true); return; }
+    if (this.voice.unlockAudio) this.voice.unlockAudio();
+    if (!this._inCall) {
+      this._inCall = true; this._firstOpen = false; this.voiceOn = true; this._reflectVoiceBtn();
+      this.root.classList.add('lc-incall'); this._callStart = Date.now(); this._startCallTimer();
+    }
+    this._started = true;
+    if (this._startCatch) { this._startCatch.remove(); this._startCatch = null; }
+    if (this.voice) this.voice.stop();
+    this.pendingField = this.schemaById['monthlyIncome'];
+    var self = this;
+    var intro = this._t('pickedIntro', name);
+    this._collecting = true; this._speakBuffer = '';
+    this._say(intro);
+    this._collecting = false;
+    var toSpeak = this._speakBuffer.trim(); this._speakBuffer = '';
+    this._speak(toSpeak).then(function () { if (self._inCall && self.voiceOn) self._startListen(); });
   };
 
   Copilot.prototype._renderEmi = function () {

@@ -7,10 +7,19 @@ in-app voice assistant (**"Arya"**) that talks to the customer in **Hinglish**,
 **fills the application form** and drives it to submission, all while rendering
 its own native UI **without touching the host app's UI**.
 
-**Conversation flow:** greet → 2–3 discovery questions (loan purpose, income,
-employment) → **product suggestions** (one-tap apply) → application details →
-submit. Arya defaults to **Hindi/Hinglish** and **sticks to one language** unless
-the customer explicitly asks to switch (e.g. says "English").
+**Platform flow (like a real lender):**
+1. **Browse** — the app opens on a **loan listing** (7 products with indicative
+   "from X% p.a." rates), not the application form.
+2. **Capture requirement** — the customer taps a loan or "Talk to Arya"; she asks
+   loan type, income, employment and **CIBIL score** (CIBIL decides the interest
+   rate — higher score, lower rate).
+3. **Recommend** — a native full-screen recommendation screen shows ranked
+   products with the customer's **personalised rate & EMI** and one-tap apply.
+4. **Apply** — only after a product is chosen does the **application form** open,
+   pre-filled, to finish and submit.
+
+Arya defaults to **Hindi/Hinglish** and **sticks to one language** unless the
+customer explicitly asks to switch (e.g. says "English").
 
 No build step, no dependencies. Open `index.html` and it runs. It is
 **mobile-first responsive** and **voice-enabled** (talk to the assistant, it

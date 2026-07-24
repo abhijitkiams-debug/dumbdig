@@ -29,14 +29,22 @@
 
   /* ---------- key + config ---------- */
 
+  function clean(k) { return (k || '').replace(/\s+/g, ''); } // strip ALL whitespace/newlines
   function getKey() {
     try {
-      var k = localStorage.getItem('sarvamKey');
-      if (k && k.trim()) return k.trim();
+      var k = clean(localStorage.getItem('sarvamKey'));
+      if (k) return k;
     } catch (e) {}
-    return (global.SARVAM_API_KEY || '').trim();
+    return clean(global.SARVAM_API_KEY);
   }
-  function setKey(k) { try { localStorage.setItem('sarvamKey', (k || '').trim()); } catch (e) {} }
+  function setKey(k) { try { localStorage.setItem('sarvamKey', clean(k)); } catch (e) {} }
+  function clearKey() { try { localStorage.removeItem('sarvamKey'); } catch (e) {} }
+  // Where the active key comes from — helps the user debug a wrong saved key.
+  function keySource() {
+    try { if (clean(localStorage.getItem('sarvamKey'))) return 'saved in this browser'; } catch (e) {}
+    if (clean(global.SARVAM_API_KEY)) return 'voice-config.local.js';
+    return 'none';
+  }
   function setLang(l) { LANG = l || 'en-IN'; }
   function setSpeaker(s) { SPEAKER = s || 'anushka'; }
 
@@ -205,11 +213,15 @@
         model: 'bulbul:v2'
       })
     }).then(function (r) {
-      if (!r.ok) throw new Error('TTS ' + r.status);
+      if (!r.ok) {
+        throw new Error(r.status === 403
+          ? 'API key rejected (403). Open ⚙ settings and re-enter your Sarvam key.'
+          : (r.status === 429 ? 'Rate limit hit (429). Wait a moment and retry.' : 'TTS error ' + r.status));
+      }
       return r.json();
     }).then(function (j) {
       var b64 = j.audios && j.audios[0];
-      if (!b64) throw new Error('TTS empty');
+      if (!b64) throw new Error('TTS returned no audio');
       return b64;
     });
   }
@@ -365,6 +377,8 @@
     hasKey: function () { return !!getKey(); },
     setKey: setKey,
     getKey: getKey,
+    clearKey: clearKey,
+    keySource: keySource,
     setLang: setLang,
     getLang: function () { return LANG; },
     setSpeaker: setSpeaker,

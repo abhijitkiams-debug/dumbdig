@@ -555,8 +555,10 @@
     back.innerHTML =
       '<div class="lc-modal">' +
         '<div class="lc-modal-t">Voice settings</div>' +
-        '<label class="lc-modal-l">Sarvam API key (optional — enables Sarvam STT/TTS)</label>' +
-        '<input class="lc-modal-in lc-k" type="password" placeholder="sk_…" />' +
+        '<label class="lc-modal-l">Sarvam API key (enables Sarvam STT/TTS)</label>' +
+        '<input class="lc-modal-in lc-k" type="text" spellcheck="false" autocapitalize="off" placeholder="sk_…" />' +
+        '<div class="lc-key-src"></div>' +
+        '<div class="lc-modal-row" style="margin-top:8px"><button class="lc-btn lc-btn-ghost lc-clear" style="flex:1">Clear saved key</button></div>' +
         '<label class="lc-modal-l">Language</label>' +
         '<select class="lc-modal-in lc-lang">' +
           '<option value="en-IN">English (India)</option>' +
@@ -580,6 +582,20 @@
     keyIn.value = this.voice.getKey();
     langIn.value = this.convLang || 'en-IN';
     var resultEl = back.querySelector('.lc-test-result');
+    var srcEl = back.querySelector('.lc-key-src');
+    var refreshSrc = function () {
+      var src = self.voice.keySource();
+      var k = self.voice.getKey();
+      srcEl.textContent = 'Active key: ' + (k ? (k.slice(0, 6) + '…' + k.slice(-3) + '  (' + src + ')') : 'none set');
+    };
+    refreshSrc();
+    back.querySelector('.lc-clear').addEventListener('click', function () {
+      self.voice.clearKey();
+      keyIn.value = self.voice.getKey(); // falls back to voice-config.local.js if present
+      refreshSrc();
+      resultEl.textContent = 'Cleared the browser-saved key.';
+      resultEl.className = 'lc-test-result';
+    });
     var close = function () { back.remove(); };
     back.addEventListener('click', function (e) { if (e.target === back) close(); });
     back.querySelector('.lc-cancel').addEventListener('click', close);
@@ -593,6 +609,7 @@
     back.querySelector('.lc-save').addEventListener('click', function () { applySettings(); close(); });
     back.querySelector('.lc-test').addEventListener('click', function () {
       applySettings();
+      refreshSrc();
       resultEl.textContent = 'Testing… (make sure your volume is up)';
       resultEl.className = 'lc-test-result';
       self.voice.test().then(function (r) {

@@ -42,6 +42,7 @@
   var rafId = null;
   var currentAmp = 0;
   var activeStream = null;
+  var lastHeardSpeech = false; // did the last capture actually pick up any voice?
   var recognition = null;
   var currentAudio = null;
   var ampCtx = null;
@@ -153,6 +154,18 @@
   function recordUntilSilence(maxMs, silenceMs) {
     maxMs = maxMs || 12000; silenceMs = silenceMs || 1300;
     if (recording) return Promise.resolve(new Blob([], { type: 'audio/webm' })); // guard against overlap
+    // Microphone capture needs a secure context (https or localhost). Opening the
+    // app over plain http on a phone (e.g. http://192.168.x.x) leaves
+    // navigator.mediaDevices undefined and STT silently dies — surface it clearly.
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      var insecure = location.protocol !== 'https:' &&
+        location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+      lastError = insecure
+        ? 'Microphone needs a secure page. Open the app over https (or on localhost).'
+        : 'This browser blocked microphone access.';
+      return Promise.reject(new Error(lastError));
+    }
+    lastHeardSpeech = false;
     recording = true;
     stopPlayback();
     // Browser echo cancellation + noise suppression so the mic doesn't pick up
@@ -171,7 +184,7 @@
         var tick = function () {
           if (rec.state !== 'recording') { resolve(); return; }
           var now = performance.now();
-          if (currentAmp > 0.05) { speech = true; lastVoice = now; }
+          if (currentAmp > 0.05) { speech = true; lastHeardSpeech = true; lastVoice = now; }
           if (now - started > maxMs || (speech && now - lastVoice > silenceMs)) {
             try { rec.stop(); } catch (e) {}
             resolve(); return;
@@ -367,17 +380,32 @@
       return recordUntilSilence().then(blobToWav).then(sarvamTranscribe).then(function (res) {
         var spoken = res.transcript;
         var lang = res.lang || LANG;
-        if (!spoken) return { display: '', text: '', lang: lang };
+        if (!spoken) {
+          // Empty transcript: distinguish "heard nothing" (silence) from a genuine
+          // failure so the caller can auto-retry instead of looking broken.
+          lastError = lastHeardSpeech ? '' : 'I didn\'t hear anything — please speak after Arya finishes.';
+          return { display: '', text: '', lang: lang, empty: true, heard: lastHeardSpeech };
+        }
+        lastError = '';
         if (isEnglish(lang)) return { display: spoken, text: spoken, lang: 'en-IN' };
         return translate(spoken, lang, 'en-IN').then(function (en) {
           return { display: spoken, text: en, lang: lang };
         });
-      }).catch(function () {
-        stopAmp();
-        return webSpeechListen().then(function (t) { return { display: t, text: t, lang: LANG }; });
+      }).catch(function (err) {
+        // Capture/decode/STT failed. Prefer the browser recogniser if present,
+        // otherwise report a clear reason rather than failing silently.
+        stopAmp(); recording = false;
+        if (!lastError) lastError = 'Speech capture failed: ' + (err && err.message ? err.message : err);
+        if (hasWebSpeechSTT()) {
+          return webSpeechListen().then(function (t) {
+            if (t) lastError = '';
+            return { display: t || '', text: t || '', lang: LANG, empty: !t };
+          });
+        }
+        return { display: '', text: '', lang: LANG, error: true };
       });
     }
-    return webSpeechListen().then(function (t) { return { display: t, text: t, lang: LANG }; });
+    return webSpeechListen().then(function (t) { return { display: t || '', text: t || '', lang: LANG, empty: !t }; });
   }
 
   // Speak English `text`, but voiced in `lang` (translating first if needed).
@@ -431,6 +459,10 @@
     translate: translate,
     getLastError: function () { return lastError; },
     unlockAudio: unlockAudio,
+    // Exposed for diagnostics/tests: run a recorded blob through the exact
+    // encoder the STT path uses (decode -> 16 kHz mono PCM16 WAV).
+    encodeWav: blobToWav,
+    transcribe: sarvamTranscribe,
     // Speaks a short phrase and resolves with a diagnostic result.
     test: function () {
       var startedAt = false;

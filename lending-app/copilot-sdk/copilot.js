@@ -144,8 +144,14 @@
 
     this._build();
     this._greet();
-    // Keep the progress ring live if the user edits the client form directly.
-    if (this.adapter.onChange) this.adapter.onChange(function () { self._refreshStatus(); });
+    // Keep the progress ring live if the user edits the client form directly,
+    // and — when the user answers the very field Arya is waiting on by typing or
+    // picking from the dropdown — accept it and move the conversation forward.
+    if (this.adapter.onChange) this.adapter.onChange(function (id) {
+      self._refreshStatus();
+      if (self._selfWrite) return; // ignore the copilot's own writes
+      self._onHostEdit(id);
+    });
 
     // Welcome the user by voice as soon as they land.
     if (this.autostart && this.voice && this.voice.isSupported()) {
@@ -439,11 +445,29 @@
       // NOTE: we do NOT switch convLang to the detected language — Arya sticks to
       // one language (default Hindi) unless the customer explicitly asks to change.
       if (english) {
+        self._emptyListens = 0;
         self._setPhase('thinking');
         self._turn(english, true, shown);
       } else {
+        var lastErr = (self.voice.getLastError && self.voice.getLastError()) || '';
+        // A hard error (mic blocked / insecure page) is not worth retrying — show it.
+        var hardError = res.error || /secure|blocked|denied|permission/i.test(lastErr);
+        if (self._inCall && !hardError) {
+          // Silence or a brief miss: keep the call alive by listening again,
+          // instead of going dead and forcing a manual tap.
+          self._emptyListens = (self._emptyListens || 0) + 1;
+          if (self._emptyListens <= 2) {
+            self.voiceCap.textContent = 'Listening…';
+            self._setPhase('idle');
+            setTimeout(function () {
+              if (self._inCall && !self._listening && self.phase === 'idle') self._startListen();
+            }, 350);
+            return;
+          }
+        }
+        self._emptyListens = 0;
         self._setPhase('idle');
-        self.voiceCap.textContent = 'Didn\'t catch that — tap 🎙️ to retry';
+        self.voiceCap.textContent = hardError ? lastErr : 'Didn\'t catch that — tap 🎙️ to retry';
         self.root.classList.add('lc-thinking');
         setTimeout(function () { if (self.phase === 'idle') self.root.classList.remove('lc-thinking'); }, 1800);
       }
@@ -952,12 +976,47 @@
       if (!self.schemaById[fieldId]) return;
       if (!self._plausible(fieldId, entities[k])) return; // ignore implausible values
       var prev = self.adapter.getValue(fieldId);
-      self.adapter.setValue(fieldId, entities[k]);
+      self._write(fieldId, entities[k]);
       if (self.adapter.flashField) self.adapter.flashField(fieldId);
       filled.push({ id: fieldId, label: self.schemaById[fieldId].label, value: entities[k], prev: prev });
     });
     if (filled.length) this.lastFilled = filled;
     return filled;
+  };
+
+  // Resolve a free-text answer to one of a select field's option VALUES.
+  // Order of preference: (1) the NLU entity for that field (authoritative for
+  // employment/loanType — it understands "I run a shop" -> business, phrasing,
+  // synonyms); (2) exact value/label match; (3) the answer contains an option
+  // value/label or a distinctive label word ("professional" -> self-employed).
+  // Normalisation folds hyphens/spaces/case so "self employed", "Self-Employed"
+  // and "self-employed" all resolve to the same option.
+  Copilot.prototype._matchOption = function (f, raw) {
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    var v = norm(raw);
+    if (!v) return null;
+
+    // (1) Let the NLU decide for the smart fields it knows about.
+    if ((f.id === 'employment' || f.id === 'loanType') && this.nlu && this.nlu.parse) {
+      var ent = (this.nlu.parse(raw).entities || {})[f.id];
+      if (ent) {
+        for (var a = 0; a < f.options.length; a++) if (f.options[a].value === ent) return ent;
+      }
+    }
+
+    // (2) + (3) match against option values/labels.
+    for (var i = 0; i < f.options.length; i++) {
+      var o = f.options[i];
+      if (!o.value) continue; // skip the "Select…" placeholder
+      var ov = norm(o.value), ol = norm(o.label);
+      if (v === ov || v === ol) return o.value;                 // exact
+      if (ov && (v.indexOf(ov) !== -1 || ov.indexOf(v) !== -1)) return o.value; // contains
+      var words = ol.split(' ');
+      for (var w = 0; w < words.length; w++) {
+        if (words[w].length > 3 && v.indexOf(words[w]) !== -1) return o.value; // label word
+      }
+    }
+    return null;
   };
 
   // Interpret a bare answer for the field we just asked about.
@@ -970,11 +1029,8 @@
       if (!/^(yes|yeah|yep|sure|ok|okay|agree|i agree|accept|confirm|done|haan)\b/i.test(val)) return null;
       val = true;
     } else if (f.type === 'select' && f.options) {
-      var lower = val.toLowerCase();
-      var opt = f.options.find(function (o) {
-        return o.value && (o.value.toLowerCase() === lower || o.label.toLowerCase().indexOf(lower) !== -1);
-      });
-      if (opt) val = opt.value; else return null;
+      var matched = this._matchOption(f, val);
+      if (matched != null) val = matched; else return null;
     } else if (f.numeric) {
       var amt = this.nlu.parseAmount(text);
       var n = amt != null ? amt : parseFloat(val.replace(/[^\d.]/g, ''));
@@ -985,15 +1041,55 @@
       return null; // don't drop a stray question into a name/city field
     }
     var prev = this.adapter.getValue(f.id);
-    this.adapter.setValue(f.id, val);
+    this._write(f.id, val);
     if (this.adapter.flashField) this.adapter.flashField(f.id);
     this.lastFilled = [{ id: f.id, label: f.label, value: val, prev: prev }];
     this.pendingField = null;
     return { id: f.id, label: f.label, value: val, prev: prev };
   };
 
+  // The user edited the host form directly (typed a value or picked from a
+  // <select>). If it's the field Arya is currently waiting on, treat it as the
+  // answer: confirm it and advance — so a dropdown pick is accepted just like a
+  // spoken or typed reply, instead of Arya re-asking the same question.
+  Copilot.prototype._onHostEdit = function (id) {
+    if (!id || !this._inCall) return;
+    var f = this.schemaById[id];
+    if (!f) return;
+    if (!this.pendingField || this.pendingField.id !== id) return;
+    // Only auto-advance on a discrete, deliberate pick (dropdown / checkbox).
+    // Text & number inputs fire on every keystroke, so advancing on them would
+    // interrupt the user mid-typing — those are captured via the chat/voice.
+    if (f.type !== 'select' && f.type !== 'checkbox' && f.id !== 'consent') return;
+    var v = this.adapter.getValue(id);
+    if (v == null || String(v).trim() === '') return;
+    this.pendingField = null;
+    this._answeredPending = true;
+    var filled = [{ id: id, label: f.label, value: v }];
+    this.lastFilled = filled;
+    this._refreshStatus();
+    var reply = this._advance({ intents: [], entities: {}, text: '' }, filled);
+    if (reply) this._say(reply);
+    this._renderSuggestions();
+    this._renderChips();
+  };
+
+  // All copilot-initiated writes go through here so the host onChange handler
+  // can tell them apart from a user directly editing the form (dropdown/typing).
+  Copilot.prototype._write = function (id, val) {
+    this._selfWrite = true;
+    try { this.adapter.setValue(id, val); }
+    finally { this._selfWrite = false; }
+  };
+
   // Numeric plausibility so a mis-heard number never silently fills a field.
+  // Only numeric fields get bounds; text/select fields (employment, loanType,
+  // city, PAN…) are always "plausible" here — validated elsewhere. Previously
+  // this returned false for any non-numeric value, which silently dropped every
+  // employment/loanType answer that arrived through the NLU path.
+  var NUMERIC_FIELDS = { monthlyIncome: 1, amount: 1, age: 1, cibil: 1, existingEmi: 1 };
   Copilot.prototype._plausible = function (id, v) {
+    if (!NUMERIC_FIELDS[id]) return true; // non-numeric field: no numeric bound
     var n = parseFloat(String(v).replace(/[^\d.]/g, ''));
     if (isNaN(n)) return false;
     if (id === 'monthlyIncome') return n >= 3000 && n <= 5000000;
@@ -1108,7 +1204,7 @@
   Copilot.prototype._undo = function () {
     var self = this;
     (this.lastFilled || []).forEach(function (f) {
-      self.adapter.setValue(f.id, f.prev == null ? '' : f.prev);
+      self._write(f.id, f.prev == null ? '' : f.prev);
     });
     this.lastFilled = [];
     this._say('Reverted. What should it be instead?');
@@ -1290,14 +1386,14 @@
 
   // Set the chosen product, switch to application stage, return the next prompt.
   Copilot.prototype._pickProduct = function (r) {
-    this.adapter.setValue('loanType', r.productId);
+    this._write('loanType', r.productId);
     if (this.adapter.flashField) this.adapter.flashField('loanType');
     if (!this.adapter.getValue('amount') && r.maxEligible) {
-      this.adapter.setValue('amount', Math.min(r.maxEligible, r.product.maxAmount));
+      this._write('amount', Math.min(r.maxEligible, r.product.maxAmount));
       if (this.adapter.flashField) this.adapter.flashField('amount');
     }
     if (this.schemaById.tenure && !this.adapter.getValue('tenure')) {
-      this.adapter.setValue('tenure', r.tenureMonths);
+      this._write('tenure', r.tenureMonths);
     }
     this.stage = 'application';
     this.awaitingProductPick = false;
@@ -1314,7 +1410,7 @@
   // Called by the host when a loan card is tapped on the browse screen: set the
   // loan type and start the voice flow straight at the requirement questions.
   Copilot.prototype.startFromBrowse = function (productId) {
-    this.adapter.setValue('loanType', productId);
+    this._write('loanType', productId);
     this.stage = 'discovery';
     var name = (this.catalog.byId(productId) || {}).name || '';
     if (!this.voice || !this.voice.isSupported()) { this.toggle(true); return; }

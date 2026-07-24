@@ -263,6 +263,8 @@
     brand: { name: 'Arya', accent: '#4f46e5', language: 'hi-IN' },
     autostart: true
   });
+  // Expose the mounted copilot for debugging/automated tests (no behavioural effect).
+  window.LendCopilotInstance = copilot;
 
   /* ---------------- browse-screen actions ---------------- */
 

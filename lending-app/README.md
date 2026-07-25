@@ -67,8 +67,9 @@ The key is **never committed**. Two ways:
    git-ignored.
 
 > Voice STT and `speechSynthesis` need a secure context — serve over `https://`
-> or `http://localhost` (some browsers don't allow the mic on `file://`). A
-> quick local server: `python3 -m http.server` inside `lending-app/`.
+> or `http://localhost` (browsers block the mic on `file://` and on plain-`http`
+> LAN addresses). Start the local server with **`./run.sh`** (see below) — don't
+> use `python3 -m http.server`, which lets the browser cache a stale JS bundle.
 
 ```
 lending-app/
@@ -85,19 +86,37 @@ lending-app/
 
 ## Run it
 
-Just open the file in a browser:
+Use the run script — it serves the app with **no-store cache headers**, so the
+browser always loads the current build (plain `python3 -m http.server` lets a
+device keep running an old cached bundle, which looks like "the fix didn't
+work"):
 
 ```bash
-xdg-open lending-app/index.html      # Linux
-open lending-app/index.html          # macOS
+cd lending-app
+./run.sh            # -> http://localhost:8000/index.html   (or ./run.sh 9000)
 ```
 
-Then click the 💬 launcher at the bottom-right and type something like:
+Then open `http://localhost:8000/index.html` and start a voice call, or click
+the ⌨️ button and type something like:
 
 > *"I want a ₹5 lakh personal loan, I earn 60k a month, I'm salaried, age 30"*
 
-Watch the form on the left fill itself, the completion ring climb, and product
+Watch the form fill itself, the completion ring climb, and product
 recommendations appear.
+
+**Verifying the live build.** The call bar shows a small build stamp (e.g.
+`v18`) next to *Arya*. If it doesn't match the latest, the page is cached —
+`run.sh` prevents that, but an old tab may need one hard refresh.
+
+**On-device diagnostics.** Append `?debug=1` to the URL
+(`…/index.html?debug=1`). After each voice turn a muted line shows exactly what
+STT heard, the detected language, the English text the NLU received, and whether
+a field was filled (`✓ loanType = personal` / `✗ no match`) — so a "captured but
+not recognised" case is diagnosable without devtools.
+
+> **Mic needs a secure context.** On a phone, `http://<your-ip>:8000` won't grant
+> the microphone — browsers only allow it on `https://` or `localhost`. Use an
+> https tunnel (e.g. `ngrok http 8000`) to test voice from a phone.
 
 ## What the copilot does
 

@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v18';
+  var BUILD = 'v19';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);

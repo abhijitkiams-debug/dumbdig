@@ -394,8 +394,18 @@
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
 @media (min-width: 640px) {
-  .lc-reco { max-width: 460px; left: 50%; transform: translateX(-50%); border-radius: 22px; inset: 24px auto; top: 24px; bottom: 24px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
-  @keyframes lc-reco-in { from { opacity: 0; transform: translate(-50%, 24px); } }
+  /* Larger screens: a centred, mobile-width floating panel.
+     NOTE: do NOT use the `inset` shorthand here — it resets `left` to auto and
+     the translateX(-50%) then throws the panel off the left edge. Set each side
+     explicitly so left:50% + translateX(-50%) actually centres it. */
+  .lc-reco {
+    width: 100%; max-width: 440px;
+    left: 50%; right: auto; top: 24px; bottom: 24px;
+    transform: translateX(-50%);
+    border-radius: 22px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35);
+  }
+  @keyframes lc-reco-in { from { opacity: 0; transform: translateX(-50%) translateY(24px); } }
 }
 
 /* settings modal */

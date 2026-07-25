@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v20';
+  var BUILD = 'v21';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -70,7 +70,7 @@
       afterPick: function (name) { return 'बढ़िया! मैंने आपको ' + name + ' के लिए select कर लिया। अब बस कुछ details चाहिए। '; },
       pickedIntro: function (name) { return 'बढ़िया choice! ' + name + ' के लिए, आपका best rate जानने के लिए मुझे थोड़ी जानकारी चाहिए। आपकी monthly income कितनी है?'; },
       submitAsk: 'बस हो गया! क्या मैं आपकी application submit कर दूँ? हाँ बोलिए।',
-      submitted: function (ref) { return 'हो गया! आपकी application submit हो गई। Reference ' + ref + '। एक credit officer आपको जल्दी call करेगा। Setu Finance चुनने के लिए धन्यवाद!'; },
+      submitted: function (ref) { return '🎉 बधाई हो! आपकी loan application successfully submit हो गई है। आपका reference number है ' + ref + '। हमारी team आपको verification के लिए 24 से 48 घंटे में call करेगी और approval confirm करेगी। Setu Finance चुनने के लिए धन्यवाद!'; },
       didntCatch: 'माफ़ कीजिए, समझ नहीं आया। दोबारा बोलिए या नीचे type कीजिए।',
       notCaught: 'माफ़ कीजिए, मैं ठीक से समझ नहीं पाई।',
       changeWhat: 'कोई बात नहीं। आप क्या बदलना चाहते हैं?',
@@ -104,7 +104,7 @@
       afterPick: function (name) { return 'Great choice! I\'ve set you up for a ' + name + '. Now I just need a few details. '; },
       pickedIntro: function (name) { return 'Great choice! For a ' + name + ', I need a few details to get your best rate. What\'s your monthly income?'; },
       submitAsk: 'That\'s everything! Shall I submit your application now? Say yes.',
-      submitted: function (ref) { return 'Done! Your application is submitted. Reference ' + ref + '. A credit officer will call you shortly. Thank you for choosing Setu Finance!'; },
+      submitted: function (ref) { return '🎉 Congratulations! Your loan application has been submitted successfully. Your reference number is ' + ref + '. Our team will call you within 24 to 48 hours to verify your details and confirm your approval. Thank you for choosing Setu Finance!'; },
       didntCatch: 'Sorry, I didn\'t catch that. Please say it again or type below.',
       notCaught: 'Sorry, I didn\'t quite get that.',
       changeWhat: 'No problem. What would you like to change?',
@@ -809,7 +809,7 @@
     var isBlocking = res.intents.some(function (i) { return blockingIntents.indexOf(i) !== -1; });
     var consentAffirm = this.pendingField &&
       (this.pendingField.type === 'checkbox' || this.pendingField.id === 'consent') &&
-      /^(yes|yeah|yep|sure|ok|okay|agree|accept|confirm|done|haan|ji|theek|thik)\b/i.test(text);
+      this._saidYes(text);
 
     // Fill logic, grounded to avoid mis-reading the customer:
     //  - the answer to the CURRENT question is slotted into that field first,
@@ -938,6 +938,9 @@
     // Application stage: collect the remaining details, then submit.
     var nextA = this._nextBestField();
     if (nextA) { this.pendingField = nextA; return lead + P.ask[nextA.id]; }
+    // Everything is in. If the customer has already given consent (the consent
+    // prompt itself asks for the go-ahead), submit right away — don't ask again.
+    if (this.adapter.getValue('consent')) { this._doSubmit(); return ''; }
     this.awaitingSubmit = true;
     return gotIt + P.submitAsk;
   };
@@ -963,7 +966,24 @@
   };
 
   Copilot.prototype._isAffirm = function (res) {
-    return res.intents.indexOf('affirm') !== -1 || res.intents.indexOf('apply') !== -1;
+    return res.intents.indexOf('affirm') !== -1 || res.intents.indexOf('apply') !== -1 ||
+      this._saidYes(res.text);
+  };
+
+  // A broad yes / agreement / consent recogniser — the NLU 'affirm' intent only
+  // catches replies that START with "yes", but a customer may agree with
+  // "I agree", "consent given", "मैं सहमत हूँ", "de diya" etc. This covers those
+  // so the consent step and submit confirmation don't loop or hallucinate.
+  var YES_RE = new RegExp(
+    '\\b(yes|yeah|yep|yup|sure|ok|okay|agree|agreed|accept|accepted|consent|' +
+    'consented|confirm|confirmed|proceed|go ahead|do it|please do|absolutely|' +
+    'definitely|haan|haa|ji|theek|thik|sahi|sahmati|sehmati|razi|raazi|manzoor|' +
+    'de di|de diya|de dijiye|kar do|kar dijiye)\\b',
+    'i');
+  var YES_DEVANAGARI = /हाँ|हां|ठीक|सहमत|सहमति|मंज़ूर|मंजूर|राज़ी|राजी|दे दी|दे दिया|कर दो|कर दीजिए|ठीक है/;
+  Copilot.prototype._saidYes = function (text) {
+    var t = String(text || '');
+    return YES_RE.test(t) || YES_DEVANAGARI.test(t);
   };
 
   // Localised, comma-joined field labels for the "got it" confirmation.
@@ -1079,7 +1099,7 @@
     if (!f) return null;
     var val = text.trim();
     if (f.type === 'checkbox' || f.id === 'consent') {
-      if (!/^(yes|yeah|yep|sure|ok|okay|agree|i agree|accept|confirm|done|haan)\b/i.test(val)) return null;
+      if (!this._saidYes(val)) return null;
       val = true;
     } else if (f.type === 'select' && f.options) {
       // Selects match on options via NLU/keywords, so a whole sentence
@@ -1303,9 +1323,9 @@
 
   Copilot.prototype._renderProducts = function () {
     var self = this;
-    var profile = this._profile();
-    var recs = this.catalog.recommend(profile).slice(0, 3);
-    this._recs = recs;
+    // Render the list _offerProducts already chose (relatable set + variations);
+    // only fall back to a fresh ranking if we're called without one.
+    var recs = (this._recs && this._recs.length) ? this._recs : this.catalog.recommend(this._profile()).slice(0, 3);
     var wrap = el('div', 'lc-msg lc-bot lc-products');
     wrap.innerHTML = '<div class="lc-prod-h">' + esc(this._t('recommendIntro')) + '</div>';
 
@@ -1338,24 +1358,74 @@
 
   /* ---- native full-screen recommendation overlay (quotes-style) ---- */
 
+  // Build a RELATABLE recommendation set. Anchored on the loan the customer
+  // actually asked for; alternatives are limited to the same product "family"
+  // (a substitutable need) AND a genuinely lower rate — never an unrelated home
+  // or education loan next to a gold loan. When there aren't enough cheaper
+  // alternatives, we round out the screen with interest/EMI VARIATIONS of the
+  // same loan at different tenures, so the customer can compare terms.
   Copilot.prototype._offerProducts = function () {
-    var recs = this.catalog.recommend(this._profile()).slice(0, 4);
+    var self = this, C = this.catalog;
+    var profile = this._profile();
+    var all = C.recommend(profile);
+    var recs;
+    var wanted = profile.loanType;
+    if (wanted) {
+      var byId = {}; all.forEach(function (r) { byId[r.productId] = r; });
+      var primary = byId[wanted] || all[0];
+      var fam = primary.product.family;
+      var alts = all.filter(function (r) {
+        return r.productId !== primary.productId &&
+          r.product.family === fam &&
+          r.rate < primary.rate - 0.01;      // only if it genuinely saves interest
+      }).sort(function (a, b) { return a.rate - b.rate; }).slice(0, 2);
+      recs = [primary].concat(alts);
+      if (recs.length < 3) recs = recs.concat(this._tenureVariations(primary, 3 - recs.length));
+    } else {
+      recs = all.slice(0, 3);
+    }
     this._recs = recs;
     this._renderProducts();     // cards in the chat panel too
     this._showRecoScreen(recs); // the native overlay screen
   };
 
-  Copilot.prototype._recoLabels = function () {
-    if (this._uiLang() === 'hi') {
-      return { title: 'आपके लिए Best Loans', sub: 'Arya की सलाह — आपकी profile के हिसाब से',
-        eligible: 'Eligible amount', rate: 'ब्याज दर', emi: 'EMI', tenure: 'अवधि', month: '/महीना',
-        apply: 'Apply करें', talk: 'Arya से बात करें', best: 'Best Match', fast: 'तुरंत approval',
-        low: 'सबसे कम rate', yr: 'साल', perAnnum: '% सालाना', totalInt: 'कुल ब्याज', close: 'बंद करें' };
+  // Same product, different tenures — gives "different interest variations" of
+  // the chosen loan (shorter tenure = less total interest, longer = lower EMI).
+  Copilot.prototype._tenureVariations = function (base, n) {
+    var C = this.catalog, prod = base.product, out = [];
+    var amt = base.sizedAmount || base.maxEligible || prod.minAmount;
+    var cands = [prod.minMonths, prod.defaultMonths, prod.maxMonths];
+    var seen = {}; seen[base.tenureMonths] = 1;
+    for (var i = 0; i < cands.length && out.length < n; i++) {
+      var m = cands[i];
+      if (!m || seen[m]) continue; seen[m] = 1;
+      var e = Math.round(C.emi(amt, base.rate, m));
+      var v = {}; for (var k in base) v[k] = base[k];
+      v.tenureMonths = m; v.emi = e; v.totalInterest = Math.round(e * m - amt);
+      v._variation = true;
+      v._varLabel = (m < base.tenureMonths) ? 'saveInt' : 'lowEmi';
+      out.push(v);
     }
-    return { title: 'Recommended for you', sub: 'Arya’s picks based on your profile',
+    return out;
+  };
+
+  Copilot.prototype._recoLabels = function () {
+    var lp = this._profile().loanType;
+    var name = (lp && this.catalog.byId(lp) && this.catalog.byId(lp).name) || '';
+    if (this._uiLang() === 'hi') {
+      return { title: name ? (name + ' — best options') : 'आपके लिए Best Loans',
+        sub: name ? ('आपकी ' + name + ' के लिए best terms') : 'Arya की सलाह — आपकी profile के हिसाब से',
+        eligible: 'Eligible amount', rate: 'ब्याज दर', emi: 'EMI', tenure: 'अवधि', month: '/महीना',
+        apply: 'Apply करें', talk: 'कोई सवाल? Arya से पूछें', best: 'Best Match', fast: 'तुरंत approval',
+        saveInt: 'ब्याज बचाएं', lowEmi: 'कम EMI',
+        low: 'सबसे कम rate', yr: 'साल', months: 'महीने', perAnnum: '% सालाना', totalInt: 'कुल ब्याज', close: 'बंद करें' };
+    }
+    return { title: name ? (name + ' — best options') : 'Recommended for you',
+      sub: name ? ('Best terms for your ' + name) : 'Arya’s picks based on your profile',
       eligible: 'Eligible amount', rate: 'Interest rate', emi: 'EMI', tenure: 'Tenure', month: '/mo',
-      apply: 'Apply', talk: 'Talk to Arya', best: 'Best Match', fast: 'Fast approval',
-      low: 'Lowest rate', yr: 'yr', perAnnum: '% p.a.', totalInt: 'Total interest', close: 'Close' };
+      apply: 'Apply', talk: 'Have a question? Ask Arya', best: 'Best Match', fast: 'Fast approval',
+      saveInt: 'Save interest', lowEmi: 'Lower EMI',
+      low: 'Lowest rate', yr: 'yr', months: 'mo', perAnnum: '% p.a.', totalInt: 'Total interest', close: 'Close' };
   };
 
   Copilot.prototype._showRecoScreen = function (recs) {
@@ -1379,21 +1449,31 @@
     var strip = '<div class="lc-reco-strip">' + chips.map(function (c) { return '<span class="lc-reco-chip">' + esc(c) + '</span>'; }).join('') + '</div>';
 
     // cards
+    var fmtTen = function (m) {
+      return m < 12 ? (m + ' ' + esc(L.months)) : ((Math.round(m / 12 * 10) / 10) + ' ' + esc(L.yr));
+    };
     var cards = recs.map(function (r, i) {
       var pr = r.product;
+      var yrs = fmtTen(r.tenureMonths);
       var tags = [];
-      if (i === 0) tags.push('<span class="lc-reco-tag lc-tag-best">' + esc(L.best) + '</span>');
-      if (!pr.secured) tags.push('<span class="lc-reco-tag lc-tag-fast">' + esc(L.fast) + '</span>');
-      var yrs = Math.round(r.tenureMonths / 12 * 10) / 10;
+      if (r._variation) {
+        // a tenure variation of the same loan — label the trade-off, not "best".
+        tags.push('<span class="lc-reco-tag lc-tag-flexi">' + esc(L[r._varLabel] || L.tenure) + '</span>');
+      } else {
+        if (i === 0) tags.push('<span class="lc-reco-tag lc-tag-best">' + esc(L.best) + '</span>');
+        if (!pr.secured) tags.push('<span class="lc-reco-tag lc-tag-fast">' + esc(L.fast) + '</span>');
+      }
+      // variation cards read as "<tenure> plan" so repeats of the same loan are clear.
+      var nameLine = 'Setu ' + esc(pr.name) + (r._variation ? ' · ' + yrs + ' plan' : '');
       return '<div class="lc-reco-card' + (i === 0 ? ' lc-reco-top' : '') + '" data-idx="' + i + '">' +
         '<div class="lc-reco-crow">' +
           '<span class="lc-reco-emoji">' + pr.emoji + '</span>' +
-          '<div class="lc-reco-name">Setu ' + esc(pr.name) + '<div class="lc-reco-tags">' + tags.join('') + '</div></div>' +
+          '<div class="lc-reco-name">' + nameLine + '<div class="lc-reco-tags">' + tags.join('') + '</div></div>' +
         '</div>' +
         '<div class="lc-reco-grid">' +
           '<div><span>' + esc(L.eligible) + '</span><b>' + C.inrShort(r.maxEligible) + '</b></div>' +
           '<div><span>' + esc(L.rate) + '</span><b>' + r.rate.toFixed(2) + esc(L.perAnnum) + '</b></div>' +
-          '<div><span>' + esc(L.tenure) + '</span><b>' + yrs + ' ' + esc(L.yr) + '</b></div>' +
+          '<div><span>' + esc(L.tenure) + '</span><b>' + yrs + '</b></div>' +
         '</div>' +
         '<div class="lc-reco-foot">' +
           '<div class="lc-reco-emi"><span>' + esc(L.emi) + '</span><b>' + C.inr(r.emi) + '<i>' + esc(L.month) + '</i></b></div>' +
@@ -1432,6 +1512,7 @@
 
   // One-tap apply from a product card -> move into the application stage.
   Copilot.prototype._pickFromCard = function (r) {
+    this._hideRecoScreen();  // always drop the overlay so the form is visible/editable
     var text = this._pickProduct(r);
     this._say(text);
     this._refreshStatus();

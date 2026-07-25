@@ -368,6 +368,7 @@
 .lc-reco-tag { font-size: 10.5px; font-weight: 700; border-radius: 20px; padding: 2px 8px; }
 .lc-tag-best { background: #ecfdf5; color: #047857; }
 .lc-tag-fast { background: #eff6ff; color: #1d4ed8; }
+.lc-tag-flexi { background: #fff7ed; color: #c2410c; }
 .lc-reco-grid { display: flex; gap: 8px; margin: 13px 0; }
 .lc-reco-grid > div { flex: 1; }
 .lc-reco-grid span { display: block; font-size: 11px; color: var(--lc-sub); }

@@ -218,8 +218,20 @@
     }
   ];
 
+  // Product "family" — groups loans a customer would realistically substitute
+  // for the SAME need, so recommendations stay relatable. Someone asking for a
+  // gold loan (quick cash) should see cash-type alternatives, never an unrelated
+  // home or education loan just because its rate happens to be lower.
+  var FAMILY = {
+    personal: 'cash', gold: 'cash', business: 'cash', lap: 'cash',
+    home: 'home',
+    twowheeler: 'vehicle', car: 'vehicle', threewheeler: 'vehicle', ucv: 'vehicle', tractor: 'vehicle',
+    consumer: 'purchase', mobile: 'purchase',
+    education: 'education'
+  };
+
   var BY_ID = {};
-  PRODUCTS.forEach(function (p) { BY_ID[p.id] = p; });
+  PRODUCTS.forEach(function (p) { p.family = FAMILY[p.id] || 'other'; BY_ID[p.id] = p; });
 
   /* ---------- credit / risk scoring ---------- */
 

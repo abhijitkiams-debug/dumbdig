@@ -36,7 +36,7 @@
   var EMPLOYMENT = [
     { id: 'salaried', words: ['salaried', 'salary', 'employee', 'employed', 'job', 'private company', 'govt', 'government', 'working in', 'work at', 'ctc', 'सैलरी', 'नौकरी', 'नौकरीपेशा', 'naukri', 'nokri', 'naukari'] },
     { id: 'self-employed', words: ['self employed', 'self-employed', 'freelanc', 'consultant', 'professional', 'doctor', 'lawyer', 'ca ', 'architect', 'सेल्फ', 'फ्रीलांस', 'पेशेवर'] },
-    { id: 'business', words: ['business owner', 'businessman', 'proprietor', 'trader', 'shop owner', 'entrepreneur', 'own business', 'own a business', 'बिज़नेस', 'व्यापारी', 'दुकानदार', 'कारोबारी', 'vyapari', 'dukaandaar'] },
+    { id: 'business', words: ['business owner', 'businessman', 'proprietor', 'trader', 'shop owner', 'shop', 'my shop', 'own shop', 'own a shop', 'self business', 'entrepreneur', 'own business', 'own a business', 'बिज़नेस', 'व्यापारी', 'दुकानदार', 'दुकान', 'कारोबारी', 'कारोबार', 'कामकाज', 'काम काज', 'काम-काज', 'धंधा', 'vyapari', 'dukaandaar', 'dukaan', 'dhandha', 'kaamkaaj'] },
     { id: 'student', words: ['student', 'studying', 'no income', 'unemployed', 'छात्र', 'विद्यार्थी', 'student hoon'] }
   ];
   // NOTE: dictionaries share substrings ("employed" ⊂ "self employed"), so

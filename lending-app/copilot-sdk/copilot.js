@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v19';
+  var BUILD = 'v20';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -802,38 +802,53 @@
     }
 
     var res = this.nlu.parse(text);
-    var actionIntents = ['recommend', 'eligibility', 'emi', 'documents', 'help', 'greet', 'affirm', 'deny'];
-    var isAction = res.intents.some(function (i) { return actionIntents.indexOf(i) !== -1; });
+    // Intents that request a DIFFERENT action and so should stop us slotting the
+    // utterance into the pending field. A leading "yes/no" (affirm/deny) or a
+    // greeting must NOT block — "Yes, this is my shop" still answers the question.
+    var blockingIntents = ['recommend', 'eligibility', 'emi', 'documents', 'help'];
+    var isBlocking = res.intents.some(function (i) { return blockingIntents.indexOf(i) !== -1; });
     var consentAffirm = this.pendingField &&
       (this.pendingField.type === 'checkbox' || this.pendingField.id === 'consent') &&
       /^(yes|yeah|yep|sure|ok|okay|agree|accept|confirm|done|haan|ji|theek|thik)\b/i.test(text);
 
     // Fill logic, grounded to avoid mis-reading the customer:
-    //  - a SHORT reply is treated as the answer to the current question first
-    //    (so "5 lakh" fills the field Arya just asked, not a random amount slot);
-    //  - longer sentences go through full multi-field extraction.
+    //  - the answer to the CURRENT question is slotted into that field first,
+    //    scoped to it — so an employment answer like "I run a shop" fills
+    //    employment=business and does NOT get filed as a business LOAN;
+    //  - anything else mentioned in the same breath only fills EMPTY fields, so
+    //    an answer meant for the pending question can't overwrite one already
+    //    given (e.g. a loan type chosen earlier);
+    //  - a bare number on a short reply is never repurposed into another field.
     var wordCount = text.trim().split(/\s+/).length;
     var shortAnswer = wordCount <= 6;
     var filled = [];
-    if (this.pendingField && shortAnswer && (!isAction || consentAffirm)) {
-      // Short reply = the answer to the current question. Try to slot it there.
+    if (this.pendingField && (!isBlocking || consentAffirm)) {
       var slot = this._fillPending(text);
-      if (slot) filled = [slot];
-      else {
-        // It didn't fit. Only extract STRONG, unambiguous entities (loan type,
-        // employment, PAN…) — NEVER repurpose a bare number into another field.
+      if (slot) {
+        filled = [slot];
+        // Also capture other fields said in the same breath — into empty fields
+        // only, never clobbering an already-answered one.
+        var others = {};
+        Object.keys(res.entities).forEach(function (k) {
+          var fid = self._entityFieldId(k);
+          if (!fid || fid === slot.id) return;
+          var cur = self.adapter.getValue(fid);
+          if (cur == null || String(cur).trim() === '') others[k] = res.entities[k];
+        });
+        filled = filled.concat(this._applyEntities(others));
+      } else if (shortAnswer) {
+        // Short reply that didn't slot: only STRONG entities, never a bare number.
         var strong = {};
         ['loanType', 'employment', 'pan', 'email', 'mobile', 'city', 'fullName', 'pincode', 'aadhaar']
           .forEach(function (k) { if (res.entities[k] != null) strong[k] = res.entities[k]; });
         filled = this._applyEntities(strong);
+      } else {
+        // Longer free-form utterance that didn't answer the question directly.
+        filled = this._applyEntities(res.entities);
       }
     } else {
-      // Longer / free-form utterance: full multi-field extraction.
+      // No pending question: full multi-field extraction.
       filled = this._applyEntities(res.entities);
-      if (!filled.length && this.pendingField && (!isAction || consentAffirm)) {
-        var slot2 = this._fillPending(text);
-        if (slot2) filled = [slot2];
-      }
     }
     // remember whether this turn actually captured the field we asked for
     this._answeredPending = filled.some(function (f) {
@@ -994,14 +1009,18 @@
 
   /* ---- write extracted entities into the host form via the adapter ---- */
 
+  // Which host field an NLU entity key writes to.
+  var ENTITY_FIELD_MAP = {
+    fullName: 'fullName', mobile: 'mobile', email: 'email', pan: 'pan',
+    aadhaar: 'aadhaar', city: 'city', pincode: 'pincode', age: 'age',
+    employment: 'employment', monthlyIncome: 'monthlyIncome', cibil: 'cibil',
+    loanType: 'loanType', amount: 'amount', tenureMonths: 'tenure'
+  };
+  Copilot.prototype._entityFieldId = function (entityKey) { return ENTITY_FIELD_MAP[entityKey] || null; };
+
   Copilot.prototype._applyEntities = function (entities) {
     var self = this, filled = [];
-    var map = {
-      fullName: 'fullName', mobile: 'mobile', email: 'email', pan: 'pan',
-      aadhaar: 'aadhaar', city: 'city', pincode: 'pincode', age: 'age',
-      employment: 'employment', monthlyIncome: 'monthlyIncome', cibil: 'cibil',
-      loanType: 'loanType', amount: 'amount', tenureMonths: 'tenure'
-    };
+    var map = ENTITY_FIELD_MAP;
     Object.keys(map).forEach(function (k) {
       if (entities[k] == null) return;
       var fieldId = map[k];
@@ -1025,16 +1044,19 @@
   // and "self-employed" all resolve to the same option.
   Copilot.prototype._matchOption = function (f, raw) {
     var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
-    var v = norm(raw);
-    if (!v) return null;
 
-    // (1) Let the NLU decide for the smart fields it knows about.
+    // (1) Let the NLU decide for the smart fields it knows about. This runs on
+    // the RAW text first, so Devanagari/Hinglish answers ("मेरा दुकान है",
+    // "कामकाज है") resolve — normalising to ASCII below would strip them to ''.
     if ((f.id === 'employment' || f.id === 'loanType') && this.nlu && this.nlu.parse) {
       var ent = (this.nlu.parse(raw).entities || {})[f.id];
       if (ent) {
         for (var a = 0; a < f.options.length; a++) if (f.options[a].value === ent) return ent;
       }
     }
+
+    var v = norm(raw);
+    if (!v) return null;
 
     // (2) + (3) match against option values/labels.
     for (var i = 0; i < f.options.length; i++) {
@@ -1056,11 +1078,12 @@
     var f = this.pendingField;
     if (!f) return null;
     var val = text.trim();
-    if (val.length > 60) return null; // a sentence, not a field value
     if (f.type === 'checkbox' || f.id === 'consent') {
       if (!/^(yes|yeah|yep|sure|ok|okay|agree|i agree|accept|confirm|done|haan)\b/i.test(val)) return null;
       val = true;
     } else if (f.type === 'select' && f.options) {
+      // Selects match on options via NLU/keywords, so a whole sentence
+      // ("yes, this is my shop") can still resolve to an option.
       var matched = this._matchOption(f, val);
       if (matched != null) val = matched; else return null;
     } else if (f.numeric) {
@@ -1069,8 +1092,9 @@
       if (isNaN(n)) return null;
       if (!this._plausible(f.id, n)) return null; // reject implausible -> re-ask
       val = n;
-    } else if (!this._validText(f.id, val)) {
-      return null; // don't drop a stray question into a name/city field
+    } else {
+      if (val.length > 60) return null; // a sentence, not a name/city/text value
+      if (!this._validText(f.id, val)) return null; // don't drop a stray question in
     }
     var prev = this.adapter.getValue(f.id);
     this._write(f.id, val);

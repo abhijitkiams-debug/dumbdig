@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v22';
+  var BUILD = 'v23';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -316,6 +316,14 @@
     this.callLangBtn.addEventListener('click', function () { self._cycleLang(); });
     root.appendChild(callbar);
     this._reflectLangBtn();
+
+    // Dimming scrim behind the recommendation / success overlays, so on wider
+    // screens the centred panel reads as a modal instead of overlapping the
+    // host form behind it. Shown via the .lc-reco-open class.
+    var scrim = el('div', 'lc-scrim');
+    scrim.addEventListener('click', function () { if (self._reco) self._hideRecoScreen(); });
+    root.appendChild(scrim);
+    this._scrim = scrim;
 
     root.appendChild(panel);
     root.appendChild(fab);

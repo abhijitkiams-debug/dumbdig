@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v21';
+  var BUILD = 'v22';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -528,8 +528,10 @@
 
   Copilot.prototype._fabTap = function () {
     // Voice-capable -> start a call; otherwise open the text chat panel.
-    if (this.voice && this.voice.isSupported()) this.startCall();
-    else this.toggle(true);
+    if (this.voice && this.voice.isSupported()) {
+      if (this._inCall) { this._micTap(); return; } // already in a call (e.g. on the reco screen) -> tap to talk
+      this.startCall();
+    } else this.toggle(true);
   };
 
   Copilot.prototype.startCall = function () {
@@ -801,6 +803,34 @@
       return;
     }
 
+    // Awaiting a yes/no read-back confirmation for name or city.
+    if (this._confirming) {
+      var cid = this._confirming.id;
+      if (this._saidNo(text)) {                    // wrong -> clear and re-ask
+        this._write(cid, '');
+        this._confirming = null;
+        this.pendingField = this.schemaById[cid];
+        this._refreshStatus();
+        this._say(this._P().ask[cid]);
+        this._renderChips();
+        return;
+      }
+      if (this._saidYes(text)) {                    // confirmed -> continue
+        this._confirming = null;
+        this._refreshStatus();
+        var creply = this._advance({ intents: [], entities: {}, text: '' }, []);
+        if (creply) this._say(creply);
+        this._renderSuggestions();
+        this._renderChips();
+        return;
+      }
+      // Neither yes nor no: treat the reply as a correction and re-capture.
+      this._write(cid, '');
+      this.pendingField = this.schemaById[cid];
+      this._confirming = null;
+      // fall through to normal fill handling below
+    }
+
     var res = this.nlu.parse(text);
     // Intents that request a DIFFERENT action and so should stop us slotting the
     // utterance into the pending field. A leading "yes/no" (affirm/deny) or a
@@ -856,6 +886,22 @@
     });
 
     this._refreshStatus();
+
+    // Name & city are free text that STT easily mishears — read the captured
+    // value back and get a yes/no before moving on, so the form is accurate.
+    var toConfirm = filled.filter(function (f) { return f.id === 'fullName' || f.id === 'city'; })[0];
+    if (toConfirm && !this._confirming) {
+      var cval = this.adapter.getValue(toConfirm.id);
+      if (cval && String(cval).trim() !== '') {
+        this._confirming = { id: toConfirm.id, value: cval };
+        this.pendingField = null;
+        this._say(this._confirmPrompt(toConfirm.id, cval));
+        this._renderSuggestions();
+        this._renderChips();
+        return;
+      }
+    }
+
     var reply = this._advance(res, filled);
     if (reply) this._say(reply);
 
@@ -984,6 +1030,28 @@
   Copilot.prototype._saidYes = function (text) {
     var t = String(text || '');
     return YES_RE.test(t) || YES_DEVANAGARI.test(t);
+  };
+
+  var NO_RE = /\b(no|nope|nah|not correct|incorrect|wrong|change|edit|galat|nahi|nahin)\b/i;
+  var NO_DEVANAGARI = /नहीं|नही|ग़लत|गलत|बदल/;
+  Copilot.prototype._saidNo = function (text) {
+    var t = String(text || '');
+    return NO_RE.test(t) || NO_DEVANAGARI.test(t);
+  };
+
+  // Read-back confirmation prompt for error-prone free-text fields (name, city),
+  // which STT can easily mishear. Spelled out so the customer can catch it.
+  Copilot.prototype._confirmPrompt = function (id, val) {
+    var hi = this._uiLang() === 'hi';
+    if (id === 'fullName') {
+      return hi ? ('मैंने आपका नाम "' + val + '" समझा। क्या यह सही है? हाँ या नहीं बोलिए।')
+                : ('I heard your name as "' + val + '". Is that correct? Please say yes or no.');
+    }
+    if (id === 'city') {
+      return hi ? ('आपका शहर "' + val + '" — क्या यह सही है? हाँ या नहीं बोलिए।')
+                : ('Your city is "' + val + '" — is that correct? Please say yes or no.');
+    }
+    return hi ? ('मैंने "' + val + '" समझा — क्या यह सही है?') : ('I heard "' + val + '" — is that right?');
   };
 
   // Localised, comma-joined field labels for the "got it" confirmation.
@@ -1297,7 +1365,11 @@
     var chips = [];
     var next = this._nextBestField();
 
-    if (next && next.id === 'loanType') {
+    // Confirming a read-back name/city -> offer plain yes / no.
+    if (this._confirming) {
+      var hi = this._uiLang() === 'hi';
+      chips = [[hi ? 'हाँ, सही है ✓' : 'Yes, correct ✓', 'yes'], [hi ? 'नहीं, बदलें ✗' : 'No, change it ✗', 'no']];
+    } else if (next && next.id === 'loanType') {
       chips = [['Personal loan', 'I want a personal loan'], ['Home loan', 'home loan'],
         ['Gold loan', 'gold loan'], ['Business loan', 'business loan'], ['Car loan', 'car loan']];
     } else if (next && next.id === 'employment') {
@@ -1483,14 +1555,11 @@
       '</div>';
     }).join('');
 
-    reco.innerHTML = head + strip + '<div class="lc-reco-list">' + cards + '</div>' +
-      '<div class="lc-reco-bar"><button class="lc-reco-talk">🎙️ ' + esc(L.talk) + '</button></div>';
+    // No bottom "talk" bar — Arya stays reachable via the floating orb (shown on
+    // this screen) and keeps listening after reading out the options.
+    reco.innerHTML = head + strip + '<div class="lc-reco-list">' + cards + '</div>';
 
     reco.querySelector('.lc-reco-back').addEventListener('click', function () { self._hideRecoScreen(); });
-    reco.querySelector('.lc-reco-talk').addEventListener('click', function () {
-      self._hideRecoScreen();
-      if (self.voiceOn && self.voice) self._startListen();
-    });
     reco.querySelectorAll('.lc-reco-apply').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var idx = parseInt(btn.getAttribute('data-idx'), 10);
@@ -1508,6 +1577,65 @@
   Copilot.prototype._hideRecoScreen = function () {
     this.root.classList.remove('lc-reco-open');
     if (this._reco) { this._reco.remove(); this._reco = null; }
+  };
+
+  /* ---- native confirmation screen shown after the application is submitted ---- */
+
+  Copilot.prototype._showSuccessScreen = function (ref) {
+    var self = this, C = this.catalog, a = this.adapter, hi = this._uiLang() === 'hi';
+    if (this._success) { this._success.remove(); this._success = null; }
+    this._hideRecoScreen();
+
+    var lt = a.getValue('loanType'), prod = C.byId(lt);
+    var name = String(a.getValue('fullName') || '').trim();
+    var amount = parseFloat(String(a.getValue('amount')).replace(/[^\d.]/g, ''));
+    var tenure = parseFloat(String(a.getValue('tenure')).replace(/[^\d.]/g, ''));
+    var rec = (this._recs || []).filter(function (r) { return r.productId === lt && !r._variation; })[0];
+
+    var L = hi ? {
+      title: 'Application Submit हो गई!', sub: name ? ('बधाई हो, ' + esc(name) + '! 🎉') : 'बधाई हो! 🎉',
+      refl: 'आपका Reference Number', loan: 'Loan', amount: 'Amount', emi: 'EMI', tenure: 'अवधि',
+      month: '/माह', mo: 'महीने', yr: 'साल',
+      note: 'हमारी team आपको <b>24–48 घंटे</b> में call करके details verify करेगी और approval confirm करेगी।',
+      done: 'ठीक है'
+    } : {
+      title: 'Application Submitted!', sub: name ? ('Congratulations, ' + esc(name) + '! 🎉') : 'Congratulations! 🎉',
+      refl: 'Your Reference Number', loan: 'Loan', amount: 'Amount', emi: 'EMI', tenure: 'Tenure',
+      month: '/mo', mo: 'mo', yr: 'yr',
+      note: 'Our team will call you within <b>24–48 hours</b> to verify your details and confirm your approval.',
+      done: 'Done'
+    };
+    var fmtTen = function (m) { return m < 12 ? (m + ' ' + L.mo) : ((Math.round(m / 12 * 10) / 10) + ' ' + L.yr); };
+    var row = function (k, v) { return v ? ('<div class="lc-suc-row"><span>' + esc(k) + '</span><b>' + v + '</b></div>') : ''; };
+    var rows = '';
+    if (prod) rows += row(L.loan, prod.emoji + ' Setu ' + esc(prod.name));
+    if (!isNaN(amount)) rows += row(L.amount, esc(C.inr(amount)));
+    if (rec) rows += row(L.emi, esc(C.inr(rec.emi)) + '<i>' + esc(L.month) + '</i>');
+    if (!isNaN(tenure) && tenure) rows += row(L.tenure, esc(fmtTen(tenure)));
+
+    var scr = el('div', 'lc-reco lc-success');
+    scr.innerHTML =
+      '<div class="lc-suc-inner">' +
+        '<div class="lc-suc-badge">✓</div>' +
+        '<div class="lc-suc-title">' + esc(L.title) + '</div>' +
+        '<div class="lc-suc-sub">' + L.sub + '</div>' +
+        '<div class="lc-suc-ref"><span>' + esc(L.refl) + '</span><b>' + esc(ref) + '</b></div>' +
+        (rows ? '<div class="lc-suc-card">' + rows + '</div>' : '') +
+        '<div class="lc-suc-note">' + L.note + '</div>' +
+        '<button class="lc-suc-done">' + esc(L.done) + '</button>' +
+      '</div>';
+    scr.querySelector('.lc-suc-done').addEventListener('click', function () {
+      self._hideSuccessScreen();
+      if (self._inCall) self.endCall();
+    });
+    this.root.appendChild(scr);
+    this._success = scr;
+    this.root.classList.add('lc-reco-open');
+  };
+
+  Copilot.prototype._hideSuccessScreen = function () {
+    if (this._success) { this._success.remove(); this._success = null; }
+    if (!this._reco) this.root.classList.remove('lc-reco-open');
   };
 
   // One-tap apply from a product card -> move into the application stage.
@@ -1605,6 +1733,7 @@
     this.awaitingSubmit = false;
     var ref = 'LC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
     this._say(this._t('submitted', ref));
+    this._showSuccessScreen(ref); // native confirmation screen
   };
 
   /* ================= public factory ================= */

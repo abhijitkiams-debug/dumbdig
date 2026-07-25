@@ -272,6 +272,9 @@
 }
 .lc-root.lc-incall .lc-callbar { display: flex; animation: lc-callin .28s ease; }
 .lc-root.lc-incall .lc-fab { display: none; }
+/* On the recommendation screen Arya stays reachable through the floating orb
+   (the call bar is hidden there), so surface it above the overlay. */
+.lc-root.lc-reco-open .lc-fab { display: block; z-index: 9; }
 /* When the chat panel is open, hide the call bar so it doesn't cover the composer. */
 .lc-root.lc-open .lc-callbar { display: none; }
 @keyframes lc-callin { from { opacity: 0; transform: translateX(-50%) translateY(28px); } }
@@ -393,6 +396,48 @@
   width: 100%; min-height: 50px; border: none; border-radius: 14px; cursor: pointer;
   font-size: 15px; font-weight: 700; color: #fff;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+/* ===== post-submission confirmation screen (reuses .lc-reco positioning) ===== */
+.lc-success { background: #f8fafc; overflow-y: auto; }
+.lc-suc-inner {
+  min-height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: calc(40px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
+}
+.lc-suc-badge {
+  width: 84px; height: 84px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 44px; color: #fff; font-weight: 800;
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 14px 34px rgba(16,185,129,.45);
+  animation: lc-suc-pop .4s cubic-bezier(.2,.9,.3,1.4) both;
+}
+@keyframes lc-suc-pop { from { transform: scale(.4); opacity: 0; } }
+.lc-suc-title { font-size: 23px; font-weight: 800; margin: 20px 0 4px; color: var(--lc-ink); }
+.lc-suc-sub { font-size: 15px; color: var(--lc-sub); margin-bottom: 20px; }
+.lc-suc-ref {
+  width: 100%; max-width: 340px; border: 1px dashed #94a3b8; border-radius: 14px;
+  padding: 12px; background: #fff; margin-bottom: 16px;
+}
+.lc-suc-ref span { display: block; font-size: 11px; color: var(--lc-sub); text-transform: uppercase; letter-spacing: .5px; }
+.lc-suc-ref b { font-size: 22px; letter-spacing: 1px; color: #0f766e; }
+.lc-suc-card {
+  width: 100%; max-width: 340px; background: #fff; border: 1px solid var(--lc-line);
+  border-radius: 14px; padding: 6px 14px; margin-bottom: 16px;
+}
+.lc-suc-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--lc-soft); }
+.lc-suc-row:last-child { border-bottom: none; }
+.lc-suc-row span { font-size: 13px; color: var(--lc-sub); }
+.lc-suc-row b { font-size: 14px; color: var(--lc-ink); }
+.lc-suc-row b i { font-size: 11px; font-style: normal; color: var(--lc-sub); font-weight: 600; }
+.lc-suc-note {
+  width: 100%; max-width: 340px; font-size: 13px; line-height: 1.5; color: #334155;
+  background: #ecfdf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 24px;
+}
+.lc-suc-done {
+  width: 100%; max-width: 340px; min-height: 52px; margin-top: auto; border: none; border-radius: 14px;
+  cursor: pointer; font-size: 16px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #0f766e, #0d9488);
 }
 @media (min-width: 640px) {
   /* Larger screens: a centred, mobile-width floating panel.

@@ -864,6 +864,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.color = 0xFFFF6A6A.toInt()
         textPaint.textSize = h * 0.035f
         canvas.drawText("RAM   vs   RAVAN", cx, h * 0.215f, textPaint)
+        // Brand tagline.
+        textPaint.color = 0xBBFFD24A.toInt()
+        textPaint.textSize = h * 0.024f
+        canvas.drawText("Draw the bow.  Sever all ten heads.", cx, h * 0.252f, textPaint)
 
         val modeFill = if (daily) 0xFF3A2A12.toInt() else 0xFF1A2230.toInt()
         val modeTxt = if (daily) Ram.GOLD else 0xCCFFFFFF.toInt()
@@ -902,10 +906,25 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.textSize = h * 0.04f
         canvas.drawText("BEGIN BATTLE", cx, rectPlay.centerY() + h * 0.014f, textPaint)
 
+        // Rotating feature hook — the attract-screen "why you'll love it" line.
+        val hook = readyHooks[((bgPhase / 150f).toInt()) % readyHooks.size]
+        val fade = 0.55f + 0.45f * sin(bgPhase * 0.05f)
+        textPaint.color = ((0x66 + (0x80 * fade).toInt()).coerceIn(0, 255) shl 24) or 0x00FFD24A
+        textPaint.textSize = h * 0.024f
+        canvas.drawText(hook, cx, h * 0.755f, textPaint)
+
         textPaint.color = 0x99FFFFFF.toInt()
         textPaint.textSize = h * 0.024f
         canvas.drawText("BEST $bestScore   •   MOST HEADS ${prefs.mostHeads}", cx, h * 0.80f, textPaint)
     }
+
+    private val readyHooks = arrayOf(
+        "Clash arrows mid-air, Pocket-Tanks style",
+        "New Daily Battle — the same fight for everyone",
+        "Unleash four divine astras",
+        "Choose a boon after every severed head",
+        "Then survive the Rage of Ravan"
+    )
 
     private fun drawBoon(canvas: Canvas) {
         val cx = w / 2f
@@ -983,8 +1002,15 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             canvas.drawText("DAY STREAK $dailyStreak", cx, h * 0.515f, textPaint)
         }
 
+        // Share nudge — drives the social loop.
+        textPaint.color = 0xAAFFFFFF.toInt()
+        textPaint.textSize = h * 0.022f
+        val nudge = if (daily) "Share your result — challenge friends to today's battle"
+                    else "Share your battle card — can they beat you?"
+        canvas.drawText(nudge, cx, rectRetry.top - h * 0.02f, textPaint)
+
         drawButton(canvas, rectRetry, "FIGHT AGAIN", Ram.SAFFRON, 0xFF2A1206.toInt(), h * 0.036f)
-        drawButton(canvas, rectShare, "SHARE", 0xFF2C3A52.toInt(), Color.WHITE, h * 0.034f)
+        drawButton(canvas, rectShare, "SHARE & CHALLENGE", 0xFF2C3A52.toInt(), Color.WHITE, h * 0.03f)
     }
 
     // ----------------------------------------------------------------------

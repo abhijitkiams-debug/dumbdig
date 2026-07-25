@@ -22,7 +22,7 @@
 
   // Build stamp — shown in the call bar so the live bundle is verifiable at a
   // glance. Bump this together with the ?v= query in index.html on each change.
-  var BUILD = 'v23';
+  var BUILD = 'v24';
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -1182,6 +1182,17 @@
       // ("yes, this is my shop") can still resolve to an option.
       var matched = this._matchOption(f, val);
       if (matched != null) val = matched; else return null;
+    } else if (f.id === 'mobile') {
+      // Accept typed OR spoken digits ("nine eight seven…", "double five…").
+      var mob = this.nlu.parseMobile ? this.nlu.parseMobile(text) : null;
+      if (!mob) return null; // not a valid 10-digit mobile -> re-ask
+      val = mob;
+    } else if (f.id === 'pincode' || f.id === 'aadhaar') {
+      var digits = this.nlu.spokenDigits ? this.nlu.spokenDigits(text) : val.replace(/\D/g, '');
+      var need = f.id === 'aadhaar' ? 12 : 6;
+      var found = digits.match(f.id === 'aadhaar' ? /\d{12}/ : /[1-9]\d{5}/);
+      if (!found) return null;
+      val = found[0];
     } else if (f.numeric) {
       var amt = this.nlu.parseAmount(text);
       var n = amt != null ? amt : parseFloat(val.replace(/[^\d.]/g, ''));
@@ -1252,9 +1263,18 @@
     return true;
   };
 
+  // Greetings / filler that are never a person's name or a city — reject so a
+  // "Hello" or "namaste" at the name step isn't captured as the customer's name.
+  var NON_NAME_RE = /^(hi+|hey+|hello+|heya|yo|hola|namaste|namaskar|namaskaar|hallo|salaam|salam|good\s*(morning|afternoon|evening|day)|thanks?|thank\s*you|ok(ay)?|yes|yeah|yep|no|nope|nah|please|sorry|hmm+|haan|nahi|nahin|kya|test(ing)?|arya|assistant|bot)$/i;
+  var NON_NAME_DEV = /^(नमस्ते|नमस्कार|हैलो|हाय|हेलो|धन्यवाद|शुक्रिया|हाँ|हां|नहीं|ठीक)$/;
+
   // Light plausibility check so free text answers only fill fields they fit.
   Copilot.prototype._validText = function (id, val) {
     var words = val.split(/\s+/).length;
+    var trimmed = val.trim();
+    if (id === 'fullName' || id === 'city') {
+      if (NON_NAME_RE.test(trimmed) || NON_NAME_DEV.test(trimmed)) return false;
+    }
     if (id === 'fullName') return /^[a-z][a-z .']{1,40}$/i.test(val) && words <= 4;
     if (id === 'city') return /^[a-z][a-z .'-]{1,30}$/i.test(val) && words <= 3;
     if (id === 'pincode') return /^[1-9]\d{5}$/.test(val);

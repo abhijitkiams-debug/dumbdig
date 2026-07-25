@@ -97,6 +97,50 @@
     return (found && hadScale && val > 0) ? Math.round(val) : null;
   }
 
+  // Spoken single digits (phone numbers etc.) in English & Hindi/Hinglish, plus
+  // Devanagari numerals and "double/triple X" (Indian style, e.g. "double five"
+  // -> 55). Returns a digit STRING — used for mobile / Aadhaar / pincode where a
+  // customer reads a number out one digit at a time.
+  var DIGIT_WORDS = {
+    zero: '0', oh: '0', o: '0', naught: '0', nought: '0', sifar: '0', shunya: '0', sunya: '0',
+    one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9',
+    ek: '1', do: '2', teen: '3', char: '4', chaar: '4', paanch: '5', panch: '5', paach: '5',
+    chhe: '6', che: '6', chah: '6', chhah: '6', saat: '7', aath: '8', nau: '9',
+    // Devanagari digit words
+    'शून्य': '0', 'सिफ़र': '0', 'सिफर': '0', 'एक': '1', 'दो': '2', 'तीन': '3', 'चार': '4',
+    'पांच': '5', 'पाँच': '5', 'छह': '6', 'छे': '6', 'सात': '7', 'आठ': '8', 'नौ': '9'
+  };
+  var DEV_DIGITS = { '०': '0', '१': '1', '२': '2', '३': '3', '४': '4', '५': '5', '६': '6', '७': '7', '८': '8', '९': '9' };
+  function spokenDigits(text) {
+    if (!text) return '';
+    var raw = String(text).toLowerCase().replace(/[०-९]/g, function (d) { return DEV_DIGITS[d] || ''; });
+    var tokens = raw.replace(/[^a-z0-9ऀ-ॿ\s]/g, ' ').split(/\s+/);
+    var out = '', mult = 1;
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i];
+      if (!tk) continue;
+      if (tk === 'double') { mult = 2; continue; }
+      if (tk === 'triple') { mult = 3; continue; }
+      var d = /^\d+$/.test(tk) ? tk : (DIGIT_WORDS[tk] != null ? DIGIT_WORDS[tk] : null);
+      if (d != null) {
+        if (d.length === 1) { for (var r = 0; r < mult; r++) out += d; }
+        else out += d;
+        mult = 1;
+      } else { mult = 1; }
+    }
+    return out;
+  }
+
+  // Extract a 10-digit Indian mobile, whether typed ("9876543210") or spoken
+  // ("nine eight seven…", "double nine…").
+  function parseMobile(text) {
+    var m = String(text || '').match(RE.mobile);
+    if (m) return m[1];
+    var d = spokenDigits(text).replace(/^(?:0|91)/, '');
+    var mm = d.match(/[6-9]\d{9}/);
+    return mm ? mm[0] : null;
+  }
+
   // Returns the numeric rupee value of the first monetary mention, or null.
   function parseAmount(text) {
     var t = text.toLowerCase().replace(/,/g, '');
@@ -249,7 +293,7 @@
     if ((m = text.match(RE.pan))) entities.pan = m[1].toUpperCase();
     if ((m = text.match(RE.aadhaar))) entities.aadhaar = m[1].replace(/\s/g, '');
     if ((m = text.match(RE.email))) entities.email = m[1].toLowerCase();
-    if ((m = text.match(RE.mobile))) entities.mobile = m[1];
+    var mob = parseMobile(text); if (mob) entities.mobile = mob;
     // Pincode only if it isn't the same 6 digits as something else; keep simple.
     if ((m = text.match(RE.pincode)) && !entities.aadhaar) {
       // avoid grabbing part of a phone number
@@ -293,6 +337,8 @@
     parseAmount: parseAmount,
     parseIncome: parseIncome,
     parseTenure: parseTenure,
+    parseMobile: parseMobile,
+    spokenDigits: spokenDigits,
     LOAN_TYPES: LOAN_TYPES
   };
 })(typeof window !== 'undefined' ? window : this);

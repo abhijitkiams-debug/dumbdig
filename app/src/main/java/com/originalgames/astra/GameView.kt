@@ -75,6 +75,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var hurtFlash = 0f
     private var victoryBanner = 0
 
+    // Global pace multiplier: <1 slows the whole battle down for readability.
+    private val pace = 0.58f
+
+    // --- Aiming (Pocket-Tanks-style manual shots) ---
+    private enum class Touch { NONE, MOVE, AIM }
+    private var touchMode = Touch.NONE
+    private var aimX = 0f
+    private var aimY = 0f
+    private var manualCooldown = 0
+
     // --- Modes ---
     private var daily = false
     private var rng: Random = Random.Default
@@ -213,15 +223,50 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun handlePlayTouch(action: Int, x: Float, y: Float) {
+        // Vertical control split: drag down low to MOVE Ram (dodge), drag up high
+        // to AIM a charged shot (angle + power) and release to loose it. The
+        // floating astra button fires the armed astra.
+        val split = h * 0.62f
         when (action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                // Tapping the astra button fires; anywhere else starts steering.
-                if (rectAstra.contains(x, y)) {
-                    if (astraMeter >= 1f) fireAstra()
-                } else ram.moveTo(x)
+                when {
+                    rectAstra.contains(x, y) -> { if (astraMeter >= 1f) fireAstra(); touchMode = Touch.NONE }
+                    y > split -> { touchMode = Touch.MOVE; ram.moveTo(x) }
+                    else -> { touchMode = Touch.AIM; aimX = x; aimY = y }
+                }
             }
-            MotionEvent.ACTION_MOVE -> if (!rectAstra.contains(x, y)) ram.moveTo(x)
+            MotionEvent.ACTION_MOVE -> when (touchMode) {
+                Touch.MOVE -> ram.moveTo(x)
+                Touch.AIM -> { aimX = x; aimY = y }
+                Touch.NONE -> {}
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                if (touchMode == Touch.AIM) fireAimedArrow(aimX, aimY)
+                touchMode = Touch.NONE
+            }
         }
+    }
+
+    /** Fires a powerful, player-aimed arrow toward [tx],[ty]; power scales with drag length. */
+    private fun fireAimedArrow(tx: Float, ty: Float) {
+        if (manualCooldown > 0) return
+        val dx = tx - ram.x; val dy = ty - (ram.y - ram.radius)
+        val dist = kotlin.math.hypot(dx, dy)
+        if (dist < ram.radius * 0.6f) return          // ignore taps that aren't a real aim
+        val dirX = dx / dist; val dirY = dy / dist
+        if (dirY > -0.15f) return                     // must aim generally upward, toward Ravan
+        val power = (dist / (h * 0.42f)).coerceIn(0.35f, 1f)
+        val speed = (h * 0.016f + h * 0.012f * power) * pace * 1.9f
+        val dmg = loadout.arrowDamage * (1.6f + power * 1.9f)
+        arrows.add(
+            Arrow(
+                ram.x, ram.y - ram.radius, dirX * speed, dirY * speed,
+                damage = dmg, length = h * 0.024f,
+                color = 0xFFFFF3C0.toInt(), pierce = loadout.pierce
+            )
+        )
+        manualCooldown = 10
+        sound.shoot(); haptics.light()
     }
 
     private fun handleReadyTap(x: Float, y: Float) {
@@ -269,7 +314,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         ravan.reset()
         loadout.reset()
         fireCooldown = 0
-        attackTimer = 90
+        attackTimer = 120
+        touchMode = Touch.NONE
+        manualCooldown = 0
         astraMeter = 0f
         armedAstra = AstraType.AGNEYA
         headsSevered = 0
@@ -302,6 +349,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
         if (state != State.PLAYING) return
         survivalTicks++
+        if (manualCooldown > 0) manualCooldown--
         ram.update()
         ravan.update()
 
@@ -437,9 +485,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun fireVolley() {
-        sound.shoot(); haptics.light()
+        // Auto-fire is the steady baseline; aimed shots are the heavy hitters.
+        sound.shoot()
         val n = loadout.arrowsPerShot
-        val speed = h * 0.018f
+        val speed = h * 0.018f * pace * 1.7f
         val startY = ram.y - ram.radius * 1.2f
         val total = loadout.spread
         for (idx in 0 until n) {
@@ -449,7 +498,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                 Arrow(
                     x = ram.x, y = startY,
                     vx = cos(ang) * speed, vy = sin(ang) * speed,
-                    damage = loadout.arrowDamage,
+                    damage = loadout.arrowDamage * 0.6f,
                     length = h * 0.02f,
                     color = Ram.GOLD,
                     pierce = loadout.pierce
@@ -473,7 +522,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                     severed = damageRavan(ravan.activeHeadMaxHp * 0.4f + 5f)
                 }
                 AstraType.NAGA -> {
-                    val speed = h * 0.02f
+                    val speed = h * 0.02f * pace * 1.7f
                     for (s in 0 until 6) {
                         val ang = -Math.PI.toFloat() / 2f + (s - 2.5f) * 0.18f
                         arrows.add(
@@ -520,15 +569,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun nextAttackGap(): Int {
         val d = difficulty()
-        val base = (62 - d * 2).coerceAtLeast(22)
-        val jitter = 0.8f + rng.nextFloat() * 0.5f
-        return (base * jitter).toInt().coerceAtLeast(16)
+        // Longer gaps + slower ramp so the battle is readable, not frantic.
+        val base = (70 - d * 1.6f).coerceAtLeast(30f)
+        val jitter = 0.85f + rng.nextFloat() * 0.5f
+        return (base * jitter / pace).toInt().coerceAtLeast(24)
     }
 
     private fun spawnAttackWave() {
         val d = difficulty()
         val topY = h * 0.20f
-        val fall = h * 0.006f + d * h * 0.00018f
+        // Slower fall + gentler difficulty ramp (scaled by the global pace).
+        val fall = (h * 0.006f + d * h * 0.00011f) * pace
         // Pattern pool widens with difficulty.
         val pool = ArrayList<Int>()
         pool.add(6); pool.add(6); pool.add(0)            // Ravan's aimed arrows (core duel) + baan rain
@@ -539,8 +590,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         if (d >= 6) pool.add(5)                          // storm
         when (pool[rng.nextInt(pool.size)]) {
             0 -> {
-                val count = 3 + d / 3
-                for (s in 0 until count.coerceAtMost(9)) {
+                val count = 2 + d / 4
+                for (s in 0 until count.coerceAtMost(7)) {
                     val x = w * (0.12f + rng.nextFloat() * 0.76f)
                     spawn(Aayudha.Type.BAAN, x, topY, 0f, fall * 1.3f, w * 0.012f)
                 }
@@ -572,7 +623,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             6 -> {
                 // Ravan looses a fan of aimed arrows straight at Ram — these are
                 // destructible, so Ram's auto-arrows clash with them in mid-air.
-                val count = (2 + d / 4).coerceAtMost(5)
+                val count = (1 + d / 5).coerceAtMost(4)
                 val ox = ravan.activeHeadX(); val oy = ravan.activeHeadY() + h * 0.02f
                 val sp = fall * 1.45f
                 for (s in 0 until count) {
@@ -640,12 +691,21 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             )
         }
         ravan.draw(canvas, rage)
+        // Telegraph: the active head pulses just before Ravan looses an attack.
+        if (state == State.PLAYING && attackTimer in 1..16) {
+            val f = 1f - attackTimer / 16f
+            ringPaint.color = ((0x30 + (0x70 * f).toInt()) shl 24) or 0x00FF4D5E
+            ringPaint.strokeWidth = h * 0.005f
+            canvas.drawCircle(ravan.activeHeadX(), ravan.activeHeadY(), w * (0.06f + 0.04f * f), ringPaint)
+        }
         for (ay in aayudhas) ay.draw(canvas)
         for (a in arrows) a.draw(canvas)
         for (s in astras) s.draw(canvas, w, h)
         if (this::ram.isInitialized && state != State.GAME_OVER) ram.draw(canvas)
         particles.draw(canvas)
         if (shaking) canvas.restore()
+
+        if (state == State.PLAYING && touchMode == Touch.AIM) drawAimPreview(canvas)
 
         if (hurtFlash > 0.02f) {
             bgPaint.color = ((0x66 * hurtFlash).toInt().coerceIn(0, 255) shl 24) or 0x00FF3030
@@ -660,6 +720,38 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             State.GAME_OVER -> drawGameOver(canvas)
         }
         if (victoryBanner > 0 && state == State.PLAYING) drawVictoryBanner(canvas)
+    }
+
+    /** Dashed guide line + power gauge for the Pocket-Tanks-style aimed shot. */
+    private fun drawAimPreview(canvas: Canvas) {
+        val ox = ram.x; val oy = ram.y - ram.radius
+        val dx = aimX - ox; val dy = aimY - oy
+        val dist = kotlin.math.hypot(dx, dy)
+        if (dist < ram.radius * 0.6f) return
+        val dirX = dx / dist; val dirY = dy / dist
+        val valid = dirY < -0.15f
+        val power = (dist / (h * 0.42f)).coerceIn(0.35f, 1f)
+        val col = if (valid) 0xFFFFF3C0.toInt() else 0xFFFF5A5A.toInt()
+
+        ringPaint.color = (0xCC shl 24) or (col and 0x00FFFFFF)
+        ringPaint.strokeWidth = h * 0.004f
+        var t = ram.radius
+        val seg = h * 0.022f
+        while (t < h) {
+            val y1 = oy + dirY * t
+            if (y1 < 0f) break
+            canvas.drawLine(ox + dirX * t, y1, ox + dirX * (t + seg * 0.55f), oy + dirY * (t + seg * 0.55f), ringPaint)
+            t += seg
+        }
+        barPaint.color = (0xAA shl 24) or (col and 0x00FFFFFF)
+        canvas.drawCircle(aimX, aimY, h * 0.009f, barPaint)
+
+        // Power gauge under Ram.
+        val bw = w * 0.2f; val bx = ox - bw / 2f; val by = oy + ram.radius * 1.9f; val bh = h * 0.012f
+        barPaint.color = 0x44FFFFFF
+        canvas.drawRoundRect(bx, by, bx + bw, by + bh, bh / 2f, bh / 2f, barPaint)
+        barPaint.color = if (valid) Ram.GOLD else 0xFFFF5A5A.toInt()
+        canvas.drawRoundRect(bx, by, bx + bw * power, by + bh, bh / 2f, bh / 2f, barPaint)
     }
 
     private fun drawBackground(canvas: Canvas) {
@@ -732,11 +824,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.color = if (full) 0xFFFFE14A.toInt() else 0x66FFFFFF.toInt()
         canvas.drawText(if (full) "TAP!" else "ASTRA", cx, cy + r * 0.35f, textPaint)
 
-        // First-run hint.
-        if (survivalTicks < 150 && headsSevered == 0) {
-            textPaint.color = 0x88FFFFFF.toInt()
-            textPaint.textSize = h * 0.024f
-            canvas.drawText("drag to move  •  arrows fire automatically", w / 2f, h * 0.78f, textPaint)
+        // First-run hints.
+        if (survivalTicks < 260 && headsSevered == 0) {
+            textPaint.color = 0x99FFFFFF.toInt()
+            textPaint.textSize = h * 0.023f
+            canvas.drawText("drag low = move    •    drag high = aim & fire", w / 2f, h * 0.55f, textPaint)
         }
     }
 
@@ -792,12 +884,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         // How to play.
         textPaint.color = 0xCCFFFFFF.toInt()
         textPaint.textSize = h * 0.026f
-        canvas.drawText("DRAG to dodge Ravan's astras", cx, h * 0.44f, textPaint)
-        canvas.drawText("Arrows fire on their own", cx, h * 0.485f, textPaint)
-        canvas.drawText("Fill the meter, TAP to unleash an Astra", cx, h * 0.53f, textPaint)
+        canvas.drawText("Drag DOWN LOW to move & dodge", cx, h * 0.435f, textPaint)
+        canvas.drawText("Drag UP HIGH to aim, release to fire", cx, h * 0.475f, textPaint)
+        canvas.drawText("Your bow also auto-fires", cx, h * 0.515f, textPaint)
+        canvas.drawText("Fill the meter, TAP the Astra orb", cx, h * 0.555f, textPaint)
         textPaint.color = 0x88FFFFFF.toInt()
         textPaint.textSize = h * 0.022f
-        canvas.drawText("Sever all 10 heads of Ravan", cx, h * 0.575f, textPaint)
+        canvas.drawText("Sever all 10 heads of Ravan", cx, h * 0.595f, textPaint)
 
         val pulse = 0.5f + 0.5f * sin(bgPhase * 0.08f)
         barPaint.color = Ram.SAFFRON

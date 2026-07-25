@@ -65,9 +65,9 @@ class Ram(
         targetX = px.coerceIn(minX, maxX)
     }
 
-    /** Tight hit circle, written into [out] as a square for cheap overlap tests. */
+    /** Tight, forgiving hit circle written into [out] as a square for cheap tests. */
     fun bounds(out: RectF) {
-        val r = radius * 0.62f
+        val r = radius * 0.5f
         out.set(x - r, y - r, x + r, y + r)
     }
 

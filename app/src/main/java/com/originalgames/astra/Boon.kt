@@ -8,7 +8,7 @@ import kotlin.random.Random
  * core loop into a compulsive one.
  */
 class Loadout {
-    var fireInterval = 22       // frames between volleys (lower = faster)
+    var fireInterval = 30       // frames between volleys (lower = faster)
     var arrowsPerShot = 1
     var spread = 0f             // total fan angle (radians) when >1 arrow
     var arrowDamage = 5f

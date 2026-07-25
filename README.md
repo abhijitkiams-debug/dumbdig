@@ -44,9 +44,11 @@ every one of those levers:
 
 ## Gameplay
 
-- **Drag** anywhere to slide Ram and dodge Ravan's incoming aayudha.
-- Ram **auto-looses arrows** upward at the active head — focus on positioning and survival.
-- **Astra meter** fills as you deal damage. When full, **tap the ASTRA button** to unleash the armed astra; firing **cycles to the next** one.
+- **Drag low** (bottom of the screen) to slide Ram and dodge Ravan's incoming aayudha.
+- **Drag high** (upper screen) to **aim a charged shot** by angle + power — a dashed guide and power gauge appear; **release to loose it** (Pocket-Tanks-style). Aimed shots hit far harder than the auto-fire.
+- Ram's bow also **auto-looses** a steady stream of arrows, so passive play still makes progress.
+- **Astra meter** fills as you deal damage. When full, **tap the floating ASTRA orb** to unleash the armed astra; firing **cycles to the next** one.
+- The battle runs at a deliberately **readable pace**, and Ravan's active head **pulses a telegraph** just before each attack.
 - Each head you sever offers a **choice of three boons** that permanently buff this run.
 - **Lives** are three hearts (top-left). Take three hits and Ram falls.
 - **Score** = heads × 250 + damage dealt + survival. Your best (endless) is saved locally.

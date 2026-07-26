@@ -21,6 +21,11 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_HEADS, 0)
         set(value) = sp.edit().putInt(KEY_HEADS, value).apply()
 
+    /** Total duels won against Ravan. */
+    var wins: Int
+        get() = sp.getInt(KEY_WINS, 0)
+        set(value) = sp.edit().putInt(KEY_WINS, value).apply()
+
     var soundEnabled: Boolean
         get() = sp.getBoolean(KEY_SOUND, true)
         set(value) = sp.edit().putBoolean(KEY_SOUND, value).apply()
@@ -79,6 +84,7 @@ class Prefs(context: Context) {
         private const val FILE = "astra_prefs"
         private const val KEY_BEST = "best_score"
         private const val KEY_HEADS = "most_heads"
+        private const val KEY_WINS = "wins"
         private const val KEY_SOUND = "sound_enabled"
         private const val KEY_HAPTICS = "haptics_enabled"
         private const val KEY_STREAK = "daily_streak"

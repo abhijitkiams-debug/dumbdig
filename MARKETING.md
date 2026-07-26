@@ -1,5 +1,13 @@
 # Astra: Ram vs Ravan — Communication & Copy Kit
 
+> **Note:** the game is now a **side-view artillery duel** (Pocket-Tanks style:
+> aim angle + power, weapon select, wind, destructible terrain). Some lines below
+> were written for the earlier "dodge & sever the heads" concept and should be
+> re-pointed to the duel framing (e.g. "aim your shot, read the wind, defeat
+> Ravan"). The taglines, brand voice, ASO bank and social/video structure all
+> still apply. Ask and I'll regenerate the kit for the duel format.
+
+
 Launch-ready marketing copy for every surface. Everything here is written to the
 platform's real character limits and tuned to the game's viral hooks: one-thumb
 play, Pocket-Tanks aiming, roguelite boons, a daily shared battle, and the

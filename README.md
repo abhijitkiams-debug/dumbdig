@@ -1,19 +1,23 @@
 # Astra: Ram vs Ravan 🏹🔥
 
-**A one-thumb, boss-survival archery game for Android — built from scratch, 100% original, zero copyrighted assets.**
+**A side-view artillery duel for Android — Pocket Tanks meets the Ramayana. Built from scratch, 100% original, zero copyrighted assets.**
 
-You are **Ram**, the divine archer. Above you looms **Ravan**, the ten-headed
-Demon-King of Lanka, raining down a storm of *aayudha* — arrows, maces,
-tridents, war-discs and homing fire-bolts. Drag to dodge. Your bow fires on its
-own. Fill the meter and unleash a rotating arsenal of divine **astras**. Sever
-all ten heads — then survive his Rage.
+You are **Ram**, the divine archer, on the left. Across a varied, destructible
+battlefield stands **Ravan**, the ten-headed Demon-King of Lanka. Take turns
+lobbing weapons over the terrain: pick your **weapon**, drag to set your **aim
+angle and power** (a live trajectory arc previews the shot), account for the
+**wind**, and release to fire. Whittle his health to zero before he does yours.
 
 ```
-   (o)(o)(o)(o)(o)(o)(o)(o)(o)(o)    <- Ravan's 10 heads
-      v    O    Y    v    O          <- incoming aayudha (dodge!)
-              |  |  |                 <- your auto-fired arrows
-            >Ram<        [ASTRA]      <- drag to move | tap to unleash
+                          .  ^  .            <- wind + arcing shot
+                     .            .
+   \O/  Ram      .                   .   Ravan (10 heads)
+   /|\ >==      pillar   [temple]        \=<  /|\
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   <- destructible terrain
+   [Baan][Agni][Tri][Gada][Brahma]   <- pick weapon · drag to aim · release
 ```
+
+> Landscape orientation. Turn your phone sideways for the full battlefield.
 
 ---
 
@@ -27,64 +31,47 @@ every one of those levers:
 
 | Viral trait | How Astra delivers it |
 |-------------|-----------------------|
-| **3-second comprehension** | One rule: drag to dodge. Arrows fire themselves. Anyone plays instantly. |
-| **One-thumb control** | The whole game is a single dragging thumb + an optional Astra tap. |
-| **Instant restart** | Fall → tap → fighting again. No menus between attempts. |
-| **"One more try" loop** | Runs are short, deaths feel like *your* dodge, the next run is one tap away. |
-| **Roguelite build depth** | Every severed head offers a **Vardaan** (boon) — twin arrows, piercing, crits, astra surge… so each run grows its own bow (the Archero hook). |
-| **Variable rewards** | Random 3-boon offers + a rotating astra arsenal keep the dopamine unpredictable. |
-| **A braggable hero metric** | "I severed **8 / 10** of Ravan's heads" is instantly legible and competitive. |
-| **Readable at a glance** | Bold silhouettes, signature gold/saffron vs demon-red — looks great in a 6-second clip. |
-| **Share loop** | One-tap **SHARE** renders a branded result card (heads + score) for the system share sheet. |
-| **Daily Battle** | A date-seeded fight that's *identical for everyone that day* — directly comparable scores to send friends. |
-| **Daily streak** | Consecutive days build a streak shown on screen and on the share card — a daily-return hook. |
+| **Seconds to grasp** | The universally-understood "aim-and-lob" artillery loop — everyone has played a Pocket Tanks / Angry Birds shot. |
+| **Easy to learn, hard to master** | Anyone can fire; wind, terrain, weapon choice and blast timing are the mastery curve. |
+| **Instant restart** | Win/lose → tap → new terrain, fighting again. No menus between duels. |
+| **"One more duel" loop** | Duels are short and swingy; a lucky Brahmastra or a wind read flips the fight. |
+| **Weapon variety & choice** | Five weapons with distinct arcs, blasts and ammo — expressive, screenshot-worthy shots. |
+| **Destructible, varied terrain** | Fresh battlefield every duel with craters and cover — endless situational variety. |
+| **A braggable metric** | "I slayed Ravan in **6 rounds**" is instantly legible and competitive. |
+| **Readable at a glance** | Bold side-view silhouettes, signature gold/saffron vs demon-red — looks great in a clip. |
+| **Share loop** | One-tap **SHARE** renders a branded result card for the system share sheet. |
 | **Cultural resonance** | The Ramayana is one of the most beloved stories on Earth — built-in emotional pull and a massive audience. |
-| **Smooth juice** | Particle bursts, screen-shake, hit-flashes, head-sever explosions, synth SFX, haptics. |
-| **Tiny + offline** | ~3 MB debug / **0.65 MB release**, no network, no accounts; the only permission is the benign auto-granted `VIBRATE`. |
+| **Smooth juice** | Explosion bursts, screen craters, hit-flashes, synth SFX, haptics. |
+| **Tiny + offline** | ~3 MB debug / **0.66 MB release**, no network, no accounts; the only permission is the benign auto-granted `VIBRATE`. |
 
 ## Gameplay
 
-- **Drag low** (bottom of the screen) to slide Ram and dodge Ravan's incoming aayudha.
-- **Drag high** (upper screen) to **aim a charged shot** by angle + power — a dashed guide and power gauge appear; **release to loose it** (Pocket-Tanks-style). Aimed shots hit far harder than the auto-fire.
-- Ram's bow also **auto-looses** a steady stream of arrows, so passive play still makes progress.
-- **Astra meter** fills as you deal damage. When full, **tap the floating ASTRA orb** to unleash the armed astra; firing **cycles to the next** one.
-- The battle runs at a deliberately **readable pace**, and Ravan's active head **pulses a telegraph** just before each attack.
-- Each head you sever offers a **choice of three boons** that permanently buff this run.
-- **Lives** are three hearts (top-left). Take three hits and Ram falls.
-- **Score** = heads × 250 + damage dealt + survival. Your best (endless) is saved locally.
+It's a **turn-based artillery duel** (think Pocket Tanks / Gunbound):
 
-### The arsenal
+1. **Pick a weapon** from the bottom selector — each has its own damage, blast, weight and ammo.
+2. **Aim**: drag from Ram to set the shot's **angle and power**. A dashed **trajectory arc** previews exactly where it'll go, and the angle/power read out live.
+3. **Mind the wind**: the wind indicator (top-centre) nudges every shot left or right.
+4. **Release to fire.** The arrow/astra arcs over the terrain, craters the ground, and damages Ravan if it lands close enough.
+5. **Ravan fires back** — his aim sharpens each round, so finish him quickly.
+6. First to drop the other's **health bar** to zero wins the duel.
 
-**Ravan's aayudha (dodge or shoot down):**
+Every battle generates **fresh, destructible terrain** with pillars for cover, so no two duels play the same.
+
+### The arsenal (weapons)
 
 | Weapon | Behaviour |
 |--------|-----------|
-| **Baan** (arrow) | Straight & fast — your arrows *can* shoot it down. |
-| **Ravan-baan** (aimed red arrow) | Loosed straight at Ram in a fan — clashes mid-air with your arrows, Pocket-Tanks style. |
-| **Chakra** (war-disc) | Spins and weaves side to side — destructible. |
-| **Gada** (mace) | Heavy, lobbed in an arc — must be dodged. |
-| **Trishul** (trident) | Falls straight and fast — must be dodged. |
-| **Shakti** (fire-bolt) | Curves toward Ram — must be out-manoeuvred. |
+| **Baan** | The basic arrow. Small blast, unlimited ammo. |
+| **Agni Baan** | Fire arrow with a solid explosive blast. |
+| **Tri-Baan** | Fires three arrows in a spread — great for a moving/uncertain aim. |
+| **Gada** (mace) | Heavy, arcs steeply, big damage and blast. |
+| **Brahmastra** | The ultimate — huge damage and blast, but only **one** per duel. |
 
-**Ram's divine astras (rotate as you fire):**
+### Progression
 
-| Astra | Effect |
-|-------|--------|
-| **Agneyastra** (fire) | A wall of flame burns all incoming aayudha and scorches Ravan. |
-| **Vayavyastra** (wind) | A gale blows every incoming weapon off the screen. |
-| **Nagastra** (serpent) | A volley of homing serpent-arrows seeks threats and Ravan. |
-| **Brahmastra** (ultimate) | A pillar of light clears the field and devastates Ravan. |
-
-### Modes & progression
-
-- **Endless War** — a freshly random battle every run. Your best score is saved.
-- **Daily Battle** — toggle on the start screen. The attack patterns are seeded
-  from the date, so everyone playing that day faces the *same* fight. Play it,
-  then tap **SHARE** to post a result card and challenge friends to beat it.
-  - **Streak** — finishing the daily on consecutive days builds a day streak,
-    shown on the start screen, the game-over screen, and the share card.
-- **Rage of Ravan** — sever all ten heads and Ravan regrows them, tougher each
-  cycle, for endless score-chasing. Your heads-severed count keeps climbing.
+- **Win duels** against Ravan — your total **wins** and **best damage** are saved locally.
+- Earn **coins** for every hit landed (a foundation for future weapon unlocks / a shop).
+- **Share** your result card after each duel to challenge friends.
 
 ## Tech at a glance
 
@@ -101,19 +88,18 @@ every one of those levers:
 app/src/main/
 ├── AndroidManifest.xml
 ├── java/com/originalgames/astra/
-│   ├── MainActivity.kt      # immersive single-activity host
-│   ├── GameView.kt          # game loop, state machine, rendering, spawning, boons
-│   ├── Ram.kt               # the player archer: movement, lives, bow
-│   ├── Ravan.kt             # the ten-headed boss: heads, HP, drawing
-│   ├── Arrow.kt             # Ram's arrows (+ pierce / homing flags)
-│   ├── Aayudha.kt           # Ravan's incoming weapon arsenal + collision
-│   ├── Astra.kt             # the four divine astras + on-screen effects
-│   ├── Boon.kt              # the roguelite loadout + Vardaan upgrades
+│   ├── MainActivity.kt      # immersive single-activity host (landscape)
+│   ├── GameView.kt          # turn loop, aiming, AI, rendering, HUD
+│   ├── Terrain.kt           # generated destructible heightmap + pillars
+│   ├── Fighter.kt           # Ram & Ravan combatants (side-view, HP)
+│   ├── Projectile.kt        # ballistic shot under gravity + wind, trail
+│   ├── Weapon.kt            # the weapon loadout (damage/blast/ammo)
+│   ├── Palette.kt           # shared colour palette
 │   ├── ParticleSystem.kt    # pooled burst particles (no per-frame allocation)
 │   ├── SoundManager.kt      # runtime PCM sound synthesis
 │   ├── Haptics.kt           # crash-proof vibration feedback
 │   ├── ShareCard.kt         # renders & shares the result-card image
-│   └── Prefs.kt             # best score, most heads, FX, daily streak
+│   └── Prefs.kt             # wins, best damage, FX toggles
 └── res/                     # original vector launcher icon (bow & arrow), theme
 ```
 

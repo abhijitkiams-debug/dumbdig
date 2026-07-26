@@ -76,7 +76,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var victoryBanner = 0
 
     // Global pace multiplier: <1 slows the whole battle down for readability.
-    private val pace = 0.58f
+    private val pace = 0.45f
 
     // --- Aiming (Pocket-Tanks-style manual shots) ---
     private enum class Touch { NONE, MOVE, AIM }
@@ -179,8 +179,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun layoutUi() {
         val cx = w / 2f
-        val bw = w * 0.56f
-        val bh = h * 0.075f
+        val bw = w * 0.66f
+        val bh = h * 0.078f
         val mw = w * 0.64f
         val mh = h * 0.05f
         rectMode.set(cx - mw / 2f, h * 0.30f, cx + mw / 2f, h * 0.30f + mh)
@@ -284,6 +284,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                     offered[i].apply(loadout, ram)
                     ram.invuln = 50
                     attackTimer = (attackTimer).coerceAtLeast(40)
+                    touchMode = Touch.NONE
                     state = State.PLAYING
                 }
                 sound.confirm(); haptics.pop()
@@ -481,6 +482,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private fun openBoon() {
         // Boons draw from the non-seeded RNG so they never shift the daily course.
         offered = Boon.offer(Random.Default)
+        touchMode = Touch.NONE   // cancel any in-progress aim so it can't stray-fire on resume
         state = State.CHOOSING_BOON
     }
 
@@ -671,6 +673,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         prefs.submitHeads(headsSevered)
         bestScore = prefs.bestScore
         if (daily) dailyStreak = prefs.registerDailyCompletion(dateLabel, yesterdayLabel())
+        touchMode = Touch.NONE
         state = State.GAME_OVER
         gameOverAt = System.currentTimeMillis()
     }
@@ -681,6 +684,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun drawGame(canvas: Canvas) {
         drawBackground(canvas)
+        // The start screen is a clean menu — don't bleed the live battlefield through it.
+        if (state == State.READY) { drawReady(canvas); return }
         // Brief screen shake on clashes/hits — applied to the world only, not the HUD.
         val shaking = shake > 0.2f
         if (shaking) {
@@ -858,44 +863,48 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawRect(0f, 0f, w, h, dimPaint)
         textPaint.textAlign = Paint.Align.CENTER
 
+        // --- Title block ---
         textPaint.color = Ram.GOLD
-        textPaint.textSize = h * 0.10f
-        canvas.drawText("ASTRA", cx, h * 0.17f, textPaint)
+        textPaint.textSize = h * 0.095f
+        canvas.drawText("ASTRA", cx, h * 0.155f, textPaint)
         textPaint.color = 0xFFFF6A6A.toInt()
-        textPaint.textSize = h * 0.035f
-        canvas.drawText("RAM   vs   RAVAN", cx, h * 0.215f, textPaint)
-        // Brand tagline.
-        textPaint.color = 0xBBFFD24A.toInt()
-        textPaint.textSize = h * 0.024f
-        canvas.drawText("Draw the bow.  Sever all ten heads.", cx, h * 0.252f, textPaint)
+        textPaint.textSize = h * 0.032f
+        canvas.drawText("RAM   vs   RAVAN", cx, h * 0.195f, textPaint)
+        textPaint.color = 0xAAFFD24A.toInt()
+        textPaint.textSize = h * 0.022f
+        canvas.drawText("Draw the bow.  Sever all ten heads.", cx, h * 0.232f, textPaint)
 
-        val modeFill = if (daily) 0xFF3A2A12.toInt() else 0xFF1A2230.toInt()
-        val modeTxt = if (daily) Ram.GOLD else 0xCCFFFFFF.toInt()
-        val modeLabel = if (daily) "DAILY BATTLE  •  $dateLabel" else "ENDLESS WAR"
-        drawButton(canvas, rectMode, modeLabel, modeFill, modeTxt, h * 0.026f)
-        textPaint.textSize = h * 0.02f
-        textPaint.color = 0x99FFFFFF.toInt()
-        canvas.drawText(
-            if (daily) "same battle for everyone today  •  streak $dailyStreak" else "tap to switch mode",
-            cx, rectMode.bottom + h * 0.032f, textPaint
-        )
-
+        // --- Mode toggle ---
         val fxOn = sound.enabled
         drawButton(canvas, rectFx, if (fxOn) "FX: ON" else "FX: OFF",
             if (fxOn) 0xFF1A2230.toInt() else 0xFF2A1A1A.toInt(),
             if (fxOn) 0xCCFFFFFF.toInt() else 0x77FFFFFF.toInt(), h * 0.02f)
 
-        // How to play.
-        textPaint.color = 0xCCFFFFFF.toInt()
-        textPaint.textSize = h * 0.026f
-        canvas.drawText("Drag DOWN LOW to move & dodge", cx, h * 0.435f, textPaint)
-        canvas.drawText("Drag UP HIGH to aim, release to fire", cx, h * 0.475f, textPaint)
-        canvas.drawText("Your bow also auto-fires", cx, h * 0.515f, textPaint)
-        canvas.drawText("Fill the meter, TAP the Astra orb", cx, h * 0.555f, textPaint)
+        val modeFill = if (daily) 0xFF3A2A12.toInt() else 0xFF1A2230.toInt()
+        val modeTxt = if (daily) Ram.GOLD else 0xCCFFFFFF.toInt()
+        val modeLabel = if (daily) "DAILY BATTLE  •  $dateLabel" else "ENDLESS WAR"
+        drawButton(canvas, rectMode, modeLabel, modeFill, modeTxt, h * 0.026f)
+        textPaint.textSize = h * 0.019f
         textPaint.color = 0x88FFFFFF.toInt()
-        textPaint.textSize = h * 0.022f
-        canvas.drawText("Sever all 10 heads of Ravan", cx, h * 0.595f, textPaint)
+        canvas.drawText(
+            if (daily) "same battle for everyone  •  streak $dailyStreak" else "tap to switch mode",
+            cx, rectMode.bottom + h * 0.03f, textPaint
+        )
 
+        // --- How to play (compact card) ---
+        val cardTop = h * 0.42f; val cardBot = h * 0.60f
+        barPaint.color = 0x22FFFFFF
+        canvas.drawRoundRect(w * 0.10f, cardTop, w * 0.90f, cardBot, h * 0.02f, h * 0.02f, barPaint)
+        textPaint.color = 0x88FFD24A.toInt()
+        textPaint.textSize = h * 0.02f
+        canvas.drawText("HOW TO PLAY", cx, cardTop + h * 0.033f, textPaint)
+        textPaint.color = 0xDDFFFFFF.toInt()
+        textPaint.textSize = h * 0.024f
+        canvas.drawText("Drag LOW  —  move & dodge", cx, cardTop + h * 0.075f, textPaint)
+        canvas.drawText("Drag HIGH  —  aim, release to fire", cx, cardTop + h * 0.112f, textPaint)
+        canvas.drawText("Tap the ASTRA orb when it's full", cx, cardTop + h * 0.149f, textPaint)
+
+        // --- Begin button ---
         val pulse = 0.5f + 0.5f * sin(bgPhase * 0.08f)
         barPaint.color = Ram.SAFFRON
         barPaint.alpha = (200 + 55 * pulse).toInt()
@@ -903,28 +912,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawRoundRect(rectPlay, pr, pr, barPaint)
         barPaint.alpha = 255
         textPaint.color = 0xFF2A1206.toInt()
-        textPaint.textSize = h * 0.04f
-        canvas.drawText("BEGIN BATTLE", cx, rectPlay.centerY() + h * 0.014f, textPaint)
+        textPaint.textSize = h * 0.036f
+        canvas.drawText("BEGIN  BATTLE", cx, rectPlay.centerY() + h * 0.013f, textPaint)
 
-        // Rotating feature hook — the attract-screen "why you'll love it" line.
-        val hook = readyHooks[((bgPhase / 150f).toInt()) % readyHooks.size]
-        val fade = 0.55f + 0.45f * sin(bgPhase * 0.05f)
-        textPaint.color = ((0x66 + (0x80 * fade).toInt()).coerceIn(0, 255) shl 24) or 0x00FFD24A
-        textPaint.textSize = h * 0.024f
-        canvas.drawText(hook, cx, h * 0.755f, textPaint)
-
+        // --- Records ---
         textPaint.color = 0x99FFFFFF.toInt()
-        textPaint.textSize = h * 0.024f
-        canvas.drawText("BEST $bestScore   •   MOST HEADS ${prefs.mostHeads}", cx, h * 0.80f, textPaint)
+        textPaint.textSize = h * 0.023f
+        canvas.drawText("BEST $bestScore    •    MOST HEADS ${prefs.mostHeads}", cx, h * 0.83f, textPaint)
     }
-
-    private val readyHooks = arrayOf(
-        "Clash arrows mid-air, Pocket-Tanks style",
-        "New Daily Battle — the same fight for everyone",
-        "Unleash four divine astras",
-        "Choose a boon after every severed head",
-        "Then survive the Rage of Ravan"
-    )
 
     private fun drawBoon(canvas: Canvas) {
         val cx = w / 2f

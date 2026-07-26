@@ -56,6 +56,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var round = 1
     private var damageDealt = 0
     private var thinkTimer = 0
+    private var rathBoost = 1f
     private var gameOverAt = 0L
     private var playerWon = false
     private var bgPhase = 0f
@@ -72,6 +73,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private val rectShare = RectF()
     private val rectPause = RectF()
     private val rectFx = RectF()
+    private val rectArmour = RectF()
+    private val rectRath = RectF()
     private val weaponRects = Array(Weapon.entries.size) { RectF() }
 
     // Paints.
@@ -107,8 +110,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         unit = h * 0.014f
         skyPaint.shader = LinearGradient(
             0f, 0f, 0f, h,
-            intArrayOf(0xFF5B3A8A.toInt(), 0xFFC9628A.toInt(), 0xFFF2A65A.toInt()),
-            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
+            intArrayOf(0xFF7A4B12.toInt(), 0xFFC9871E.toInt(), 0xFFF3D27A.toInt()),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP
         )
         layoutUi()
         newBattle()
@@ -128,6 +131,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private fun layoutUi() {
         val bw = w * 0.28f; val bh = h * 0.11f; val cx = w / 2f
         rectBegin.set(cx - bw / 2f, h * 0.66f, cx + bw / 2f, h * 0.66f + bh)
+        // Upgrade chips on the start screen.
+        val uw = w * 0.24f; val uh = h * 0.13f; val ug = w * 0.03f
+        rectArmour.set(cx - uw - ug / 2f, h * 0.46f, cx - ug / 2f, h * 0.46f + uh)
+        rectRath.set(cx + ug / 2f, h * 0.46f, cx + uw + ug / 2f, h * 0.46f + uh)
         rectRetry.set(cx - bw / 2f, h * 0.62f, cx + bw / 2f, h * 0.62f + bh)
         rectShare.set(cx - bw / 2f, h * 0.76f, cx + bw / 2f, h * 0.76f + bh * 0.8f)
         val ic = h * 0.09f
@@ -152,7 +159,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         terrain = Terrain(w, h, Random.nextLong())
         val ramX = w * 0.12f
         val ravX = w * 0.88f
-        ram = Fighter(true, ramX, terrain.heightAt(ramX), h * 0.11f, 100f)
+        val armour = prefs.armourOwned && prefs.armourOn
+        val rath = prefs.rathOwned && prefs.rathOn
+        ram = Fighter(true, ramX, terrain.heightAt(ramX), h * 0.11f, if (armour) 150f else 100f)
+        ram.armour = armour; ram.rath = rath
+        rathBoost = if (rath) 1.2f else 1f
         ravan = Fighter(false, ravX, terrain.heightAt(ravX), h * 0.14f, 110f)
         ammo.clear()
         for (wp in Weapon.entries) ammo[wp] = wp.ammo
@@ -176,7 +187,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val a = event.actionMasked; val x = event.x; val y = event.y
         synchronized(holder) {
             when (state) {
-                State.READY -> if (a == MotionEvent.ACTION_DOWN && rectBegin.contains(x, y)) startBattle()
+                State.READY -> if (a == MotionEvent.ACTION_DOWN) handleReadyTap(x, y)
                 State.PLAYER_AIM -> handleAim(a, x, y)
                 State.PAUSED -> if (a == MotionEvent.ACTION_DOWN) state = State.PLAYER_AIM
                 State.GAME_OVER -> if (a == MotionEvent.ACTION_DOWN) handleGameOverTap(x, y)
@@ -207,6 +218,22 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         }
     }
 
+    private fun handleReadyTap(x: Float, y: Float) {
+        when {
+            rectBegin.contains(x, y) -> startBattle()
+            rectArmour.contains(x, y) -> {
+                if (prefs.armourOwned) prefs.armourOn = !prefs.armourOn
+                else if (prefs.wins >= Prefs.ARMOUR_COST) { prefs.armourOwned = true; prefs.armourOn = true }
+                sound.confirm()
+            }
+            rectRath.contains(x, y) -> {
+                if (prefs.rathOwned) prefs.rathOn = !prefs.rathOn
+                else if (prefs.wins >= Prefs.RATH_COST) { prefs.rathOwned = true; prefs.rathOn = true }
+                sound.confirm()
+            }
+        }
+    }
+
     private fun toggleFx() {
         val on = !sound.enabled
         sound.enabled = on; haptics.enabled = on
@@ -225,7 +252,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val dx = aimX - mx; val dy = aimY - my
         val d = hypot(dx, dy).coerceAtLeast(1f)
         val power = (d / (w * 0.38f)).coerceIn(0.16f, 1f)
-        val v = minV + power * (maxV - minV)
+        val v = (minV + power * (maxV - minV)) * rathBoost   // Rath adds launch power
         return floatArrayOf(dx / d * v, dy / d * v, power)
     }
 
@@ -392,35 +419,46 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun drawBackground(canvas: Canvas) {
         canvas.drawRect(0f, 0f, w, h, skyPaint)
-        // Sun.
-        bgPaint.color = 0x55FFF2C0.toInt()
-        canvas.drawCircle(w * 0.5f, h * 0.32f, h * 0.14f, bgPaint)
-        bgPaint.color = 0xAAFFE9A8.toInt()
-        canvas.drawCircle(w * 0.5f, h * 0.32f, h * 0.09f, bgPaint)
-        // Distant mountains.
-        bgPaint.color = 0x552A1533
-        drawHill(canvas, w * 0.2f, h * 0.72f, w * 0.5f)
-        drawHill(canvas, w * 0.7f, h * 0.72f, w * 0.55f)
-        // Faint temple silhouette centre.
-        bgPaint.color = 0x33301028
-        val tx = w * 0.5f; val ty = h * 0.72f
-        path.reset()
-        path.moveTo(tx - w * 0.05f, ty)
-        path.lineTo(tx - w * 0.05f, ty - h * 0.22f)
-        path.lineTo(tx, ty - h * 0.34f)
-        path.lineTo(tx + w * 0.05f, ty - h * 0.22f)
-        path.lineTo(tx + w * 0.05f, ty)
-        path.close()
-        canvas.drawPath(path, bgPaint)
+        // Sun glow.
+        bgPaint.color = 0x55FFF6D0.toInt()
+        canvas.drawCircle(w * 0.5f, h * 0.28f, h * 0.16f, bgPaint)
+        bgPaint.color = 0xCCFFF0B0.toInt()
+        canvas.drawCircle(w * 0.5f, h * 0.28f, h * 0.09f, bgPaint)
+        // The golden castle of Lanka, in two silhouette layers.
+        drawCastle(canvas, h * 0.72f, 0.55f, 0xFFB07E1E.toInt(), 0.75f)
+        drawCastle(canvas, h * 0.72f, 1.0f, 0xFFE8B84B.toInt(), 1.0f)
     }
 
-    private fun drawHill(canvas: Canvas, cx: Float, baseY: Float, width: Float) {
-        path.reset()
-        path.moveTo(cx - width / 2f, baseY)
-        path.lineTo(cx, baseY - width * 0.35f)
-        path.lineTo(cx + width / 2f, baseY)
-        path.close()
-        canvas.drawPath(path, bgPaint)
+    /** Draws a row of golden towers with domes, ramparts and flags. */
+    private fun drawCastle(canvas: Canvas, baseY: Float, scaleF: Float, color: Int, alpha: Float) {
+        bgPaint.color = (((0xFF * alpha).toInt() shl 24) or (color and 0x00FFFFFF))
+        // Rampart wall.
+        val wallTop = baseY - h * 0.16f * scaleF
+        canvas.drawRect(0f, wallTop, w, baseY, bgPaint)
+        // Crenellations.
+        var cx = 0f; val cw = w * 0.03f
+        while (cx < w) { canvas.drawRect(cx, wallTop - h * 0.02f, cx + cw * 0.6f, wallTop, bgPaint); cx += cw }
+        // Towers.
+        val towers = floatArrayOf(0.12f, 0.30f, 0.5f, 0.7f, 0.88f)
+        for ((i, tx) in towers.withIndex()) {
+            val txp = tx * w
+            val tw = w * (0.05f + (i % 2) * 0.015f) * scaleF
+            val th = h * (0.20f + (i % 3) * 0.06f) * scaleF
+            canvas.drawRect(txp - tw, baseY - th, txp + tw, baseY, bgPaint)
+            // Onion dome.
+            path.reset()
+            path.moveTo(txp - tw, baseY - th)
+            path.cubicTo(txp - tw, baseY - th - tw * 1.6f, txp + tw, baseY - th - tw * 1.6f, txp + tw, baseY - th)
+            path.close()
+            canvas.drawPath(path, bgPaint)
+            canvas.drawCircle(txp, baseY - th - tw * 1.5f, tw * 0.3f, bgPaint)
+            // Flag.
+            if (scaleF >= 1f) {
+                val fp = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xCCFF4D5E.toInt() }
+                canvas.drawRect(txp, baseY - th - tw * 2.6f, txp + tw * 0.9f, baseY - th - tw * 2.1f, fp)
+                bgPaint.strokeWidth = tw * 0.12f
+            }
+        }
     }
 
     private fun drawTrajectory(canvas: Canvas) {
@@ -483,9 +521,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             canvas.drawText(if (wp.unlimited) "∞" else "x${ammoOf(wp)}", r.centerX(), r.bottom - r.height() * 0.12f, textPaint)
         }
 
+        // Selected astra name + mythic description (Mahabharata / Ramayana lore).
+        val selTop = weaponRects[0].top
+        val selCx = (weaponRects.first().left + weaponRects.last().right) / 2f
+        textPaint.color = selected.color; textPaint.textSize = h * 0.038f
+        canvas.drawText(selected.full, selCx, selTop - h * 0.055f, textPaint)
+        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = h * 0.026f
+        canvas.drawText(selected.desc, selCx, selTop - h * 0.018f, textPaint)
+
         if (state == State.PLAYER_AIM && !aiming) {
-            textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.03f
-            canvas.drawText("YOUR TURN — drag from Ram to aim, release to fire", w * 0.5f, h * 0.62f, textPaint)
+            textPaint.color = 0xAAFFF0C0.toInt(); textPaint.textSize = h * 0.03f
+            canvas.drawText("YOUR TURN — drag from Ram to aim, release to fire", w * 0.5f, h * 0.30f, textPaint)
         }
     }
 
@@ -526,8 +572,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawText("ASTRA", cx, h * 0.24f, textPaint)
         textPaint.color = Palette.DEMON; textPaint.textSize = h * 0.05f
         canvas.drawText("RAM   vs   RAVAN", cx, h * 0.32f, textPaint)
-        textPaint.color = 0xAAFFD24A.toInt(); textPaint.textSize = h * 0.032f
-        canvas.drawText("An artillery duel — aim, power & astras over the battlefield", cx, h * 0.40f, textPaint)
+        textPaint.color = 0xAAFFD24A.toInt(); textPaint.textSize = h * 0.03f
+        canvas.drawText("An artillery duel — aim, power & astras over the battlefield", cx, h * 0.395f, textPaint)
+
+        // Powers earned by winning duels.
+        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.026f
+        canvas.drawText("POWERS — win duels to unlock, tap to equip", cx, h * 0.44f, textPaint)
+        drawUpgradeChip(canvas, rectArmour, "ARMOUR", "+50 HP",
+            prefs.armourOwned, prefs.armourOn, Prefs.ARMOUR_COST)
+        drawUpgradeChip(canvas, rectRath, "RATH", "+power & range",
+            prefs.rathOwned, prefs.rathOn, Prefs.RATH_COST)
 
         val pulse = 0.5f + 0.5f * sin(bgPhase * 0.08f)
         barPaint.color = Palette.SAFFRON; barPaint.alpha = (200 + 55 * pulse).toInt()
@@ -538,6 +592,25 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
         textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.032f
         canvas.drawText("WINS ${prefs.wins}    •    BEST DMG ${prefs.bestScore}", cx, h * 0.86f, textPaint)
+    }
+
+    private fun drawUpgradeChip(canvas: Canvas, r: RectF, name: String, perk: String,
+                                owned: Boolean, on: Boolean, cost: Int) {
+        val avail = owned || prefs.wins >= cost
+        barPaint.color = when { on -> 0xCC3A2A12.toInt(); owned -> 0xAA202832.toInt(); avail -> 0xAA1A2230.toInt(); else -> 0x66101418.toInt() }
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
+        ringPaint.color = if (on) Palette.GOLD else 0x44FFFFFF
+        ringPaint.strokeWidth = h * 0.005f
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, ringPaint)
+        textPaint.color = if (avail) Palette.GOLD else 0x77FFFFFF.toInt()
+        textPaint.textSize = r.height() * 0.24f
+        canvas.drawText(name, r.centerX(), r.top + r.height() * 0.32f, textPaint)
+        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = r.height() * 0.16f
+        canvas.drawText(perk, r.centerX(), r.top + r.height() * 0.56f, textPaint)
+        val status = when { on -> "EQUIPPED ✓"; owned -> "tap to equip"; avail -> "UNLOCK (tap)"; else -> "win $cost duels" }
+        textPaint.color = if (on) Palette.GRASS else 0x99FFFFFF.toInt()
+        textPaint.textSize = r.height() * 0.16f
+        canvas.drawText(status, r.centerX(), r.bottom - r.height() * 0.14f, textPaint)
     }
 
     private fun drawPaused(canvas: Canvas) {

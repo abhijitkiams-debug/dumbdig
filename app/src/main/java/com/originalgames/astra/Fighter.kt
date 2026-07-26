@@ -8,8 +8,10 @@ import android.graphics.RectF
 
 /**
  * A duelling combatant standing on the terrain — Ram (player, faces right) or
- * Ravan (the ten-headed boss, faces left). Drawn from primitives in a side-on
- * silhouette to match the classic Ram-vs-Ravan art style.
+ * Ravan (the ten-headed boss, faces left), drawn in a familiar, lightly
+ * anime-styled side view: big expressive eyes, golden crowns, and iconography
+ * (Ram blue-skinned with a tilak; Ravan's ten fierce heads). Ram can be
+ * equipped with unlockable golden Armour (+health) and a Rath / chariot.
  */
 class Fighter(
     val isRam: Boolean,
@@ -19,7 +21,9 @@ class Fighter(
     var maxHp: Float
 ) {
     var hp = maxHp
-    var hurt = 0f                       // flash timer when struck
+    var hurt = 0f
+    var armour = false
+    var rath = false
     private val facing = if (isRam) 1f else -1f
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -27,11 +31,13 @@ class Fighter(
     private val path = Path()
     private val oval = RectF()
 
-    /** Chest height — where projectiles are launched from and aimed at. */
-    fun muzzleX() = x + facing * scale * 0.35f
-    fun muzzleY() = feetY - scale * 1.05f
-    fun centerY() = feetY - scale * 0.85f
-    fun bodyRadius() = scale * 0.7f
+    private fun rathLift() = if (rath) scale * 0.42f else 0f
+    private fun baseY() = feetY - rathLift()
+
+    fun muzzleX() = x + facing * scale * 0.4f
+    fun muzzleY() = baseY() - scale * 1.05f
+    fun centerY() = baseY() - scale * 0.85f
+    fun bodyRadius() = scale * 0.72f
 
     fun hitBy(px: Float, py: Float, blast: Float): Float {
         val d = kotlin.math.hypot(px - x, py - centerY())
@@ -42,6 +48,7 @@ class Fighter(
     fun update() { if (hurt > 0f) hurt -= 1f }
 
     fun draw(canvas: Canvas) {
+        if (rath && isRam) drawRath(canvas)
         if (isRam) drawRam(canvas) else drawRavan(canvas)
         if (hurt > 0f) {
             p.color = ((0x66 * (hurt / 12f)).toInt().coerceIn(0, 255) shl 24) or 0x00FFFFFF
@@ -49,79 +56,188 @@ class Fighter(
         }
     }
 
+    // ------------------------------------------------------------ anime eyes
+    private fun eye(canvas: Canvas, ex: Float, ey: Float, r: Float, iris: Int, angry: Boolean) {
+        p.color = Color.WHITE
+        oval.set(ex - r, ey - r * 0.8f, ex + r, ey + r * 0.8f)
+        canvas.drawOval(oval, p)
+        p.color = iris
+        canvas.drawCircle(ex + facing * r * 0.2f, ey, r * 0.55f, p)
+        p.color = Color.BLACK
+        canvas.drawCircle(ex + facing * r * 0.2f, ey, r * 0.28f, p)
+        p.color = Color.WHITE
+        canvas.drawCircle(ex + facing * r * 0.05f, ey - r * 0.25f, r * 0.14f, p)
+        // Brow.
+        stroke.color = if (angry) 0xFF3A0A0A.toInt() else 0xFF2A1A0A.toInt()
+        stroke.strokeWidth = r * 0.28f; stroke.strokeCap = Paint.Cap.ROUND
+        if (angry) canvas.drawLine(ex - r, ey - r * 0.7f, ex + r, ey - r * 1.1f, stroke)
+        else canvas.drawLine(ex - r, ey - r * 1.0f, ex + r, ey - r * 0.9f, stroke)
+    }
+
     // ------------------------------------------------------------------ RAM
     private fun drawRam(canvas: Canvas) {
-        val s = scale
-        // Aura.
+        val s = scale; val by = baseY()
         p.color = 0x333AA0FF
-        canvas.drawCircle(x, centerY(), s * 1.3f, p)
+        canvas.drawCircle(x, by - s * 0.85f, s * 1.35f, p)
         // Legs.
-        stroke.color = 0xFF8A5A2A.toInt(); stroke.strokeWidth = s * 0.16f; stroke.strokeCap = Paint.Cap.ROUND
-        canvas.drawLine(x, feetY - s * 0.5f, x - s * 0.25f, feetY, stroke)
-        canvas.drawLine(x, feetY - s * 0.5f, x + s * 0.25f, feetY, stroke)
-        // Dhoti + torso.
+        stroke.color = 0xFF8FC4F2.toInt(); stroke.strokeWidth = s * 0.16f; stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawLine(x, by - s * 0.5f, x - s * 0.22f, by, stroke)
+        canvas.drawLine(x, by - s * 0.5f, x + s * 0.22f, by, stroke)
+        // Dhoti.
         p.color = Palette.SAFFRON
-        oval.set(x - s * 0.32f, feetY - s * 0.95f, x + s * 0.32f, feetY - s * 0.35f)
+        oval.set(x - s * 0.32f, by - s * 0.95f, x + s * 0.32f, by - s * 0.3f)
         canvas.drawRoundRect(oval, s * 0.2f, s * 0.2f, p)
-        p.color = Palette.RAM_BLUE
-        oval.set(x - s * 0.3f, feetY - s * 1.25f, x + s * 0.3f, feetY - s * 0.8f)
-        canvas.drawRoundRect(oval, s * 0.18f, s * 0.18f, p)
-        // Head + crown.
-        p.color = Palette.SKIN
-        canvas.drawCircle(x, feetY - s * 1.42f, s * 0.24f, p)
+        // Torso (blue skin) or golden armour.
+        if (armour) {
+            p.color = Palette.GOLD
+            oval.set(x - s * 0.34f, by - s * 1.28f, x + s * 0.34f, by - s * 0.8f)
+            canvas.drawRoundRect(oval, s * 0.16f, s * 0.16f, p)
+            p.color = 0xFFB8860B.toInt()
+            canvas.drawLine(x - s * 0.34f, by - s * 1.04f, x + s * 0.34f, by - s * 1.04f, linePaint(s * 0.05f))
+            // Shoulder guards.
+            p.color = Palette.GOLD
+            canvas.drawCircle(x - s * 0.34f, by - s * 1.2f, s * 0.14f, p)
+            canvas.drawCircle(x + s * 0.34f, by - s * 1.2f, s * 0.14f, p)
+        } else {
+            p.color = 0xFF7EBEF5.toInt()
+            oval.set(x - s * 0.3f, by - s * 1.25f, x + s * 0.3f, by - s * 0.8f)
+            canvas.drawRoundRect(oval, s * 0.18f, s * 0.18f, p)
+        }
+        // Arms holding the bow.
+        stroke.color = 0xFF7EBEF5.toInt(); stroke.strokeWidth = s * 0.11f
+        canvas.drawLine(x, by - s * 1.05f, x + facing * s * 0.5f, by - s * 1.0f, stroke)
+        // Head (blue skin).
+        val hx = x; val hy = by - s * 1.48f; val hr = s * 0.27f
+        p.color = 0xFF8FC4F2.toInt()
+        canvas.drawCircle(hx, hy, hr, p)
+        // Eyes (kind).
+        eye(canvas, hx + facing * hr * 0.15f, hy - hr * 0.05f, hr * 0.34f, 0xFF3A2A6A.toInt(), false)
+        // Tilak.
+        p.color = Palette.DEMON
+        canvas.drawCircle(hx, hy - hr * 0.55f, hr * 0.12f, p)
+        // Gentle smile.
+        stroke.color = 0xFF5A3A2A.toInt(); stroke.strokeWidth = hr * 0.14f
+        oval.set(hx - hr * 0.35f, hy + hr * 0.05f, hx + hr * 0.35f, hy + hr * 0.5f)
+        canvas.drawArc(oval, 20f, 140f, false, stroke)
+        // Golden crown (mukut) with a gem + feather.
         p.color = Palette.GOLD
         path.reset()
-        path.moveTo(x - s * 0.24f, feetY - s * 1.56f)
-        path.lineTo(x - s * 0.12f, feetY - s * 1.78f)
-        path.lineTo(x, feetY - s * 1.58f)
-        path.lineTo(x + s * 0.12f, feetY - s * 1.78f)
-        path.lineTo(x + s * 0.24f, feetY - s * 1.56f)
+        path.moveTo(hx - hr * 0.9f, hy - hr * 0.7f)
+        path.lineTo(hx - hr * 0.5f, hy - hr * 1.5f)
+        path.lineTo(hx, hy - hr * 0.9f)
+        path.lineTo(hx + hr * 0.5f, hy - hr * 1.5f)
+        path.lineTo(hx + hr * 0.9f, hy - hr * 0.7f)
         path.close()
         canvas.drawPath(path, p)
+        p.color = Palette.DEMON
+        canvas.drawCircle(hx, hy - hr * 1.05f, hr * 0.14f, p)
         // Bow, facing the enemy.
         stroke.color = Palette.GOLD; stroke.strokeWidth = s * 0.09f
-        oval.set(x + facing * s * 0.1f - s * 0.55f, feetY - s * 1.5f, x + facing * s * 0.1f + s * 0.55f, feetY - s * 0.55f)
-        canvas.drawArc(oval, if (isRam) -60f else 120f, 120f, false, stroke)
+        oval.set(x + facing * s * 0.15f - s * 0.55f, by - s * 1.5f, x + facing * s * 0.15f + s * 0.55f, by - s * 0.55f)
+        canvas.drawArc(oval, -60f, 120f, false, stroke)
+    }
+
+    private fun linePaint(wdt: Float): Paint {
+        stroke.style = Paint.Style.STROKE; stroke.strokeWidth = wdt; stroke.color = p.color
+        return stroke
+    }
+
+    // ---------------------------------------------------------------- RATH
+    private fun drawRath(canvas: Canvas) {
+        val s = scale
+        // Horse silhouette in front.
+        p.color = 0xFF6E5030.toInt()
+        oval.set(x + s * 0.5f, feetY - s * 0.7f, x + s * 1.5f, feetY - s * 0.2f)
+        canvas.drawRoundRect(oval, s * 0.2f, s * 0.2f, p)
+        canvas.drawCircle(x + s * 1.5f, feetY - s * 0.78f, s * 0.22f, p)   // horse head
+        // Horse legs.
+        stroke.color = 0xFF5A4028.toInt(); stroke.strokeWidth = s * 0.07f; stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawLine(x + s * 0.7f, feetY - s * 0.25f, x + s * 0.7f, feetY, stroke)
+        canvas.drawLine(x + s * 1.3f, feetY - s * 0.25f, x + s * 1.3f, feetY, stroke)
+        // Chariot deck.
+        p.color = Palette.GOLD
+        oval.set(x - s * 0.6f, feetY - s * 0.55f, x + s * 0.6f, feetY - s * 0.25f)
+        canvas.drawRoundRect(oval, s * 0.1f, s * 0.1f, p)
+        p.color = 0xFF8A5A1A.toInt()
+        canvas.drawRect(x - s * 0.6f, feetY - s * 0.3f, x + s * 0.6f, feetY - s * 0.1f, p)
+        // Wheel.
+        p.color = 0xFF3A2716.toInt()
+        canvas.drawCircle(x - s * 0.2f, feetY - s * 0.02f, s * 0.28f, p)
+        p.color = Palette.GOLD
+        canvas.drawCircle(x - s * 0.2f, feetY - s * 0.02f, s * 0.1f, p)
+        stroke.color = Palette.GOLD; stroke.strokeWidth = s * 0.03f
+        for (a in 0 until 6) {
+            val ang = Math.toRadians((a * 60).toDouble())
+            canvas.drawLine(x - s * 0.2f, feetY - s * 0.02f,
+                x - s * 0.2f + kotlin.math.cos(ang).toFloat() * s * 0.28f,
+                feetY - s * 0.02f + kotlin.math.sin(ang).toFloat() * s * 0.28f, stroke)
+        }
     }
 
     // ---------------------------------------------------------------- RAVAN
     private fun drawRavan(canvas: Canvas) {
-        val s = scale
+        val s = scale; val by = feetY
         // Body.
         p.color = 0xFF2A1622.toInt()
-        oval.set(x - s * 0.5f, feetY - s * 1.15f, x + s * 0.5f, feetY)
+        oval.set(x - s * 0.55f, by - s * 1.15f, x + s * 0.55f, by)
         canvas.drawRoundRect(oval, s * 0.24f, s * 0.24f, p)
-        // Sash.
+        // Sash + belt.
         p.color = 0xFF7A1F2B.toInt()
-        canvas.drawRect(x - s * 0.5f, feetY - s * 0.75f, x + s * 0.5f, feetY - s * 0.6f, p)
-        // Ten heads in a fan crown.
-        val hr = s * 0.17f
-        for (i in 0 until 10) {
-            val f = (i - 4.5f) / 4.5f
-            val hx = x + f * s * 0.62f
-            val hy = feetY - s * 1.32f - (1f - f * f) * s * 0.28f
-            p.color = 0xFF3A2230.toInt()
-            canvas.drawCircle(hx, hy, hr, p)
-            p.color = Palette.DEMON
-            canvas.drawCircle(hx - hr * 0.3f, hy - hr * 0.1f, hr * 0.18f, p)
-            canvas.drawCircle(hx + hr * 0.3f, hy - hr * 0.1f, hr * 0.18f, p)
-            p.color = Palette.GOLD
+        canvas.drawRect(x - s * 0.55f, by - s * 0.75f, x + s * 0.55f, by - s * 0.6f, p)
+        p.color = Palette.GOLD
+        canvas.drawRect(x - s * 0.55f, by - s * 0.62f, x + s * 0.55f, by - s * 0.55f, p)
+        // Big curved sword.
+        stroke.color = 0xFFC9CDD6.toInt(); stroke.strokeWidth = s * 0.09f; stroke.strokeCap = Paint.Cap.ROUND
+        val sx = x + facing * s * 0.55f
+        canvas.drawLine(sx, by - s * 0.9f, sx + facing * s * 0.5f, by - s * 1.5f, stroke)
+
+        // Ten fierce heads: a big central one flanked by a fan of smaller heads.
+        for (i in 0 until 9) {
+            val f = (i - 4f) / 4f
+            val hx = x + f * s * 0.66f
+            val hy = by - s * 1.28f - (1f - f * f) * s * 0.22f
+            drawDemonHead(canvas, hx, hy, s * 0.15f, false)
+        }
+        drawDemonHead(canvas, x, by - s * 1.62f, s * 0.26f, true)
+    }
+
+    private fun drawDemonHead(canvas: Canvas, hx: Float, hy: Float, hr: Float, main: Boolean) {
+        // Crown.
+        p.color = Palette.GOLD
+        path.reset()
+        path.moveTo(hx - hr * 0.9f, hy - hr * 0.6f)
+        path.lineTo(hx - hr * 0.5f, hy - hr * 1.5f)
+        path.lineTo(hx, hy - hr * 0.8f)
+        path.lineTo(hx + hr * 0.5f, hy - hr * 1.5f)
+        path.lineTo(hx + hr * 0.9f, hy - hr * 0.6f)
+        path.close()
+        canvas.drawPath(path, p)
+        // Face (dark demon skin).
+        p.color = if (main) 0xFF4A2036.toInt() else 0xFF3A2230.toInt()
+        canvas.drawCircle(hx, hy, hr, p)
+        // Fierce eyes.
+        val er = hr * 0.36f
+        eye(canvas, hx - hr * 0.4f, hy - hr * 0.05f, er, Palette.DEMON, true)
+        eye(canvas, hx + hr * 0.4f, hy - hr * 0.05f, er, Palette.DEMON, true)
+        // Third eye on the main head.
+        if (main) { p.color = Palette.GOLD; canvas.drawCircle(hx, hy - hr * 0.55f, hr * 0.12f, p) }
+        // Mustache + fanged mouth.
+        stroke.color = Color.BLACK; stroke.strokeWidth = hr * 0.14f
+        canvas.drawLine(hx - hr * 0.5f, hy + hr * 0.45f, hx + hr * 0.5f, hy + hr * 0.45f, stroke)
+        p.color = Color.WHITE
+        for (k in intArrayOf(-1, 1)) {
             path.reset()
-            path.moveTo(hx - hr * 0.6f, hy - hr * 0.7f)
-            path.lineTo(hx, hy - hr * 1.5f)
-            path.lineTo(hx + hr * 0.6f, hy - hr * 0.7f)
+            path.moveTo(hx + k * hr * 0.25f, hy + hr * 0.45f)
+            path.lineTo(hx + k * hr * 0.4f, hy + hr * 0.45f)
+            path.lineTo(hx + k * hr * 0.32f, hy + hr * 0.75f)
             path.close()
             canvas.drawPath(path, p)
         }
-        // Big curved sword, facing Ram.
-        stroke.color = 0xFFC9CDD6.toInt(); stroke.strokeWidth = s * 0.09f; stroke.strokeCap = Paint.Cap.ROUND
-        val sx = x + facing * s * 0.55f
-        canvas.drawLine(sx, feetY - s * 0.9f, sx + facing * s * 0.5f, feetY - s * 1.4f, stroke)
     }
 
     fun drawHealthBar(canvas: Canvas, text: Paint) {
-        val bw = scale * 1.4f; val bh = scale * 0.14f
-        val left = x - bw / 2f; val top = feetY - scale * 2.0f
+        val bw = scale * 1.5f; val bh = scale * 0.14f
+        val left = x - bw / 2f; val top = baseY() - scale * 2.05f
         p.color = 0x66000000
         canvas.drawRoundRect(left - bh * 0.3f, top - bh * 0.3f, left + bw + bh * 0.3f, top + bh + bh * 0.3f, bh, bh, p)
         p.color = 0xFF333333.toInt()
@@ -129,9 +245,7 @@ class Fighter(
         val frac = (hp / maxHp).coerceIn(0f, 1f)
         p.color = if (isRam) Palette.GRASS else Palette.DEMON
         canvas.drawRoundRect(left, top, left + bw * frac, top + bh, bh / 2f, bh / 2f, p)
-        text.color = Color.WHITE
-        text.textSize = bh * 0.9f
-        text.textAlign = Paint.Align.CENTER
+        text.color = Color.WHITE; text.textSize = bh * 0.9f; text.textAlign = Paint.Align.CENTER
         canvas.drawText(if (isRam) "RAM" else "RAVAN", x, top - bh * 0.5f, text)
     }
 }

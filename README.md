@@ -67,11 +67,21 @@ Every battle generates **fresh, destructible terrain** with pillars for cover, s
 | **Gada** (mace) | Heavy, arcs steeply, big damage and blast. |
 | **Brahmastra** | The ultimate — huge damage and blast, but only **one** per duel. |
 
-### Progression
+### Progression — win to earn powers
 
-- **Win duels** against Ravan — your total **wins** and **best damage** are saved locally.
-- Earn **coins** for every hit landed (a foundation for future weapon unlocks / a shop).
+- **Win duels** against Ravan to unlock powers on the start screen:
+  - **Armour** (win 2) — golden plate for Ram, **+50 health**.
+  - **Rath** (win 5) — a divine chariot, **+power & range** on every shot (and Ram rides it into battle).
+  - Tap a power to **equip / unequip** it before a duel.
+- Earn **coins** for every hit landed; **wins** and **best damage** are saved locally.
 - **Share** your result card after each duel to challenge friends.
+
+### Look & feel
+
+- **Golden castle backdrop** — the fabled golden city of the Ramayana rises behind the battlefield.
+- **Familiar, lightly anime-styled fighters** — blue-skinned Ram with crown and tilak; Ravan's ten fierce, fanged heads.
+- **Real arrow & astra visuals** — arrows fly as shaft + head + fletching; heavy astras as glowing energy orbs.
+- **Mahabharata / Ramayana astra lore** — every weapon is a named divine astra (Sharanga Baan, Agneyastra, Nagastra, Kaumodaki, Brahmastra) with a mythic one-line description shown as you aim.
 
 ## Tech at a glance
 

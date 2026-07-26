@@ -26,6 +26,20 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_WINS, 0)
         set(value) = sp.edit().putInt(KEY_WINS, value).apply()
 
+    // Unlockable powers, bought with wins, then equipped for battle.
+    var armourOwned: Boolean
+        get() = sp.getBoolean(KEY_ARM_OWN, false)
+        set(v) = sp.edit().putBoolean(KEY_ARM_OWN, v).apply()
+    var rathOwned: Boolean
+        get() = sp.getBoolean(KEY_RATH_OWN, false)
+        set(v) = sp.edit().putBoolean(KEY_RATH_OWN, v).apply()
+    var armourOn: Boolean
+        get() = sp.getBoolean(KEY_ARM_ON, false)
+        set(v) = sp.edit().putBoolean(KEY_ARM_ON, v).apply()
+    var rathOn: Boolean
+        get() = sp.getBoolean(KEY_RATH_ON, false)
+        set(v) = sp.edit().putBoolean(KEY_RATH_ON, v).apply()
+
     var soundEnabled: Boolean
         get() = sp.getBoolean(KEY_SOUND, true)
         set(value) = sp.edit().putBoolean(KEY_SOUND, value).apply()
@@ -85,6 +99,12 @@ class Prefs(context: Context) {
         private const val KEY_BEST = "best_score"
         private const val KEY_HEADS = "most_heads"
         private const val KEY_WINS = "wins"
+        private const val KEY_ARM_OWN = "armour_owned"
+        private const val KEY_RATH_OWN = "rath_owned"
+        private const val KEY_ARM_ON = "armour_on"
+        private const val KEY_RATH_ON = "rath_on"
+        const val ARMOUR_COST = 2
+        const val RATH_COST = 5
         private const val KEY_SOUND = "sound_enabled"
         private const val KEY_HAPTICS = "haptics_enabled"
         private const val KEY_STREAK = "daily_streak"

@@ -26,7 +26,29 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_WINS, 0)
         set(value) = sp.edit().putInt(KEY_WINS, value).apply()
 
-    // Unlockable powers, bought with wins, then equipped for battle.
+    /** Current campaign stage (index into Enemy.ROSTER). */
+    var stage: Int
+        get() = sp.getInt(KEY_STAGE, 0)
+        set(v) = sp.edit().putInt(KEY_STAGE, v).apply()
+
+    /** Punya points — currency from wins + quiz, spent in the upgrade shop. */
+    var points: Int
+        get() = sp.getInt(KEY_POINTS, 0)
+        set(v) = sp.edit().putInt(KEY_POINTS, v).apply()
+
+    /** Bow upgrade level (0..3) — each level adds arrow damage. */
+    var bowLevel: Int
+        get() = sp.getInt(KEY_BOW, 0)
+        set(v) = sp.edit().putInt(KEY_BOW, v).apply()
+
+    /** Times Ravan himself has been defeated (full campaign clears). */
+    var ravanWins: Int
+        get() = sp.getInt(KEY_RAVAN, 0)
+        set(v) = sp.edit().putInt(KEY_RAVAN, v).apply()
+
+    fun spend(cost: Int): Boolean { if (points >= cost) { points -= cost; return true }; return false }
+
+    // Unlockable powers, bought with points, then equipped for battle.
     var armourOwned: Boolean
         get() = sp.getBoolean(KEY_ARM_OWN, false)
         set(v) = sp.edit().putBoolean(KEY_ARM_OWN, v).apply()
@@ -103,8 +125,16 @@ class Prefs(context: Context) {
         private const val KEY_RATH_OWN = "rath_owned"
         private const val KEY_ARM_ON = "armour_on"
         private const val KEY_RATH_ON = "rath_on"
-        const val ARMOUR_COST = 2
-        const val RATH_COST = 5
+        private const val KEY_STAGE = "stage"
+        private const val KEY_POINTS = "points"
+        private const val KEY_BOW = "bow_level"
+        private const val KEY_RAVAN = "ravan_wins"
+        const val ARMOUR_COST = 8      // punya points
+        const val RATH_COST = 15
+        const val BOW_COST = 6         // per level
+        const val MAX_BOW = 3
+        const val WIN_REWARD = 5
+        const val QUIZ_REWARD = 3
         private const val KEY_SOUND = "sound_enabled"
         private const val KEY_HAPTICS = "haptics_enabled"
         private const val KEY_STREAK = "daily_streak"

@@ -42,6 +42,17 @@ class SoundManager(var enabled: Boolean = true) {
     /** A bright triumphant tone for victory over Ravan. */
     fun victory() = play(startFreq = 660f, endFreq = 990f, durationMs = 480, volume = 0.5f)
 
+    // --- Distinct per-astra impact sounds ---
+    fun impactBaan() = play(880f, 1150f, 70, 0.30f)
+    fun impactAgni() = play(500f, 180f, 340, 0.55f)          // fiery whoosh-down
+    fun impactNaga() = play(1200f, 700f, 220, 0.40f)         // serpentine hiss
+    fun impactGada() = play(240f, 70f, 380, 0.6f)            // heavy thud
+    fun impactBrahma() = play(320f, 1500f, 480, 0.6f)        // cataclysmic rise
+
+    // --- Helper summons ---
+    fun hanuman() = play(300f, 900f, 420, 0.55f)             // heroic leap
+    fun lakshman() = play(700f, 1300f, 260, 0.45f)           // precise volley
+
     private fun play(startFreq: Float, endFreq: Float, durationMs: Int, volume: Float) {
         if (!enabled) return
         thread(isDaemon = true) {

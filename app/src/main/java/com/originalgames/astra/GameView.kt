@@ -29,8 +29,13 @@ import kotlin.random.Random
  */
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
-    private enum class State { READY, PLAYER_AIM, FLYING, ENEMY_THINK, PAUSED, GAME_OVER }
+    private enum class State { READY, QUIZ, PLAYER_AIM, FLYING, ENEMY_THINK, PAUSED, GAME_OVER }
     private enum class Turn { PLAYER, ENEMY }
+
+    /** Transient astra impact / helper visual effect. */
+    private class Fx(val x: Float, val y: Float, val kind: Int, val maxAge: Int, val color: Int) {
+        var age = 0
+    }
 
     private val prefs = Prefs(context)
     private val sound = SoundManager(prefs.soundEnabled)
@@ -57,10 +62,26 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var damageDealt = 0
     private var thinkTimer = 0
     private var rathBoost = 1f
+    private var bowMult = 1f
+    private var enemyAccuracy = 1f
     private var gameOverAt = 0L
     private var playerWon = false
     private var bgPhase = 0f
     private var coins = 0
+
+    // Campaign + helpers.
+    private lateinit var enemyDef: Enemy
+    private var hanumanUsed = false
+    private var lakshmanUsed = false
+    private val fxs = ArrayList<Fx>()
+    private var banner = ""
+    private var bannerTimer = 0
+    private var bannerColor = Palette.GOLD
+
+    // Quiz.
+    private var question: Question? = null
+    private var quizPicked = -1
+    private var quizTimer = 0
 
     // Aim input.
     private var aiming = false
@@ -75,6 +96,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private val rectFx = RectF()
     private val rectArmour = RectF()
     private val rectRath = RectF()
+    private val rectBow = RectF()
+    private val rectHanuman = RectF()
+    private val rectLakshman = RectF()
+    private val quizRects = Array(4) { RectF() }
     private val weaponRects = Array(Weapon.entries.size) { RectF() }
 
     // Paints.
@@ -129,26 +154,38 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     fun onActivityPause() { if (state == State.PLAYER_AIM) state = State.PAUSED }
 
     private fun layoutUi() {
-        val bw = w * 0.28f; val bh = h * 0.11f; val cx = w / 2f
-        rectBegin.set(cx - bw / 2f, h * 0.66f, cx + bw / 2f, h * 0.66f + bh)
-        // Upgrade chips on the start screen.
-        val uw = w * 0.24f; val uh = h * 0.13f; val ug = w * 0.03f
-        rectArmour.set(cx - uw - ug / 2f, h * 0.46f, cx - ug / 2f, h * 0.46f + uh)
-        rectRath.set(cx + ug / 2f, h * 0.46f, cx + uw + ug / 2f, h * 0.46f + uh)
-        rectRetry.set(cx - bw / 2f, h * 0.62f, cx + bw / 2f, h * 0.62f + bh)
-        rectShare.set(cx - bw / 2f, h * 0.76f, cx + bw / 2f, h * 0.76f + bh * 0.8f)
+        val bw = w * 0.30f; val bh = h * 0.11f; val cx = w / 2f
+        rectBegin.set(cx - bw / 2f, h * 0.70f, cx + bw / 2f, h * 0.70f + bh)
+        // Three shop chips on the start screen.
+        val uw = w * 0.22f; val uh = h * 0.14f; val ug = w * 0.02f
+        val total = uw * 3 + ug * 2; val sx = cx - total / 2f; val uy = h * 0.46f
+        rectArmour.set(sx, uy, sx + uw, uy + uh)
+        rectRath.set(sx + uw + ug, uy, sx + uw * 2 + ug, uy + uh)
+        rectBow.set(sx + uw * 2 + ug * 2, uy, sx + uw * 3 + ug * 2, uy + uh)
+        rectRetry.set(cx - bw / 2f, h * 0.64f, cx + bw / 2f, h * 0.64f + bh)
+        rectShare.set(cx - bw / 2f, h * 0.78f, cx + bw / 2f, h * 0.78f + bh * 0.8f)
         val ic = h * 0.09f
         rectPause.set(w - ic - w * 0.02f, h * 0.03f, w - w * 0.02f, h * 0.03f + ic)
         rectFx.set(w - ic * 2 - w * 0.035f, h * 0.03f, w - ic - w * 0.035f, h * 0.03f + ic)
-        // Weapon selector row along the bottom.
+        // Weapon selector row along the bottom-centre.
         val n = weaponRects.size
         val gap = w * 0.012f
-        val ww = (w * 0.5f - gap * (n - 1)) / n
+        val ww = (w * 0.46f - gap * (n - 1)) / n
         val wh = h * 0.12f
-        val startX = w * 0.28f
+        val startX = w * 0.30f
         for (i in 0 until n) {
             val l = startX + i * (ww + gap)
             weaponRects[i].set(l, h - wh - h * 0.03f, l + ww, h - h * 0.03f)
+        }
+        // Helper summon buttons, bottom-left.
+        val hw = w * 0.115f; val hh = h * 0.11f; val hy = h - hh - h * 0.03f
+        rectHanuman.set(w * 0.02f, hy, w * 0.02f + hw, hy + hh)
+        rectLakshman.set(w * 0.03f + hw, hy, w * 0.03f + hw * 2, hy + hh)
+        // Quiz option buttons.
+        val qw = w * 0.62f; val qh = h * 0.11f; val qg = h * 0.025f
+        for (i in 0 until 4) {
+            val top = h * 0.40f + i * (qh + qg)
+            quizRects[i].set(cx - qw / 2f, top, cx + qw / 2f, top + qh)
         }
     }
 
@@ -164,7 +201,15 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         ram = Fighter(true, ramX, terrain.heightAt(ramX), h * 0.11f, if (armour) 150f else 100f)
         ram.armour = armour; ram.rath = rath
         rathBoost = if (rath) 1.2f else 1f
-        ravan = Fighter(false, ravX, terrain.heightAt(ravX), h * 0.14f, 110f)
+        bowMult = 1f + prefs.bowLevel * 0.2f
+        // Current campaign foe (Ravan is last).
+        enemyDef = Enemy.ROSTER[prefs.stage.coerceIn(0, Enemy.FINAL)]
+        enemyAccuracy = enemyDef.accuracy
+        ravan = Fighter(false, ravX, terrain.heightAt(ravX), h * enemyDef.scale, enemyDef.hp)
+        ravan.skin = enemyDef.skin; ravan.heads = enemyDef.heads
+        ravan.crown = enemyDef.crown; ravan.displayName = enemyDef.name.uppercase()
+        hanumanUsed = false; lakshmanUsed = false
+        fxs.clear(); banner = ""; bannerTimer = 0
         ammo.clear()
         for (wp in Weapon.entries) ammo[wp] = wp.ammo
         selected = Weapon.BAAN
@@ -178,9 +223,34 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun rollWind() { wind = (Random.nextFloat() - 0.5f) * gravity * 0.9f }
 
-    private fun startBattle() { newBattle(); state = State.PLAYER_AIM; sound.confirm() }
+    /** Begin a stage: first the Gyaan Dwar (Ramayana quiz), then the duel. */
+    private fun startBattle() {
+        newBattle()
+        question = Quiz.random(Random.Default)
+        quizPicked = -1; quizTimer = 0
+        state = State.QUIZ
+        sound.confirm()
+    }
 
     private fun ammoOf(wp: Weapon) = if (wp.unlimited) -1 else (ammo[wp] ?: 0)
+
+    private fun handleQuizTap(x: Float, y: Float) {
+        if (quizPicked >= 0) return
+        val q = question ?: return
+        for (i in quizRects.indices) {
+            if (quizRects[i].contains(x, y)) {
+                quizPicked = i
+                quizTimer = 90
+                if (i == q.answer) {
+                    prefs.points += Prefs.QUIZ_REWARD
+                    // Reward a bonus special astra shot for this battle.
+                    ammo[Weapon.AGNI] = (ammo[Weapon.AGNI] ?: 0) + 1
+                    sound.victory()
+                } else sound.hurt()
+                return
+            }
+        }
+    }
 
     // --------------------------------------------------------------- input
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -188,6 +258,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         synchronized(holder) {
             when (state) {
                 State.READY -> if (a == MotionEvent.ACTION_DOWN) handleReadyTap(x, y)
+                State.QUIZ -> if (a == MotionEvent.ACTION_DOWN) handleQuizTap(x, y)
                 State.PLAYER_AIM -> handleAim(a, x, y)
                 State.PAUSED -> if (a == MotionEvent.ACTION_DOWN) state = State.PLAYER_AIM
                 State.GAME_OVER -> if (a == MotionEvent.ACTION_DOWN) handleGameOverTap(x, y)
@@ -202,6 +273,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             MotionEvent.ACTION_DOWN -> {
                 if (rectPause.contains(x, y)) { state = State.PAUSED; return }
                 if (rectFx.contains(x, y)) { toggleFx(); return }
+                if (rectHanuman.contains(x, y)) { if (!hanumanUsed) useHanuman(); return }
+                if (rectLakshman.contains(x, y)) { if (!lakshmanUsed) useLakshman(); return }
                 for (i in weaponRects.indices) {
                     if (weaponRects[i].contains(x, y)) {
                         val wp = Weapon.entries[i]
@@ -223,16 +296,46 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             rectBegin.contains(x, y) -> startBattle()
             rectArmour.contains(x, y) -> {
                 if (prefs.armourOwned) prefs.armourOn = !prefs.armourOn
-                else if (prefs.wins >= Prefs.ARMOUR_COST) { prefs.armourOwned = true; prefs.armourOn = true }
+                else if (prefs.spend(Prefs.ARMOUR_COST)) { prefs.armourOwned = true; prefs.armourOn = true }
                 sound.confirm()
             }
             rectRath.contains(x, y) -> {
                 if (prefs.rathOwned) prefs.rathOn = !prefs.rathOn
-                else if (prefs.wins >= Prefs.RATH_COST) { prefs.rathOwned = true; prefs.rathOn = true }
+                else if (prefs.spend(Prefs.RATH_COST)) { prefs.rathOwned = true; prefs.rathOn = true }
                 sound.confirm()
+            }
+            rectBow.contains(x, y) -> {
+                if (prefs.bowLevel < Prefs.MAX_BOW && prefs.spend(Prefs.BOW_COST)) {
+                    prefs.bowLevel += 1; sound.confirm()
+                }
             }
         }
     }
+
+    private fun useHanuman() {
+        hanumanUsed = true
+        ravan.hp = (ravan.hp - 45f).coerceAtLeast(0f); ravan.hurt = 12f
+        ram.hp = (ram.hp + 25f).coerceAtMost(ram.maxHp)
+        damageDealt += 45; coins += 10
+        fxs.add(Fx(ravan.x, ravan.centerY(), FX_HANUMAN, 40, Palette.SAFFRON))
+        particles.burst(ravan.x, ravan.centerY(), Palette.SAFFRON, 40, w * 0.05f, gravity = 0.4f)
+        showBanner("JAI HANUMAN!", Palette.SAFFRON)
+        sound.hanuman(); haptics.heavy()
+        if (ravan.hp <= 0f) finish()
+    }
+
+    private fun useLakshman() {
+        lakshmanUsed = true
+        ravan.hp = (ravan.hp - 40f).coerceAtLeast(0f); ravan.hurt = 12f
+        damageDealt += 40; coins += 10
+        fxs.add(Fx(ravan.x, ravan.centerY(), FX_LAKSHMAN, 34, Palette.RAM_BLUE))
+        particles.burst(ravan.x, ravan.centerY(), Palette.RAM_BLUE, 30, w * 0.04f, gravity = 0.3f)
+        showBanner("LAKSHMAN'S VOLLEY!", Palette.RAM_BLUE)
+        sound.lakshman(); haptics.heavy()
+        if (ravan.hp <= 0f) finish()
+    }
+
+    private fun showBanner(msg: String, color: Int) { banner = msg; bannerColor = color; bannerTimer = 70 }
 
     private fun toggleFx() {
         val on = !sound.enabled
@@ -285,10 +388,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         bgPhase += 1f
         particles.update()
         if (this::ram.isInitialized) { ram.update(); ravan.update() }
+        var fi = fxs.size - 1
+        while (fi >= 0) { fxs[fi].age++; if (fxs[fi].age >= fxs[fi].maxAge) fxs.removeAt(fi); fi-- }
+        if (bannerTimer > 0) bannerTimer--
 
         when (state) {
             State.FLYING -> updateProjectiles()
             State.ENEMY_THINK -> { if (--thinkTimer <= 0) enemyFire() }
+            State.QUIZ -> { if (quizPicked >= 0 && --quizTimer <= 0) state = State.PLAYER_AIM }
             else -> {}
         }
     }
@@ -313,9 +420,15 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private fun explode(p: Projectile) {
         val blast = p.weapon.blastFrac * w
         val r = if (blast > 0f) blast else unit * 2f
-        particles.burst(p.x, p.y, p.weapon.color, if (blast > 0f) 46 else 16, r * 0.9f, gravity = 0.6f)
-        particles.burst(p.x, p.y, 0xFFFFF0C0.toInt(), 10, r * 0.5f, gravity = 0.3f)
-        if (blast > 0f) { terrain.crater(p.x, r * 0.7f); sound.sever() } else sound.hit()
+        // Distinct impact per astra: particle burst + shockwave FX + its own sound.
+        when (p.weapon) {
+            Weapon.BAAN -> { particles.burst(p.x, p.y, p.weapon.color, 14, r * 0.9f, 0.5f); fxs.add(Fx(p.x, p.y, FX_BAAN, 16, p.weapon.color)); sound.impactBaan() }
+            Weapon.AGNI -> { particles.burst(p.x, p.y, 0xFFFF6A1E.toInt(), 40, r, 0.2f); particles.burst(p.x, p.y, 0xFFFFC23A.toInt(), 20, r * 0.7f, 0.1f); fxs.add(Fx(p.x, p.y, FX_AGNI, 26, 0xFFFF6A1E.toInt())); sound.impactAgni() }
+            Weapon.NAGA -> { particles.burst(p.x, p.y, 0xFF49E07A.toInt(), 28, r * 0.9f, 0.3f); fxs.add(Fx(p.x, p.y, FX_NAGA, 22, 0xFF49E07A.toInt())); sound.impactNaga() }
+            Weapon.GADA -> { particles.burst(p.x, p.y, 0xFFB07A3A.toInt(), 34, r, 0.7f); fxs.add(Fx(p.x, p.y, FX_GADA, 24, 0xFFCBA36A.toInt())); sound.impactGada() }
+            Weapon.BRAHMA -> { particles.burst(p.x, p.y, 0xFFFFE14A.toInt(), 60, r * 1.1f, 0.2f); particles.burst(p.x, p.y, Color.WHITE, 30, r * 0.8f, 0.1f); fxs.add(Fx(p.x, p.y, FX_BRAHMA, 34, 0xFFFFE14A.toInt())); sound.impactBrahma() }
+        }
+        if (blast > 0f) terrain.crater(p.x, r * 0.7f)
         haptics.heavy()
         applyDamage(ram, p); applyDamage(ravan, p)
     }
@@ -324,9 +437,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val blast = p.weapon.blastFrac * w
         val frac = f.hitBy(p.x, p.y, blast)
         if (frac <= 0f) return
-        // Enemy shots at Ram hit a little softer to keep the duel fair.
-        val enemyScale = if (f === ram && turn == Turn.ENEMY) 0.7f else 1f
-        val dmg = p.weapon.damage * (0.5f + 0.5f * frac) * enemyScale
+        // Enemy shots at Ram hit softer; Ram's shots scale with his bow upgrade.
+        val enemyScale = if (f === ram && turn == Turn.ENEMY) 0.6f else 1f
+        val playerScale = if (f === ravan && turn == Turn.PLAYER) bowMult else 1f
+        val dmg = p.weapon.damage * (0.5f + 0.5f * frac) * enemyScale * playerScale
         f.hp = (f.hp - dmg).coerceAtLeast(0f)
         f.hurt = 12f
         if (f === ravan && turn == Turn.PLAYER) {
@@ -345,7 +459,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun finish() {
         playerWon = ravan.hp <= 0f
-        if (playerWon) { prefs.wins += 1; sound.victory() } else sound.hurt()
+        if (playerWon) {
+            prefs.wins += 1
+            prefs.points += Prefs.WIN_REWARD
+            if (prefs.stage >= Enemy.FINAL) { prefs.ravanWins += 1; prefs.stage = 0 }  // campaign cleared → new playthrough
+            else prefs.stage += 1
+            sound.victory()
+        } else sound.hurt()
         prefs.submitScore(damageDealt)
         state = State.GAME_OVER
         gameOverAt = System.currentTimeMillis()
@@ -372,8 +492,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             }
             deg += 5
         }
-        // Accuracy improves with the round number; early shots miss wide.
-        val errAng = (0.20f / (1f + round * 0.45f)) * (Random.nextFloat() - 0.5f) * 2f
+        // Accuracy improves with the round and is scaled by this foe's skill.
+        val errAng = (0.22f / (enemyAccuracy * (1f + round * 0.4f))) * (Random.nextFloat() - 0.5f) * 2f
         val ca = cos(errAng); val sa = sin(errAng)
         val rvx = bestVx * ca - bestVy * sa
         val rvy = bestVx * sa + bestVy * ca
@@ -406,15 +526,60 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         ravan.drawHealthBar(canvas, textPaint); ram.drawHealthBar(canvas, textPaint)
         for (p in projectiles) p.draw(canvas, unit)
         particles.draw(canvas)
+        for (f in fxs) drawFx(canvas, f)
 
         when (state) {
             State.READY -> drawReady(canvas)
+            State.QUIZ -> drawQuiz(canvas)
             State.PLAYER_AIM -> { if (aiming) drawTrajectory(canvas); drawHud(canvas) }
             State.FLYING -> drawHud(canvas)
-            State.ENEMY_THINK -> { drawHud(canvas); drawBanner(canvas, "RAVAN ATTACKS", Palette.DEMON) }
+            State.ENEMY_THINK -> { drawHud(canvas); drawBanner(canvas, "${enemyDef.name.uppercase()} ATTACKS", Palette.DEMON) }
             State.PAUSED -> { drawHud(canvas); drawPaused(canvas) }
             State.GAME_OVER -> drawGameOver(canvas)
         }
+        if (bannerTimer > 0 && state != State.QUIZ) {
+            val a = (255 * (bannerTimer / 70f).coerceIn(0f, 1f)).toInt()
+            textPaint.color = (a shl 24) or (bannerColor and 0x00FFFFFF)
+            textPaint.textSize = h * 0.07f
+            canvas.drawText(banner, w * 0.5f, h * 0.34f, textPaint)
+        }
+    }
+
+    private fun drawFx(canvas: Canvas, f: Fx) {
+        val t = f.age.toFloat() / f.maxAge
+        val a = ((1f - t) * 255).toInt().coerceIn(0, 255)
+        when (f.kind) {
+            FX_AGNI, FX_GADA, FX_NAGA, FX_BAAN, FX_BRAHMA -> {
+                ringPaint.color = (a shl 24) or (f.color and 0x00FFFFFF)
+                ringPaint.strokeWidth = unit * (if (f.kind == FX_BRAHMA) 1.2f else 0.7f)
+                canvas.drawCircle(f.x, f.y, t * w * (if (f.kind == FX_BRAHMA) 0.14f else 0.07f) + unit, ringPaint)
+                if (f.kind == FX_BRAHMA && t < 0.4f) {
+                    bgPaint.color = ((0x88 * (1 - t / 0.4f)).toInt() shl 24) or 0x00FFFFFF
+                    canvas.drawRect(0f, 0f, w, h, bgPaint)
+                }
+            }
+            FX_HANUMAN -> {
+                // Hanuman's leaping smash — an orange comet arc into the foe.
+                bgPaint.color = (a shl 24) or (Palette.SAFFRON and 0x00FFFFFF)
+                val hx = f.x - (1 - t) * w * 0.3f; val hy = f.y - (1 - t) * (1 - t) * h * 0.4f
+                canvas.drawCircle(hx, hy, unit * 2.5f, bgPaint)
+                ringPaint.color = (a shl 24) or (Palette.SAFFRON and 0x00FFFFFF); ringPaint.strokeWidth = unit
+                canvas.drawCircle(f.x, f.y, t * w * 0.1f + unit, ringPaint)
+            }
+            FX_LAKSHMAN -> {
+                // Lakshman's volley — three blue streaks converging on the foe.
+                stroke(a, Palette.RAM_BLUE, unit * 0.6f)
+                for (k in -1..1) {
+                    val sx = 0f; val sy = f.y + k * h * 0.12f
+                    val px = f.x - (1 - t) * (f.x - sx); val py = f.y - (1 - t) * (f.y - sy)
+                    canvas.drawLine(px - unit * 3, py - k * unit, px, py, ringPaint)
+                }
+            }
+        }
+    }
+
+    private fun stroke(a: Int, color: Int, wdt: Float) {
+        ringPaint.color = (a shl 24) or (color and 0x00FFFFFF); ringPaint.strokeWidth = wdt; ringPaint.strokeCap = Paint.Cap.ROUND
     }
 
     private fun drawBackground(canvas: Canvas) {
@@ -494,14 +659,20 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawText("$coins", w * 0.07f, h * 0.072f, textPaint)
         textPaint.textAlign = Paint.Align.CENTER
 
-        // Round + wind top-centre.
-        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = h * 0.032f
-        canvas.drawText("ROUND $round", w * 0.5f, h * 0.07f, textPaint)
+        // Foe + round + wind top-centre.
+        textPaint.color = Palette.DEMON; textPaint.textSize = h * 0.03f
+        canvas.drawText("STAGE ${prefs.stage + 1}/${Enemy.ROSTER.size}  •  ${enemyDef.name.uppercase()}", w * 0.5f, h * 0.06f, textPaint)
+        textPaint.color = 0xAAFFFFFF.toInt(); textPaint.textSize = h * 0.024f
+        canvas.drawText("ROUND $round", w * 0.5f, h * 0.09f, textPaint)
         drawWind(canvas)
 
         // Icon buttons.
         drawIcon(canvas, rectPause, "II")
         drawIcon(canvas, rectFx, if (sound.enabled) "♪" else "x")
+
+        // Helper summons (once each per battle).
+        drawHelper(canvas, rectHanuman, "HANUMAN", hanumanUsed, Palette.SAFFRON)
+        drawHelper(canvas, rectLakshman, "LAKSHMAN", lakshmanUsed, Palette.RAM_BLUE)
 
         // Weapon selector.
         for (i in weaponRects.indices) {
@@ -524,10 +695,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         // Selected astra name + mythic description (Mahabharata / Ramayana lore).
         val selTop = weaponRects[0].top
         val selCx = (weaponRects.first().left + weaponRects.last().right) / 2f
-        textPaint.color = selected.color; textPaint.textSize = h * 0.038f
-        canvas.drawText(selected.full, selCx, selTop - h * 0.055f, textPaint)
-        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = h * 0.026f
-        canvas.drawText(selected.desc, selCx, selTop - h * 0.018f, textPaint)
+        textPaint.color = selected.color; textPaint.textSize = h * 0.036f
+        val dmgTxt = "DMG ${(selected.damage * bowMult).toInt()}" + if (selected.blastFrac > 0f) "  •  BLAST" else ""
+        canvas.drawText("${selected.full}   —   $dmgTxt", selCx, selTop - h * 0.055f, textPaint)
+        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = h * 0.024f
+        canvas.drawText(selected.desc, selCx, selTop - h * 0.02f, textPaint)
 
         if (state == State.PLAYER_AIM && !aiming) {
             textPaint.color = 0xAAFFF0C0.toInt(); textPaint.textSize = h * 0.03f
@@ -557,6 +729,50 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawText(glyph, r.centerX(), r.centerY() + r.height() * 0.14f, textPaint)
     }
 
+    private fun drawHelper(canvas: Canvas, r: RectF, name: String, used: Boolean, color: Int) {
+        barPaint.color = if (used) 0x33202020 else (color and 0x00FFFFFF) or 0xAA000000.toInt()
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
+        ringPaint.color = if (used) 0x33FFFFFF else color; ringPaint.strokeWidth = h * 0.005f
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, ringPaint)
+        textPaint.color = if (used) 0x66FFFFFF else Color.WHITE; textPaint.textSize = r.height() * 0.2f
+        canvas.drawText(name, r.centerX(), r.centerY() - r.height() * 0.02f, textPaint)
+        textPaint.textSize = r.height() * 0.16f
+        textPaint.color = if (used) 0x55FFFFFF else Palette.GOLD
+        canvas.drawText(if (used) "used" else "SUMMON", r.centerX(), r.centerY() + r.height() * 0.26f, textPaint)
+    }
+
+    private fun drawQuiz(canvas: Canvas) {
+        canvas.drawRect(0f, 0f, w, h, dimPaint)
+        val q = question ?: return
+        val cx = w / 2f
+        textPaint.color = Palette.GOLD; textPaint.textSize = h * 0.05f
+        canvas.drawText("GYAAN DWAR", cx, h * 0.14f, textPaint)
+        textPaint.color = 0xAAFFFFFF.toInt(); textPaint.textSize = h * 0.026f
+        canvas.drawText("Answer to earn punya points + a bonus astra", cx, h * 0.19f, textPaint)
+        textPaint.color = Color.WHITE; textPaint.textSize = h * 0.036f
+        canvas.drawText(q.text, cx, h * 0.30f, textPaint)
+
+        for (i in quizRects.indices) {
+            val r = quizRects[i]
+            val fill = when {
+                quizPicked < 0 -> 0xAA202832.toInt()
+                i == q.answer -> 0xCC2E7D32.toInt()
+                i == quizPicked -> 0xCC7D2E2E.toInt()
+                else -> 0x66202832
+            }
+            barPaint.color = fill
+            canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
+            textPaint.color = Color.WHITE; textPaint.textSize = h * 0.032f
+            canvas.drawText(q.options[i], r.centerX(), r.centerY() + h * 0.011f, textPaint)
+        }
+        if (quizPicked >= 0) {
+            val ok = quizPicked == q.answer
+            textPaint.color = if (ok) Palette.GRASS else Palette.DEMON; textPaint.textSize = h * 0.034f
+            canvas.drawText(if (ok) "Correct! +${Prefs.QUIZ_REWARD} points, +1 Agni Baan" else "Not quite — the duel begins!",
+                cx, h * 0.94f, textPaint)
+        }
+    }
+
     private fun drawBanner(canvas: Canvas, msg: String, color: Int) {
         textPaint.color = color; textPaint.textSize = h * 0.06f
         val a = 0.6f + 0.4f * sin(bgPhase * 0.15f)
@@ -572,45 +788,60 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawText("ASTRA", cx, h * 0.24f, textPaint)
         textPaint.color = Palette.DEMON; textPaint.textSize = h * 0.05f
         canvas.drawText("RAM   vs   RAVAN", cx, h * 0.32f, textPaint)
-        textPaint.color = 0xAAFFD24A.toInt(); textPaint.textSize = h * 0.03f
-        canvas.drawText("An artillery duel — aim, power & astras over the battlefield", cx, h * 0.395f, textPaint)
+        // Campaign progress + next foe.
+        val nextFoe = Enemy.ROSTER[prefs.stage.coerceIn(0, Enemy.FINAL)]
+        textPaint.color = Palette.DEMON; textPaint.textSize = h * 0.034f
+        canvas.drawText("STAGE ${prefs.stage + 1}/${Enemy.ROSTER.size}  —  NEXT: ${nextFoe.name.uppercase()}", cx, h * 0.375f, textPaint)
+        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.024f
+        canvas.drawText(nextFoe.title, cx, h * 0.41f, textPaint)
 
-        // Powers earned by winning duels.
-        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.026f
-        canvas.drawText("POWERS — win duels to unlock, tap to equip", cx, h * 0.44f, textPaint)
-        drawUpgradeChip(canvas, rectArmour, "ARMOUR", "+50 HP",
-            prefs.armourOwned, prefs.armourOn, Prefs.ARMOUR_COST)
-        drawUpgradeChip(canvas, rectRath, "RATH", "+power & range",
-            prefs.rathOwned, prefs.rathOn, Prefs.RATH_COST)
+        // Shop.
+        textPaint.color = Palette.GOLD; textPaint.textSize = h * 0.026f
+        canvas.drawText("PUNYA POINTS: ${prefs.points}   (tap to buy / equip)", cx, h * 0.445f, textPaint)
+        drawUpgradeChip(canvas, rectArmour, "ARMOUR", "+50 HP", prefs.armourOwned, prefs.armourOn, Prefs.ARMOUR_COST)
+        drawUpgradeChip(canvas, rectRath, "RATH", "+power/range", prefs.rathOwned, prefs.rathOn, Prefs.RATH_COST)
+        drawBowChip(canvas, rectBow)
 
         val pulse = 0.5f + 0.5f * sin(bgPhase * 0.08f)
         barPaint.color = Palette.SAFFRON; barPaint.alpha = (200 + 55 * pulse).toInt()
         val pr = rectBegin.height() / 2f
         canvas.drawRoundRect(rectBegin, pr, pr, barPaint); barPaint.alpha = 255
-        textPaint.color = 0xFF2A1206.toInt(); textPaint.textSize = h * 0.05f
-        canvas.drawText("BEGIN  DUEL", cx, rectBegin.centerY() + h * 0.017f, textPaint)
+        textPaint.color = 0xFF2A1206.toInt(); textPaint.textSize = h * 0.044f
+        canvas.drawText("CHALLENGE ${nextFoe.name.uppercase()}", cx, rectBegin.centerY() + h * 0.015f, textPaint)
 
-        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.032f
-        canvas.drawText("WINS ${prefs.wins}    •    BEST DMG ${prefs.bestScore}", cx, h * 0.86f, textPaint)
+        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.03f
+        canvas.drawText("WINS ${prefs.wins}   •   RAVAN SLAIN ${prefs.ravanWins}×   •   BEST DMG ${prefs.bestScore}", cx, h * 0.90f, textPaint)
     }
 
     private fun drawUpgradeChip(canvas: Canvas, r: RectF, name: String, perk: String,
                                 owned: Boolean, on: Boolean, cost: Int) {
-        val avail = owned || prefs.wins >= cost
+        val avail = owned || prefs.points >= cost
         barPaint.color = when { on -> 0xCC3A2A12.toInt(); owned -> 0xAA202832.toInt(); avail -> 0xAA1A2230.toInt(); else -> 0x66101418.toInt() }
         canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
-        ringPaint.color = if (on) Palette.GOLD else 0x44FFFFFF
-        ringPaint.strokeWidth = h * 0.005f
+        ringPaint.color = if (on) Palette.GOLD else 0x44FFFFFF; ringPaint.strokeWidth = h * 0.005f
         canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, ringPaint)
-        textPaint.color = if (avail) Palette.GOLD else 0x77FFFFFF.toInt()
-        textPaint.textSize = r.height() * 0.24f
-        canvas.drawText(name, r.centerX(), r.top + r.height() * 0.32f, textPaint)
-        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = r.height() * 0.16f
-        canvas.drawText(perk, r.centerX(), r.top + r.height() * 0.56f, textPaint)
-        val status = when { on -> "EQUIPPED ✓"; owned -> "tap to equip"; avail -> "UNLOCK (tap)"; else -> "win $cost duels" }
-        textPaint.color = if (on) Palette.GRASS else 0x99FFFFFF.toInt()
-        textPaint.textSize = r.height() * 0.16f
-        canvas.drawText(status, r.centerX(), r.bottom - r.height() * 0.14f, textPaint)
+        textPaint.color = if (avail) Palette.GOLD else 0x77FFFFFF.toInt(); textPaint.textSize = r.height() * 0.22f
+        canvas.drawText(name, r.centerX(), r.top + r.height() * 0.30f, textPaint)
+        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = r.height() * 0.15f
+        canvas.drawText(perk, r.centerX(), r.top + r.height() * 0.53f, textPaint)
+        val status = when { on -> "EQUIPPED"; owned -> "tap to equip"; avail -> "BUY $cost pts"; else -> "$cost pts" }
+        textPaint.color = if (on) Palette.GRASS else 0x99FFFFFF.toInt(); textPaint.textSize = r.height() * 0.15f
+        canvas.drawText(status, r.centerX(), r.bottom - r.height() * 0.12f, textPaint)
+    }
+
+    private fun drawBowChip(canvas: Canvas, r: RectF) {
+        val lvl = prefs.bowLevel; val maxed = lvl >= Prefs.MAX_BOW
+        val avail = !maxed && prefs.points >= Prefs.BOW_COST
+        barPaint.color = if (lvl > 0) 0xAA202832.toInt() else 0xAA1A2230.toInt()
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
+        ringPaint.color = if (lvl > 0) Palette.GOLD else 0x44FFFFFF; ringPaint.strokeWidth = h * 0.005f
+        canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, ringPaint)
+        textPaint.color = Palette.GOLD; textPaint.textSize = r.height() * 0.22f
+        canvas.drawText("BOW  Lv$lvl", r.centerX(), r.top + r.height() * 0.30f, textPaint)
+        textPaint.color = 0xCCFFFFFF.toInt(); textPaint.textSize = r.height() * 0.15f
+        canvas.drawText("+${(lvl * 20)}% dmg", r.centerX(), r.top + r.height() * 0.53f, textPaint)
+        textPaint.color = if (maxed) Palette.GRASS else 0x99FFFFFF.toInt(); textPaint.textSize = r.height() * 0.15f
+        canvas.drawText(if (maxed) "MAX" else "UP ${Prefs.BOW_COST} pts", r.centerX(), r.bottom - r.height() * 0.12f, textPaint)
     }
 
     private fun drawPaused(canvas: Canvas) {
@@ -624,13 +855,24 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private fun drawGameOver(canvas: Canvas) {
         canvas.drawRect(0f, 0f, w, h, dimPaint)
         val cx = w / 2f
+        val foe = enemyDef.name.uppercase()
+        val wasRavan = enemyDef.heads >= 10
         textPaint.color = if (playerWon) Palette.GOLD else Palette.DEMON
-        textPaint.textSize = h * 0.10f
-        canvas.drawText(if (playerWon) "RAVAN SLAIN!" else "RAM HAS FALLEN", cx, h * 0.30f, textPaint)
-        textPaint.color = Color.WHITE; textPaint.textSize = h * 0.045f
-        canvas.drawText("Rounds $round   •   Damage $damageDealt   •   ₹$coins", cx, h * 0.40f, textPaint)
-        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.032f
-        canvas.drawText("WINS ${prefs.wins}", cx, h * 0.47f, textPaint)
+        textPaint.textSize = h * 0.09f
+        val title = when {
+            playerWon && wasRavan -> "RAVAN IS SLAIN!"
+            playerWon -> "$foe DEFEATED!"
+            else -> "RAM HAS FALLEN"
+        }
+        canvas.drawText(title, cx, h * 0.28f, textPaint)
+        textPaint.color = Color.WHITE; textPaint.textSize = h * 0.04f
+        canvas.drawText("Rounds $round   •   Damage $damageDealt   •   +${if (playerWon) Prefs.WIN_REWARD else 0} pts", cx, h * 0.38f, textPaint)
+        textPaint.color = 0x99FFFFFF.toInt(); textPaint.textSize = h * 0.03f
+        val sub = if (playerWon) {
+            if (wasRavan) "Lanka is free! A new, harder campaign awaits."
+            else "Next foe: ${Enemy.ROSTER[prefs.stage].name.uppercase()}"
+        } else "Tap FIGHT AGAIN to challenge $foe once more"
+        canvas.drawText(sub, cx, h * 0.45f, textPaint)
 
         drawButton(canvas, rectRetry, "FIGHT AGAIN", Palette.SAFFRON, 0xFF2A1206.toInt(), h * 0.045f)
         drawButton(canvas, rectShare, "SHARE & CHALLENGE", 0xFF2C3A52.toInt(), Color.WHITE, h * 0.036f)
@@ -642,6 +884,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawRoundRect(r, rad, rad, barPaint)
         textPaint.color = txt; textPaint.textSize = size
         canvas.drawText(label, r.centerX(), r.centerY() + size * 0.35f, textPaint)
+    }
+
+    companion object {
+        private const val FX_BAAN = 0
+        private const val FX_AGNI = 1
+        private const val FX_NAGA = 2
+        private const val FX_GADA = 3
+        private const val FX_BRAHMA = 4
+        private const val FX_HANUMAN = 5
+        private const val FX_LAKSHMAN = 6
     }
 
     // --------------------------------------------------------------- thread

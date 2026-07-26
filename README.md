@@ -67,13 +67,51 @@ Every battle generates **fresh, destructible terrain** with pillars for cover, s
 | **Gada** (mace) | Heavy, arcs steeply, big damage and blast. |
 | **Brahmastra** | The ultimate — huge damage and blast, but only **one** per duel. |
 
-### Progression — win to earn powers
+### Campaign — Ravan is the final boss
 
-- **Win duels** against Ravan to unlock powers on the start screen:
-  - **Armour** (win 2) — golden plate for Ram, **+50 health**.
-  - **Rath** (win 5) — a divine chariot, **+power & range** on every shot (and Ram rides it into battle).
-  - Tap a power to **equip / unequip** it before a duel.
-- Earn **coins** for every hit landed; **wins** and **best damage** are saved locally.
+Ram fights a **ladder of five foes**, each tougher than the last, ending with Ravan:
+
+1. **Tadaka** — the demoness of the forest
+2. **Vali** — the mighty vanara king
+3. **Kumbhakarna** — the colossal sleeper (tanky, but a poor shot)
+4. **Meghnad (Indrajit)** — a deadly-accurate sorcerer
+5. **Ravan** — the ten-headed Demon-King (final)
+
+Beat Ravan to free Lanka; the campaign then restarts for a fresh run. Balance is
+tuned (and verified by headless simulation) so every stage is winnable, with
+difficulty rising toward Ravan.
+
+### Gyaan Dwar — the Ramayana quiz gate
+
+Before each duel a **Ramayana knowledge question** appears. Answer correctly to
+earn **punya points** and a bonus astra for the fight ahead.
+
+### Summon your allies (once each per battle)
+
+- **Hanuman** — leaps in for a mighty smash (**big damage + heals Ram**).
+- **Lakshman** — looses a precise **guaranteed volley** at the foe.
+
+Each has its own animation and sound, and can be used **once per battle** — save
+them for the moment you need them most.
+
+### Powers & the upgrade shop — spend punya points
+
+Earn **punya points** from wins (+5) and correct quiz answers (+3), then spend them
+on the start screen:
+
+- **Armour** — golden plate, **+50 health**.
+- **Rath** — a divine chariot Ram rides, **+power & range** on every shot.
+- **Bow** — up to **Lv 3**, **+20% arrow damage** per level.
+
+Tap Armour/Rath to **equip / unequip**. **Coins**, **wins**, **Ravan kills** and
+**best damage** are all saved locally.
+
+### Astras — distinct on every hit
+
+Each divine astra has its **own damage, blast, impact animation and sound**:
+a fiery bloom for Agneyastra, a green serpent burst for Nagastra, a heavy
+shockwave for Kaumodaki, and a screen-white cataclysm for the Brahmastra.
+
 - **Share** your result card after each duel to challenge friends.
 
 ### Look & feel

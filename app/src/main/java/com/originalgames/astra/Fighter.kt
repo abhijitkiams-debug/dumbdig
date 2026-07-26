@@ -24,6 +24,11 @@ class Fighter(
     var hurt = 0f
     var armour = false
     var rath = false
+    // Enemy appearance (ignored for Ram).
+    var skin = 0xFF4A2036.toInt()
+    var heads = 10
+    var crown = true
+    var displayName = if (isRam) "RAM" else "RAVAN"
     private val facing = if (isRam) 1f else -1f
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -49,7 +54,7 @@ class Fighter(
 
     fun draw(canvas: Canvas) {
         if (rath && isRam) drawRath(canvas)
-        if (isRam) drawRam(canvas) else drawRavan(canvas)
+        if (isRam) drawRam(canvas) else drawEnemy(canvas)
         if (hurt > 0f) {
             p.color = ((0x66 * (hurt / 12f)).toInt().coerceIn(0, 255) shl 24) or 0x00FFFFFF
             canvas.drawCircle(x, centerY(), bodyRadius() * 1.4f, p)
@@ -174,11 +179,11 @@ class Fighter(
         }
     }
 
-    // ---------------------------------------------------------------- RAVAN
-    private fun drawRavan(canvas: Canvas) {
+    // ---------------------------------------------------------------- ENEMY
+    private fun drawEnemy(canvas: Canvas) {
         val s = scale; val by = feetY
         // Body.
-        p.color = 0xFF2A1622.toInt()
+        p.color = darken(skin, 0.45f)
         oval.set(x - s * 0.55f, by - s * 1.15f, x + s * 0.55f, by)
         canvas.drawRoundRect(oval, s * 0.24f, s * 0.24f, p)
         // Sash + belt.
@@ -191,29 +196,40 @@ class Fighter(
         val sx = x + facing * s * 0.55f
         canvas.drawLine(sx, by - s * 0.9f, sx + facing * s * 0.5f, by - s * 1.5f, stroke)
 
-        // Ten fierce heads: a big central one flanked by a fan of smaller heads.
-        for (i in 0 until 9) {
-            val f = (i - 4f) / 4f
-            val hx = x + f * s * 0.66f
-            val hy = by - s * 1.28f - (1f - f * f) * s * 0.22f
-            drawDemonHead(canvas, hx, hy, s * 0.15f, false)
+        if (heads >= 10) {
+            // Ravan: a fan of nine smaller heads + one crowned central head.
+            for (i in 0 until 9) {
+                val f = (i - 4f) / 4f
+                val hx = x + f * s * 0.66f
+                val hy = by - s * 1.28f - (1f - f * f) * s * 0.22f
+                drawDemonHead(canvas, hx, hy, s * 0.15f, false)
+            }
+            drawDemonHead(canvas, x, by - s * 1.62f, s * 0.26f, true)
+        } else {
+            drawDemonHead(canvas, x, by - s * 1.5f, s * 0.32f, true)
         }
-        drawDemonHead(canvas, x, by - s * 1.62f, s * 0.26f, true)
+    }
+
+    private fun darken(c: Int, f: Float): Int {
+        val r = ((c shr 16 and 0xFF) * f).toInt(); val g = ((c shr 8 and 0xFF) * f).toInt(); val b = ((c and 0xFF) * f).toInt()
+        return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 
     private fun drawDemonHead(canvas: Canvas, hx: Float, hy: Float, hr: Float, main: Boolean) {
-        // Crown.
-        p.color = Palette.GOLD
-        path.reset()
-        path.moveTo(hx - hr * 0.9f, hy - hr * 0.6f)
-        path.lineTo(hx - hr * 0.5f, hy - hr * 1.5f)
-        path.lineTo(hx, hy - hr * 0.8f)
-        path.lineTo(hx + hr * 0.5f, hy - hr * 1.5f)
-        path.lineTo(hx + hr * 0.9f, hy - hr * 0.6f)
-        path.close()
-        canvas.drawPath(path, p)
-        // Face (dark demon skin).
-        p.color = if (main) 0xFF4A2036.toInt() else 0xFF3A2230.toInt()
+        // Crown (only if this foe wears one, or always for Ravan's heads).
+        if (crown || heads >= 10) {
+            p.color = Palette.GOLD
+            path.reset()
+            path.moveTo(hx - hr * 0.9f, hy - hr * 0.6f)
+            path.lineTo(hx - hr * 0.5f, hy - hr * 1.5f)
+            path.lineTo(hx, hy - hr * 0.8f)
+            path.lineTo(hx + hr * 0.5f, hy - hr * 1.5f)
+            path.lineTo(hx + hr * 0.9f, hy - hr * 0.6f)
+            path.close()
+            canvas.drawPath(path, p)
+        }
+        // Face.
+        p.color = if (main) skin else darken(skin, 0.8f)
         canvas.drawCircle(hx, hy, hr, p)
         // Fierce eyes.
         val er = hr * 0.36f
@@ -246,6 +262,6 @@ class Fighter(
         p.color = if (isRam) Palette.GRASS else Palette.DEMON
         canvas.drawRoundRect(left, top, left + bw * frac, top + bh, bh / 2f, bh / 2f, p)
         text.color = Color.WHITE; text.textSize = bh * 0.9f; text.textAlign = Paint.Align.CENTER
-        canvas.drawText(if (isRam) "RAM" else "RAVAN", x, top - bh * 0.5f, text)
+        canvas.drawText(displayName, x, top - bh * 0.5f, text)
     }
 }

@@ -19,7 +19,7 @@ enum class Weapon(
 ) {
     BAAN("Baan", "Sharanga Baan",
         "Swift arrow of Vishnu's bow — endless quiver.",
-        1, 15f, 0.030f, 1.0f, -1, 0xFFFFD24A.toInt()),
+        1, 16f, 0.030f, 1.0f, -1, 0xFFFFD24A.toInt()),
     AGNI("Agni", "Agneyastra",
         "Astra of Agni — erupts into a wall of flame.",
         1, 24f, 0.070f, 1.0f, 6, 0xFFFF6A1E.toInt()),

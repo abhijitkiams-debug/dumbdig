@@ -599,45 +599,95 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     private fun drawBackground(canvas: Canvas) {
         canvas.drawRect(0f, 0f, w, h, skyPaint)
-        // Sun glow.
-        bgPaint.color = 0x55FFF6D0.toInt()
-        canvas.drawCircle(w * 0.5f, h * 0.28f, h * 0.16f, bgPaint)
-        bgPaint.color = 0xCCFFF0B0.toInt()
-        canvas.drawCircle(w * 0.5f, h * 0.28f, h * 0.09f, bgPaint)
-        // The golden castle of Lanka, in two silhouette layers.
-        drawCastle(canvas, h * 0.72f, 0.55f, 0xFFB07E1E.toInt(), 0.75f)
-        drawCastle(canvas, h * 0.72f, 1.0f, 0xFFE8B84B.toInt(), 1.0f)
+        val horizon = h * 0.72f
+        // Sun with soft radiating rays.
+        val sunX = w * 0.5f; val sunY = h * 0.30f
+        ringPaint.color = 0x33FFF3C0; ringPaint.strokeWidth = h * 0.006f; ringPaint.strokeCap = Paint.Cap.ROUND
+        for (a in 0 until 16) {
+            val an = a * (Math.PI.toFloat() / 8f) + bgPhase * 0.003f
+            canvas.drawLine(sunX + cos(an) * h * 0.17f, sunY + sin(an) * h * 0.17f,
+                sunX + cos(an) * h * 0.26f, sunY + sin(an) * h * 0.26f, ringPaint)
+        }
+        bgPaint.color = 0x55FFF6D0.toInt(); canvas.drawCircle(sunX, sunY, h * 0.15f, bgPaint)
+        bgPaint.color = 0xDDFFF0B0.toInt(); canvas.drawCircle(sunX, sunY, h * 0.085f, bgPaint)
+
+        // Golden haze band at the horizon.
+        bgPaint.color = 0x33FFE9A8.toInt()
+        canvas.drawRect(0f, horizon - h * 0.10f, w, horizon, bgPaint)
+
+        // The golden City of Lanka — three receding skyline layers + a grand palace.
+        drawSkyline(canvas, horizon, 0.45f, 0xFFB88A2E.toInt(), 0.6f, 0.055f)
+        drawSkyline(canvas, horizon, 0.72f, 0xFFD6A63C.toInt(), 0.85f, 0.075f)
+        drawPalace(canvas, horizon)
+        drawSkyline(canvas, horizon, 1.0f, 0xFFF0C24E.toInt(), 1f, 0.095f)
+
+        // Shimmering golden moat just in front of the city (Lanka is an island).
+        bgPaint.color = 0x552A1A08.toInt()
+        canvas.drawRect(0f, horizon, w, horizon + h * 0.03f, bgPaint)
+        stroke(0x55, Palette.GOLD, h * 0.004f)
+        var sx = (bgPhase * 0.5f) % (w * 0.08f)
+        while (sx < w) { canvas.drawLine(sx, horizon + h * 0.015f, sx + w * 0.04f, horizon + h * 0.015f, ringPaint); sx += w * 0.08f }
     }
 
-    /** Draws a row of golden towers with domes, ramparts and flags. */
-    private fun drawCastle(canvas: Canvas, baseY: Float, scaleF: Float, color: Int, alpha: Float) {
+    /** A receding row of golden towers, domes, spires and rooftops. */
+    private fun drawSkyline(canvas: Canvas, baseY: Float, sf: Float, color: Int, alpha: Float, step: Float) {
         bgPaint.color = (((0xFF * alpha).toInt() shl 24) or (color and 0x00FFFFFF))
-        // Rampart wall.
-        val wallTop = baseY - h * 0.16f * scaleF
+        val wallTop = baseY - h * 0.09f * sf
         canvas.drawRect(0f, wallTop, w, baseY, bgPaint)
-        // Crenellations.
-        var cx = 0f; val cw = w * 0.03f
-        while (cx < w) { canvas.drawRect(cx, wallTop - h * 0.02f, cx + cw * 0.6f, wallTop, bgPaint); cx += cw }
-        // Towers.
-        val towers = floatArrayOf(0.12f, 0.30f, 0.5f, 0.7f, 0.88f)
-        for ((i, tx) in towers.withIndex()) {
-            val txp = tx * w
-            val tw = w * (0.05f + (i % 2) * 0.015f) * scaleF
-            val th = h * (0.20f + (i % 3) * 0.06f) * scaleF
+        var i = 0; val sw = w * step
+        var bx = -sw * 0.5f
+        while (bx < w) {
+            val seed = (i * 37 % 7)
+            val tw = sw * (0.34f + (seed % 3) * 0.06f)
+            val th = h * (0.12f + (seed % 4) * 0.05f) * sf
+            val txp = bx + sw * 0.5f
             canvas.drawRect(txp - tw, baseY - th, txp + tw, baseY, bgPaint)
-            // Onion dome.
-            path.reset()
-            path.moveTo(txp - tw, baseY - th)
-            path.cubicTo(txp - tw, baseY - th - tw * 1.6f, txp + tw, baseY - th - tw * 1.6f, txp + tw, baseY - th)
-            path.close()
-            canvas.drawPath(path, bgPaint)
-            canvas.drawCircle(txp, baseY - th - tw * 1.5f, tw * 0.3f, bgPaint)
-            // Flag.
-            if (scaleF >= 1f) {
-                val fp = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xCCFF4D5E.toInt() }
-                canvas.drawRect(txp, baseY - th - tw * 2.6f, txp + tw * 0.9f, baseY - th - tw * 2.1f, fp)
-                bgPaint.strokeWidth = tw * 0.12f
+            when (seed % 3) {
+                0 -> { // onion dome + kalash
+                    path.reset(); path.moveTo(txp - tw, baseY - th)
+                    path.cubicTo(txp - tw, baseY - th - tw * 1.7f, txp + tw, baseY - th - tw * 1.7f, txp + tw, baseY - th)
+                    path.close(); canvas.drawPath(path, bgPaint)
+                    canvas.drawCircle(txp, baseY - th - tw * 1.6f, tw * 0.22f, bgPaint)
+                }
+                1 -> { // tall spire (shikhara)
+                    path.reset(); path.moveTo(txp - tw, baseY - th); path.lineTo(txp, baseY - th - tw * 2.4f)
+                    path.lineTo(txp + tw, baseY - th); path.close(); canvas.drawPath(path, bgPaint)
+                }
+                else -> { // flat roof + battlements
+                    var c = txp - tw
+                    while (c < txp + tw) { canvas.drawRect(c, baseY - th - tw * 0.35f, c + tw * 0.3f, baseY - th, bgPaint); c += tw * 0.5f }
+                }
             }
+            bx += sw; i++
+        }
+    }
+
+    /** Ravan's grand central palace: a broad tower, big dome and flanking spires with banners. */
+    private fun drawPalace(canvas: Canvas, baseY: Float) {
+        val cx = w * 0.5f; val gold = 0xFFF7CE5A.toInt(); val shade = 0xFFC79A34.toInt()
+        val bw = w * 0.11f; val bh = h * 0.34f
+        // Main tower.
+        bgPaint.color = shade; canvas.drawRect(cx - bw, baseY - bh, cx + bw, baseY, bgPaint)
+        bgPaint.color = gold; canvas.drawRect(cx - bw, baseY - bh, cx + bw * 0.55f, baseY, bgPaint)
+        // Grand dome.
+        path.reset(); path.moveTo(cx - bw, baseY - bh)
+        path.cubicTo(cx - bw, baseY - bh - bw * 1.8f, cx + bw, baseY - bh - bw * 1.8f, cx + bw, baseY - bh)
+        path.close(); bgPaint.color = gold; canvas.drawPath(path, bgPaint)
+        // Kalash spire on the dome.
+        bgPaint.color = gold; canvas.drawRect(cx - bw * 0.06f, baseY - bh - bw * 2.9f, cx + bw * 0.06f, baseY - bh - bw * 1.7f, bgPaint)
+        canvas.drawCircle(cx, baseY - bh - bw * 3.0f, bw * 0.18f, bgPaint)
+        // Windows.
+        bgPaint.color = 0x66301206.toInt()
+        for (r in 0 until 4) canvas.drawRect(cx - bw * 0.5f, baseY - bh * (0.85f - r * 0.2f), cx + bw * 0.5f, baseY - bh * (0.78f - r * 0.2f), bgPaint)
+        // Flanking spires with banners.
+        for (s in intArrayOf(-1, 1)) {
+            val fx = cx + s * bw * 2.2f
+            bgPaint.color = shade; canvas.drawRect(fx - bw * 0.4f, baseY - bh * 0.8f, fx + bw * 0.4f, baseY, bgPaint)
+            path.reset(); path.moveTo(fx - bw * 0.4f, baseY - bh * 0.8f); path.lineTo(fx, baseY - bh * 1.15f)
+            path.lineTo(fx + bw * 0.4f, baseY - bh * 0.8f); path.close(); bgPaint.color = gold; canvas.drawPath(path, bgPaint)
+            bgPaint.color = 0xCCFF4D5E.toInt()
+            val flag = sin(bgPhase * 0.1f + s) * bw * 0.05f
+            canvas.drawRect(fx, baseY - bh * 1.15f, fx + bw * 0.45f + flag, baseY - bh * 1.05f, bgPaint)
         }
     }
 
@@ -713,22 +763,34 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         drawHelper(canvas, rectHanuman, "HANUMAN", hanumanUsed, Palette.SAFFRON)
         drawHelper(canvas, rectLakshman, "LAKSHMAN", lakshmanUsed, Palette.RAM_BLUE)
 
-        // Weapon selector.
+        // Weapon selector — Pocket-Tanks-style tiles, each with a distinct astra icon.
         for (i in weaponRects.indices) {
             val r = weaponRects[i]; val wp = Weapon.entries[i]
             val sel = wp == selected
             val out = ammoOf(wp) == 0
-            barPaint.color = when { out -> 0x33202020; sel -> (wp.color and 0x00FFFFFF) or 0x99000000.toInt(); else -> 0xAA202832.toInt() }
-            canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, barPaint)
-            if (sel) { ringPaint.color = wp.color; ringPaint.strokeWidth = h * 0.006f; canvas.drawRoundRect(r, h * 0.02f, h * 0.02f, ringPaint) }
-            barPaint.color = if (out) 0x55FFFFFF else wp.color
-            canvas.drawCircle(r.centerX(), r.top + r.height() * 0.34f, r.height() * 0.16f, barPaint)
+            val rad = h * 0.018f
+            // Tile: inset "3D" look with a lighter top and a selected glow.
+            barPaint.color = if (out) 0xCC161616.toInt() else 0xEE10161F.toInt()
+            canvas.drawRoundRect(r, rad, rad, barPaint)
+            barPaint.color = if (out) 0x22FFFFFF else (wp.color and 0x00FFFFFF) or 0x33000000
+            canvas.drawRoundRect(r.left, r.top, r.right, r.top + r.height() * 0.5f, rad, rad, barPaint)
+            ringPaint.color = if (sel) Palette.GOLD else 0x55FFFFFF
+            ringPaint.strokeWidth = if (sel) h * 0.008f else h * 0.003f
+            canvas.drawRoundRect(r, rad, rad, ringPaint)
+            if (sel) {
+                ringPaint.color = (wp.color and 0x00FFFFFF) or 0x66000000
+                ringPaint.strokeWidth = h * 0.014f
+                canvas.drawRoundRect(r, rad, rad, ringPaint)
+            }
+            // The astra's own icon.
+            drawAstraIcon(canvas, wp, r.centerX(), r.top + r.height() * 0.36f, r.height() * 0.24f, out)
             textPaint.color = if (out) 0x66FFFFFF else Color.WHITE
             textPaint.textSize = r.height() * 0.16f
-            canvas.drawText(wp.label, r.centerX(), r.top + r.height() * 0.62f, textPaint)
+            canvas.drawText(wp.label, r.centerX(), r.top + r.height() * 0.7f, textPaint)
+            // Ammo badge.
             textPaint.textSize = r.height() * 0.15f
-            textPaint.color = 0xAAFFFFFF.toInt()
-            canvas.drawText(if (wp.unlimited) "∞" else "x${ammoOf(wp)}", r.centerX(), r.bottom - r.height() * 0.12f, textPaint)
+            textPaint.color = if (out) 0xFFFF6A6A.toInt() else 0xCCFFFFFF.toInt()
+            canvas.drawText(if (wp.unlimited) "∞" else "x${ammoOf(wp)}", r.centerX(), r.bottom - r.height() * 0.1f, textPaint)
         }
 
         // Selected astra name + mythic description (Mahabharata / Ramayana lore).
@@ -767,6 +829,57 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.color = Color.WHITE; textPaint.textSize = r.height() * 0.4f
         canvas.drawText(glyph, r.centerX(), r.centerY() + r.height() * 0.14f, textPaint)
     }
+
+    /** A distinct silhouette icon for each astra, for the selector tiles. */
+    private fun drawAstraIcon(canvas: Canvas, wp: Weapon, cx: Float, cy: Float, r: Float, dim: Boolean) {
+        val c = if (dim) 0x66FFFFFF.toInt() else wp.color
+        barPaint.color = c; ringPaint.color = c; ringPaint.strokeCap = Paint.Cap.ROUND
+        path.reset()
+        when (wp) {
+            Weapon.BAAN -> {
+                // Diagonal arrow.
+                ringPaint.strokeWidth = r * 0.28f
+                canvas.drawLine(cx - r, cy + r, cx + r * 0.7f, cy - r * 0.7f, ringPaint)
+                path.moveTo(cx + r, cy - r); path.lineTo(cx + r * 0.2f, cy - r * 0.75f); path.lineTo(cx + r * 0.75f, cy - r * 0.2f); path.close()
+                canvas.drawPath(path, barPaint)
+            }
+            Weapon.AGNI -> {
+                // Flame teardrop.
+                path.moveTo(cx, cy - r * 1.1f)
+                path.cubicTo(cx + r * 0.9f, cy - r * 0.2f, cx + r * 0.6f, cy + r, cx, cy + r)
+                path.cubicTo(cx - r * 0.6f, cy + r, cx - r * 0.9f, cy - r * 0.2f, cx, cy - r * 1.1f)
+                path.close(); canvas.drawPath(path, barPaint)
+                barPaint.color = if (dim) 0x66FFFFFF.toInt() else 0xFFFFE07A.toInt()
+                canvas.drawCircle(cx, cy + r * 0.25f, r * 0.4f, barPaint)
+            }
+            Weapon.NAGA -> {
+                // Coiled serpent (S-curve) + head.
+                ringPaint.strokeWidth = r * 0.34f
+                path.moveTo(cx - r * 0.8f, cy + r * 0.9f)
+                path.cubicTo(cx + r * 1.2f, cy + r * 0.4f, cx - r * 1.2f, cy - r * 0.4f, cx + r * 0.7f, cy - r * 0.9f)
+                canvas.drawPath(path, strokePathPaint(ringPaint))
+                canvas.drawCircle(cx + r * 0.7f, cy - r * 0.9f, r * 0.34f, barPaint)
+            }
+            Weapon.GADA -> {
+                // Spiked mace with handle.
+                ringPaint.strokeWidth = r * 0.24f
+                canvas.drawLine(cx - r * 0.7f, cy + r, cx + r * 0.2f, cy - r * 0.1f, ringPaint)
+                val hx = cx + r * 0.4f; val hy = cy - r * 0.35f
+                for (a in 0 until 8) { val an = a * (Math.PI.toFloat() / 4f); canvas.drawCircle(hx + cos(an) * r * 0.65f, hy + sin(an) * r * 0.65f, r * 0.2f, barPaint) }
+                canvas.drawCircle(hx, hy, r * 0.55f, barPaint)
+            }
+            Weapon.BRAHMA -> {
+                // Radiant sun orb.
+                ringPaint.strokeWidth = r * 0.16f
+                for (a in 0 until 8) { val an = a * (Math.PI.toFloat() / 4f); canvas.drawLine(cx + cos(an) * r * 0.7f, cy + sin(an) * r * 0.7f, cx + cos(an) * r * 1.2f, cy + sin(an) * r * 1.2f, ringPaint) }
+                canvas.drawCircle(cx, cy, r * 0.6f, barPaint)
+                barPaint.color = if (dim) 0x66FFFFFF.toInt() else Color.WHITE
+                canvas.drawCircle(cx, cy, r * 0.28f, barPaint)
+            }
+        }
+    }
+
+    private fun strokePathPaint(src: Paint): Paint { src.style = Paint.Style.STROKE; return src }
 
     private fun drawHelper(canvas: Canvas, r: RectF, name: String, used: Boolean, color: Int) {
         barPaint.color = if (used) 0x33202020 else (color and 0x00FFFFFF) or 0xAA000000.toInt()

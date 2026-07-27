@@ -42,32 +42,62 @@ class SoundManager(var enabled: Boolean = true) {
     /** A bright triumphant tone for victory over Ravan. */
     fun victory() = play(startFreq = 660f, endFreq = 990f, durationMs = 480, volume = 0.5f)
 
-    // --- Distinct per-astra impact sounds ---
+    // --- Distinct, layered ACTIVATION signatures (played on release) ---
+    // Each astra layers 2-3 tones so it is identifiable by ear alone; no astra
+    // shares a base tone with another.
+    fun castBaan() = play(760f, 520f, 90, 0.26f)                                   // crisp bowstring twang
+    fun castAgni() { play(180f, 90f, 300, 0.34f, noise = 0.5f); play(520f, 900f, 260, 0.22f) }   // low roar + rising flame
+    fun castNaga() { play(1500f, 820f, 240, 0.24f); play(300f, 260f, 240, 0.18f, noise = 0.7f) } // hiss + slither
+    fun castGada() { play(150f, 60f, 320, 0.5f); play(300f, 120f, 200, 0.22f) }                   // heavy whirl thud
+    fun castBrahma() { play(90f, 70f, 620, 0.4f); play(300f, 1400f, 560, 0.3f); play(660f, 990f, 560, 0.2f) } // divine resonance chord
+
+    fun cast(w: Weapon) = when (w) {
+        Weapon.BAAN -> castBaan(); Weapon.AGNI -> castAgni(); Weapon.NAGA -> castNaga()
+        Weapon.GADA -> castGada(); Weapon.BRAHMA -> castBrahma()
+    }
+
+    // --- Distinct per-astra IMPACT sounds (played on hit) ---
     fun impactBaan() = play(880f, 1150f, 70, 0.30f)
-    fun impactAgni() = play(500f, 180f, 340, 0.55f)          // fiery whoosh-down
-    fun impactNaga() = play(1200f, 700f, 220, 0.40f)         // serpentine hiss
-    fun impactGada() = play(240f, 70f, 380, 0.6f)            // heavy thud
-    fun impactBrahma() = play(320f, 1500f, 480, 0.6f)        // cataclysmic rise
+    fun impactAgni() { play(500f, 160f, 360, 0.55f, noise = 0.4f); play(1000f, 300f, 200, 0.2f) }  // fiery burst
+    fun impactNaga() { play(1300f, 600f, 240, 0.38f); play(700f, 400f, 200, 0.2f, noise = 0.5f) }  // venom crack
+    fun impactGada() = play(220f, 60f, 400, 0.62f, noise = 0.3f)                                    // earth-shaking thud
+    fun impactBrahma() { play(300f, 1600f, 500, 0.6f); play(120f, 80f, 520, 0.45f) }                // cataclysm
+
+    fun impact(w: Weapon) = when (w) {
+        Weapon.BAAN -> impactBaan(); Weapon.AGNI -> impactAgni(); Weapon.NAGA -> impactNaga()
+        Weapon.GADA -> impactGada(); Weapon.BRAHMA -> impactBrahma()
+    }
 
     // --- Helper summons ---
     fun hanuman() = play(300f, 900f, 420, 0.55f)             // heroic leap
     fun lakshman() = play(700f, 1300f, 260, 0.45f)           // precise volley
 
-    private fun play(startFreq: Float, endFreq: Float, durationMs: Int, volume: Float) {
+    /**
+     * Renders a short tone: a frequency glide with an exponential decay, plus an
+     * optional [noise] mix (0..1) of filtered white noise for fire/hiss texture.
+     * Layering several of these (fired together) builds each astra's signature.
+     */
+    private fun play(startFreq: Float, endFreq: Float, durationMs: Int, volume: Float, noise: Float = 0f) {
         if (!enabled) return
         thread(isDaemon = true) {
             try {
                 val samples = sampleRate * durationMs / 1000
                 val buffer = ShortArray(samples)
                 var phase = 0.0
+                var last = 0f
                 for (i in 0 until samples) {
                     val t = i.toFloat() / samples
-                    // Linearly glide frequency from start to end.
                     val freq = startFreq + (endFreq - startFreq) * t
                     phase += 2.0 * PI * freq / sampleRate
-                    // Exponential decay so notes never click on release.
                     val env = exp(-3.0 * t).toFloat()
-                    val s = sin(phase).toFloat() * env * volume
+                    var s = sin(phase).toFloat() * (1f - noise)
+                    if (noise > 0f) {
+                        // Low-passed white noise for a breathy/fiery layer.
+                        val n = (Math.random().toFloat() * 2f - 1f)
+                        last += (n - last) * 0.25f
+                        s += last * noise
+                    }
+                    s *= env * volume
                     buffer[i] = (s * Short.MAX_VALUE).toInt()
                         .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                         .toShort()

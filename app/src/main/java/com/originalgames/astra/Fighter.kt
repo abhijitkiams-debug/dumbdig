@@ -111,35 +111,56 @@ class Fighter(
         // Arms holding the bow.
         stroke.color = 0xFF7EBEF5.toInt(); stroke.strokeWidth = s * 0.11f
         canvas.drawLine(x, by - s * 1.05f, x + facing * s * 0.5f, by - s * 1.0f, stroke)
-        // Head (blue skin).
-        val hx = x; val hy = by - s * 1.48f; val hr = s * 0.27f
-        p.color = 0xFF8FC4F2.toInt()
-        canvas.drawCircle(hx, hy, hr, p)
-        // Eyes (kind).
-        eye(canvas, hx + facing * hr * 0.15f, hy - hr * 0.05f, hr * 0.34f, 0xFF3A2A6A.toInt(), false)
-        // Tilak.
-        p.color = Palette.DEMON
-        canvas.drawCircle(hx, hy - hr * 0.55f, hr * 0.12f, p)
-        // Gentle smile.
-        stroke.color = 0xFF5A3A2A.toInt(); stroke.strokeWidth = hr * 0.14f
-        oval.set(hx - hr * 0.35f, hy + hr * 0.05f, hx + hr * 0.35f, hy + hr * 0.5f)
-        canvas.drawArc(oval, 20f, 140f, false, stroke)
-        // Golden crown (mukut) with a gem + feather.
+        // --- Head: drawn for guaranteed identity readability ---
+        // Slightly larger, near-front so BOTH eyes and the Tilak always show.
+        val hx = x; val hy = by - s * 1.5f; val hr = s * 0.30f
+        // Dark contrast rim so the face reads against any (golden) background.
+        p.color = 0xFF20304A.toInt(); canvas.drawCircle(hx, hy, hr * 1.08f, p)
+        p.color = 0xFF8FC4F2.toInt(); canvas.drawCircle(hx, hy, hr, p)
+
+        // Golden crown (mukut) BEHIND the forehead so it never occludes eyes/Tilak.
         p.color = Palette.GOLD
         path.reset()
-        path.moveTo(hx - hr * 0.9f, hy - hr * 0.7f)
-        path.lineTo(hx - hr * 0.5f, hy - hr * 1.5f)
-        path.lineTo(hx, hy - hr * 0.9f)
-        path.lineTo(hx + hr * 0.5f, hy - hr * 1.5f)
-        path.lineTo(hx + hr * 0.9f, hy - hr * 0.7f)
+        path.moveTo(hx - hr * 0.95f, hy - hr * 0.55f)
+        path.lineTo(hx - hr * 0.55f, hy - hr * 1.55f)
+        path.lineTo(hx - hr * 0.18f, hy - hr * 0.85f)
+        path.lineTo(hx, hy - hr * 1.7f)
+        path.lineTo(hx + hr * 0.18f, hy - hr * 0.85f)
+        path.lineTo(hx + hr * 0.55f, hy - hr * 1.55f)
+        path.lineTo(hx + hr * 0.95f, hy - hr * 0.55f)
         path.close()
         canvas.drawPath(path, p)
-        p.color = Palette.DEMON
-        canvas.drawCircle(hx, hy - hr * 1.05f, hr * 0.14f, p)
-        // Bow, facing the enemy.
+        p.color = Palette.DEMON; canvas.drawCircle(hx, hy - hr * 1.15f, hr * 0.13f, p)
+
+        // BOTH eyes, large, distinct, symmetric — non-negotiable identity.
+        val er = hr * 0.30f
+        eye(canvas, hx - hr * 0.4f, hy + hr * 0.02f, er, 0xFF3A2A6A.toInt(), false)
+        eye(canvas, hx + hr * 0.4f, hy + hr * 0.02f, er, 0xFF3A2A6A.toInt(), false)
+        // Gentle smile.
+        stroke.color = 0xFF5A3A2A.toInt(); stroke.strokeWidth = hr * 0.12f; stroke.strokeCap = Paint.Cap.ROUND
+        oval.set(hx - hr * 0.3f, hy + hr * 0.3f, hx + hr * 0.3f, hy + hr * 0.72f)
+        canvas.drawArc(oval, 20f, 140f, false, stroke)
+
+        // Bow, facing the enemy (drawn before the Tilak pass).
         stroke.color = Palette.GOLD; stroke.strokeWidth = s * 0.09f
         oval.set(x + facing * s * 0.15f - s * 0.55f, by - s * 1.5f, x + facing * s * 0.15f + s * 0.55f, by - s * 0.55f)
         canvas.drawArc(oval, -60f, 120f, false, stroke)
+
+        // --- TILAK: drawn LAST, fully opaque, high contrast — never washed out ---
+        drawTilak(canvas, hx, hy, hr)
+    }
+
+    /** The traditional Vaishnava U-tilak: a bold white U with a saffron centre. */
+    private fun drawTilak(canvas: Canvas, hx: Float, hy: Float, hr: Float) {
+        val top = hy - hr * 0.62f; val bot = hy - hr * 0.02f; val half = hr * 0.2f
+        stroke.color = Color.WHITE; stroke.strokeWidth = hr * 0.14f; stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawLine(hx - half, top, hx - half, bot - half * 0.4f, stroke)
+        canvas.drawLine(hx + half, top, hx + half, bot - half * 0.4f, stroke)
+        oval.set(hx - half, bot - half, hx + half, bot + half * 0.4f)
+        canvas.drawArc(oval, 20f, 140f, false, stroke)
+        // Saffron centre drop, fully opaque.
+        stroke.color = Palette.SAFFRON; stroke.strokeWidth = hr * 0.12f
+        canvas.drawLine(hx, top + hr * 0.06f, hx, bot - half * 0.3f, stroke)
     }
 
     private fun linePaint(wdt: Float): Paint {

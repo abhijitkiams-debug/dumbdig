@@ -366,10 +366,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val vel = aimVelocity(mx, my)
         if (vel[2] < 0.17f) return
         launch(wp, mx, my, vel[0], vel[1])
+        // Activation burst at the muzzle, scaled by charge power (escalation).
+        particles.burst(mx, my, wp.color, (12 + vel[2] * 24).toInt(), unit * (1.4f + vel[2] * 1.6f), gravity = 0.1f)
+        fxs.add(Fx(mx, my, FX_CAST, 14, wp.color))
         if (!wp.unlimited) ammo[wp] = (ammo[wp] ?: 1) - 1
         turn = Turn.PLAYER
         state = State.FLYING
-        sound.shoot(); haptics.light()
+        sound.cast(wp); haptics.light()
     }
 
     private fun launch(wp: Weapon, mx: Float, my: Float, vx: Float, vy: Float) {
@@ -405,6 +408,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         while (i >= 0) {
             val p = projectiles[i]
             p.update()
+            emitTrail(p)
             var boom = false
             if (p.y > h || p.x < -w * 0.1f || p.x > w * 1.1f) { projectiles.removeAt(i); i--; continue }
             if (p.y < -h) { projectiles.removeAt(i); i--; continue }
@@ -415,6 +419,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             i--
         }
         if (projectiles.isEmpty() && state == State.FLYING) endTurn()
+    }
+
+    /** Residual in-flight particles — each astra leaves its own living wake. */
+    private fun emitTrail(p: Projectile) {
+        when (p.weapon) {
+            Weapon.AGNI -> particles.burst(p.x, p.y, 0xFFFF7A2E.toInt(), 2, unit * 0.9f, gravity = -0.05f)
+            Weapon.BRAHMA -> particles.burst(p.x, p.y, 0xFFFFE9A8.toInt(), 3, unit * 1.1f, gravity = 0f)
+            Weapon.NAGA -> if (p.age % 3 == 0) particles.burst(p.x, p.y, 0xFF49E07A.toInt(), 1, unit * 0.6f, gravity = 0.1f)
+            Weapon.GADA -> if (p.age % 4 == 0) particles.burst(p.x, p.y, 0xFFB07A3A.toInt(), 1, unit * 0.5f, gravity = 0.2f)
+            else -> {}
+        }
     }
 
     private fun explode(p: Projectile) {
@@ -531,7 +546,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         when (state) {
             State.READY -> drawReady(canvas)
             State.QUIZ -> drawQuiz(canvas)
-            State.PLAYER_AIM -> { if (aiming) drawTrajectory(canvas); drawHud(canvas) }
+            State.PLAYER_AIM -> { if (aiming) { drawTrajectory(canvas); drawCharge(canvas) }; drawHud(canvas) }
             State.FLYING -> drawHud(canvas)
             State.ENEMY_THINK -> { drawHud(canvas); drawBanner(canvas, "${enemyDef.name.uppercase()} ATTACKS", Palette.DEMON) }
             State.PAUSED -> { drawHud(canvas); drawPaused(canvas) }
@@ -549,10 +564,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         val t = f.age.toFloat() / f.maxAge
         val a = ((1f - t) * 255).toInt().coerceIn(0, 255)
         when (f.kind) {
-            FX_AGNI, FX_GADA, FX_NAGA, FX_BAAN, FX_BRAHMA -> {
+            FX_AGNI, FX_GADA, FX_NAGA, FX_BAAN, FX_BRAHMA, FX_CAST -> {
                 ringPaint.color = (a shl 24) or (f.color and 0x00FFFFFF)
                 ringPaint.strokeWidth = unit * (if (f.kind == FX_BRAHMA) 1.2f else 0.7f)
-                canvas.drawCircle(f.x, f.y, t * w * (if (f.kind == FX_BRAHMA) 0.14f else 0.07f) + unit, ringPaint)
+                canvas.drawCircle(f.x, f.y, t * w * (if (f.kind == FX_BRAHMA) 0.14f else if (f.kind == FX_CAST) 0.05f else 0.07f) + unit, ringPaint)
                 if (f.kind == FX_BRAHMA && t < 0.4f) {
                     bgPaint.color = ((0x88 * (1 - t / 0.4f)).toInt() shl 24) or 0x00FFFFFF
                     canvas.drawRect(0f, 0f, w, h, bgPaint)
@@ -646,6 +661,30 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         textPaint.textSize = h * 0.045f
         canvas.drawText("${abs(ang)}°   PWR ${(vel[2] * 100).toInt()}%", w * 0.04f, h * 0.20f, textPaint)
         textPaint.textAlign = Paint.Align.CENTER
+    }
+
+    /** Divine energy gathering at Ram's bow as he draws — escalates with power. */
+    private fun drawCharge(canvas: Canvas) {
+        val mx = ram.muzzleX(); val my = ram.muzzleY()
+        val power = aimVelocity(mx, my)[2]
+        val c = selected.color
+        val pulse = 0.75f + 0.25f * sin(bgPhase * 0.4f)
+        // Halo grows with charge power (low -> high escalation).
+        bgPaint.color = ((0x33 + (0x33 * power).toInt()) shl 24) or (c and 0x00FFFFFF)
+        canvas.drawCircle(mx, my, unit * (1.5f + power * 4f) * pulse, bgPaint)
+        // Rotating divine rays; more rays and longer as power rises.
+        ringPaint.color = (0xCC shl 24) or (c and 0x00FFFFFF)
+        ringPaint.strokeWidth = unit * 0.35f
+        val rays = 4 + (power * 6).toInt()
+        val rot = bgPhase * 0.15f
+        val r1 = unit * 1.2f; val r2 = unit * (1.8f + power * 3.5f) * pulse
+        for (a in 0 until rays) {
+            val an = rot + a * (2f * Math.PI.toFloat() / rays)
+            canvas.drawLine(mx + cos(an) * r1, my + sin(an) * r1, mx + cos(an) * r2, my + sin(an) * r2, ringPaint)
+        }
+        // Bright core.
+        bgPaint.color = c; canvas.drawCircle(mx, my, unit * (0.6f + power * 0.9f), bgPaint)
+        bgPaint.color = Color.WHITE; canvas.drawCircle(mx, my, unit * (0.3f + power * 0.4f), bgPaint)
     }
 
     private fun drawHud(canvas: Canvas) {
@@ -894,6 +933,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         private const val FX_BRAHMA = 4
         private const val FX_HANUMAN = 5
         private const val FX_LAKSHMAN = 6
+        private const val FX_CAST = 7
     }
 
     // --------------------------------------------------------------- thread

@@ -7,12 +7,14 @@
 <style>
   /* CredResolve brand palette: violet primary, navy-slate ink, emerald positive */
   :root {
-    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
-    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E; --border:#E4E0F0; --border-2:#EEEBF7;
-    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#F9FAFB; --raise:#F3F4F6;
+    --ink:#111827; --ink-2:#4B5563; --ink-3:#6B7280; --border:#E5E7EB; --border-2:#F1F3F5;
+    --accent:#7C3AED; --accent-ink:#6D28D9; --accent-soft:#F5F3FF;
     --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
-    --calm:#6D758E; --calm-soft:#EEEDF5; --good:#0F9D76;
-    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
+    --calm:#6B7280; --calm-soft:#F1F3F5; --good:#16A34A;
+    --grn:#16A34A; --grn-ink:#15803D; --grn-soft:#F0FDF4; --grn-border:#BBF7D0;
+    --pur:#7C3AED; --pur-ink:#6D28D9; --pur-soft:#F5F3FF; --pur-border:#DDD6FE;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 14px rgba(16,24,40,.05);
     --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
@@ -24,16 +26,20 @@
       --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
       --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
       --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
+      --grn:#34D399; --grn-ink:#6EE7B7; --grn-soft:#0E2A21; --grn-border:#1C5943;
+      --pur:#A78BE0; --pur-ink:#C4B2F0; --pur-soft:#241F3A; --pur-border:#3A3160;
       --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
     }
   }
   :root[data-theme="light"] {
-    --bg:#F7F5FC; --panel:#FFFFFF; --panel-2:#FAF8FE; --raise:#F1EDFA;
-    --ink:#1F2B44; --ink-2:#4A5578; --ink-3:#6D758E; --border:#E4E0F0; --border-2:#EEEBF7;
-    --accent:#7E6AB9; --accent-ink:#5B3F96; --accent-soft:#EFEAF9;
+    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#F9FAFB; --raise:#F3F4F6;
+    --ink:#111827; --ink-2:#4B5563; --ink-3:#6B7280; --border:#E5E7EB; --border-2:#F1F3F5;
+    --accent:#7C3AED; --accent-ink:#6D28D9; --accent-soft:#F5F3FF;
     --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
-    --calm:#6D758E; --calm-soft:#EEEDF5; --good:#0F9D76;
-    --shadow:0 1px 2px rgba(31,27,68,.05), 0 6px 20px rgba(62,25,83,.06);
+    --calm:#6B7280; --calm-soft:#F1F3F5; --good:#16A34A;
+    --grn:#16A34A; --grn-ink:#15803D; --grn-soft:#F0FDF4; --grn-border:#BBF7D0;
+    --pur:#7C3AED; --pur-ink:#6D28D9; --pur-soft:#F5F3FF; --pur-border:#DDD6FE;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 14px rgba(16,24,40,.05);
   }
   :root[data-theme="dark"] {
     --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
@@ -182,6 +188,34 @@
   .intent-m  { color:#8A6100; background:rgba(178,106,0,.14); border-color:rgba(178,106,0,.4); }
   .intent-l  { color:#B4531A; background:rgba(200,90,30,.14); border-color:rgba(200,90,30,.4); }
   .intent-x  { color:var(--crit); background:rgba(194,51,77,.12); border-color:rgba(194,51,77,.45); }
+
+  /* Segments — workflow-ready lead groups */
+  .seg-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .seg-sub { margin:5px 0 0; color:var(--ink-2); font-size:13px; max-width:76ch; }
+  .seg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px,1fr)); gap:18px; }
+  .seg-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 18px 16px; display:flex; flex-direction:column; gap:13px; transition:box-shadow .15s, border-color .15s; }
+  .seg-card:hover { box-shadow:var(--shadow); }
+  .seg-title { font-size:15.5px; font-weight:700; letter-spacing:-.01em; color:var(--ink); margin:0; }
+  .seg-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); }
+  .seg-meta .bolt { color:var(--accent); font-weight:700; }
+  .seg-pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:650; padding:3px 9px; border-radius:999px; }
+  .seg-pill.ready { color:var(--grn-ink); background:var(--grn-soft); border:1px solid var(--grn-border); }
+  .seg-pill.date { color:var(--ink-2); background:var(--raise); border:1px solid var(--border); }
+  .seg-desc { font-size:12.5px; color:var(--ink-2); margin:-3px 0 0; line-height:1.45; }
+  .seg-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .seg-stat { border:1px solid var(--border); border-radius:10px; padding:9px 12px; }
+  .seg-stat .s-l { font-size:11px; color:var(--ink-3); font-weight:600; }
+  .seg-stat .s-v { font-size:19px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; margin-top:1px; }
+  .seg-basis { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg-tag { font-size:10.5px; font-weight:600; color:var(--ink-2); background:var(--raise); border:1px solid var(--border); border-radius:6px; padding:2px 7px; }
+  .seg-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:1px; }
+  .seg-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:12.5px; font-weight:650; padding:9px 10px; border-radius:9px; cursor:pointer; border:1px solid transparent; transition:.14s; text-decoration:none; }
+  .seg-btn.campaign { color:var(--grn-ink); background:var(--grn-soft); border-color:var(--grn-border); }
+  .seg-btn.campaign:hover { background:var(--grn); color:#fff; border-color:var(--grn); }
+  .seg-btn.workflow { color:var(--pur-ink); background:var(--pur-soft); border-color:var(--pur-border); }
+  .seg-btn.workflow:hover { background:var(--pur); color:#fff; border-color:var(--pur); }
+  .seg-msg { font-size:11.5px; color:var(--ink-2); min-height:14px; }
+  .seg-msg.ok { color:var(--grn-ink); } .seg-msg.err { color:var(--crit); }
   .seg { font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; white-space:nowrap; background:var(--calm-soft); color:var(--ink-2); border:1px solid var(--border-2); }
   .seg.self_cured { background:var(--accent-soft); color:var(--accent-ink); }
   .seg.defaulter { background:var(--crit-soft); color:var(--crit); }
@@ -411,6 +445,7 @@
 
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="worklist" aria-selected="true">Worklist</button>
+      <button class="tab" data-tab="segments" aria-selected="false">Segments</button>
       <button class="tab" data-tab="analytics" aria-selected="false">Analytics</button>
       <button class="tab" data-tab="learning" aria-selected="false">Learning</button>
     </div>
@@ -438,6 +473,18 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <!-- Segments tab -->
+    <div class="tabpanel" id="tab-segments">
+      <div class="seg-head">
+        <div>
+          <h2 style="font-size:16px;">Lead segments</h2>
+          <p class="seg-sub">Leads aggregated by priority, intent and payment probability into ready-to-run groups. Send a segment to a calling / voice-blast campaign, or push it to your workflow orchestration platform.</p>
+        </div>
+        <button class="act" id="btn-workflow-cfg" title="Set your workflow orchestration endpoint">⚙ Workflow endpoint</button>
+      </div>
+      <div class="seg-grid" id="seg-grid"></div>
     </div>
 
     <!-- Analytics tab -->
@@ -643,6 +690,7 @@ function render(data){
   renderTrunc(data.worklist_truncated);
   renderWorklist();
   renderMap(data.routes);
+  renderSegments(data.segments);
   renderIntent(data.summary);
   renderStrategyMix(data.summary);
   renderMetrics(data.model_metrics, data.uploaded_labels_present);
@@ -821,6 +869,8 @@ $("#btn-edit-map").addEventListener("click", ()=>{
   $("#map-card").scrollIntoView({behavior:"smooth", block:"start"});
 });
 
+$("#btn-workflow-cfg").addEventListener("click", configWorkflow);
+
 $("#btn-new-file").addEventListener("click", ()=>{
   $("#intake-bar").style.display = "none";
   $(".lede").style.display = "";
@@ -952,6 +1002,66 @@ function renderMetrics(mm, uploadedLabels){
   if(!any){
     met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'No supervised model is driving these scores yet — payment likelihood is a <b>transparent risk heuristic</b>. It becomes a validated supervised model as soon as you upload a book with outcome-label columns, or record real repayment outcomes under <b>Learning</b>. Priority, strategy and routing are fully computed regardless.'}));
   }
+}
+
+const WF_KEY = "aayudh_workflow_url";
+const wfUrl = () => { try { return localStorage.getItem(WF_KEY) || ""; } catch(e){ return ""; } };
+const todayStr = () => new Date().toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"});
+
+function renderSegments(segs){
+  const grid = $("#seg-grid"); if(!grid) return; grid.innerHTML="";
+  if(!segs || !segs.length){ grid.innerHTML = '<p class="seg-sub">No segments yet — score a book first.</p>'; return; }
+  segs.forEach(s=>{
+    const card = el("div","seg-card");
+    card.innerHTML = `
+      <h3 class="seg-title">${s.name}</h3>
+      <div class="seg-meta"><span class="bolt">⚡</span> ${s.type}
+        <span class="seg-pill ready">● Ready</span>
+        <span class="seg-pill date">${todayStr()}</span></div>
+      <p class="seg-desc">${s.subtitle}</p>
+      <div class="seg-basis">${(s.basis||[]).map(b=>`<span class="seg-tag">${b}</span>`).join("")}</div>
+      <div class="seg-stats">
+        <div class="seg-stat"><div class="s-l">Leads</div><div class="s-v">${(s.leads||0).toLocaleString()}</div></div>
+        <div class="seg-stat"><div class="s-l">Exp. recovery</div><div class="s-v">${moneyK(s.expected_recovery)}</div></div>
+      </div>
+      <div class="seg-actions">
+        <a class="seg-btn campaign" href="/api/segment/campaign.csv?seg=${s.id}">◎ Use in Campaign</a>
+        <button class="seg-btn workflow" data-seg="${s.id}" data-name="${s.name}">⑃ Push to Workflow</button>
+      </div>
+      <div class="seg-msg" id="segmsg-${s.id}"></div>`;
+    grid.append(card);
+  });
+  grid.querySelectorAll(".seg-btn.workflow").forEach(b=>b.addEventListener("click", ()=>pushSegment(b.dataset.seg, b)));
+}
+
+async function pushSegment(seg, btn){
+  const msg = $("#segmsg-"+seg); if(msg){ msg.className="seg-msg"; msg.textContent="Pushing…"; }
+  const url = wfUrl();
+  try{
+    const res = await fetch("/api/segment/push", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({seg, webhook:url, lender: lenderName()})});
+    const d = await res.json();
+    if(d.pushed){ msg.className="seg-msg ok"; msg.textContent=`✓ Pushed ${d.count} leads to your workflow platform (HTTP ${d.status}).`; }
+    else if(d.ok){
+      // No endpoint configured — hand back the workflow package as a download.
+      downloadJSON(`workflow_${seg}.json`, d.payload);
+      msg.className="seg-msg"; msg.innerHTML=`Downloaded workflow package (${d.count} leads). <a href="#" id="setwf-${seg}">Set a workflow endpoint</a> to push automatically.`;
+      const a=$("#setwf-"+seg); if(a) a.addEventListener("click", e=>{e.preventDefault(); configWorkflow(); });
+    } else { msg.className="seg-msg err"; msg.textContent = d.error || "Push failed."; }
+  }catch(e){ if(msg){ msg.className="seg-msg err"; msg.textContent="Push failed: "+e.message; } }
+}
+
+function downloadJSON(name, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+
+function configWorkflow(){
+  const cur = wfUrl();
+  const v = prompt("Workflow orchestration endpoint (POST URL).\nSegments will be POSTed here as JSON.\nLeave blank to clear.", cur);
+  if(v===null) return;
+  try{ if(v.trim()) localStorage.setItem(WF_KEY, v.trim()); else localStorage.removeItem(WF_KEY); }catch(e){}
 }
 
 function renderIntent(s){

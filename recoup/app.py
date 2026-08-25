@@ -28,6 +28,7 @@ import ingest              # noqa: E402
 import learner             # noqa: E402
 import memory              # noqa: E402
 import pipeline            # noqa: E402
+import segments            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data", "accounts.csv")
@@ -236,6 +237,8 @@ def score_rows(rows, report, collectors, top_field, lender="default"):
         print("memory persist failed:", e)
 
     LAST_WORKLIST = list(results["worklist"])  # keep the FULL list for CSV export
+    # Aggregate the FULL portfolio into workflow-ready segments (before trimming).
+    results["segments"] = segments.build_segments(results["worklist"])
     # Strip internal feature vectors from the browser payload.
     for w in results["worklist"]:
         w.pop("_features", None)
@@ -281,6 +284,68 @@ def worklist_to_csv(worklist):
             "; ".join(row.get("reasons", []) + [row.get("audit", {}).get("action_rationale", "")]).strip("; "),
         ])
     return buf.getvalue()
+
+
+def _segment_rows(seg_id):
+    """(segment_def, rows) for a segment id, recomputed from the full worklist."""
+    sdef = next((d for d in segments.SEGMENT_DEFS if d["id"] == seg_id), None)
+    if not sdef or not LAST_WORKLIST:
+        return None, []
+    rows = [w for w in LAST_WORKLIST if segments._classify(w) == seg_id]
+    return sdef, rows
+
+
+def segment_campaign_csv(rows, channel):
+    """Dialer / voice-blast ready CSV: one contactable lead per row."""
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["account_id", "name", "mobile", "region", "channel",
+                "priority", "intent_to_pay", "payment_probability",
+                "outstanding", "first_action", "message"])
+    for row in rows:
+        strat = row.get("strategy") or {}
+        w.writerow([
+            row.get("account_id"), row.get("borrower_name"), row.get("mobile"),
+            row.get("region"), strat.get("first_action") or channel,
+            row.get("priority_level"), row.get("intent_band"),
+            row.get("prob_actual_payment"), row.get("recoverable_amount"),
+            (strat.get("first_action")), (strat.get("touches") or [{}])[0].get("message", ""),
+        ])
+    return buf.getvalue()
+
+
+def push_to_workflow(seg_id, webhook_url=None, lender="default"):
+    """
+    Build the workflow-orchestration payload for a segment and, when a webhook
+    URL is given, POST it to that orchestration platform. Returns a result dict.
+    """
+    sdef, rows = _segment_rows(seg_id)
+    if not sdef:
+        return {"ok": False, "error": "unknown segment or nothing scored yet"}
+    payload = segments.workflow_payload(sdef, rows, lender=lender)
+    if not webhook_url:
+        return {"ok": True, "pushed": False, "count": payload["lead_count"],
+                "segment_name": sdef["name"], "payload": payload,
+                "note": "No workflow endpoint configured — returning the package. "
+                        "Set your orchestration webhook URL to push automatically."}
+    # Push to the caller's orchestration platform.
+    import urllib.request
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(webhook_url, data=data, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            status = resp.status
+            body = resp.read(2048).decode("utf-8", "replace")
+        return {"ok": True, "pushed": True, "count": payload["lead_count"],
+                "segment_name": sdef["name"], "endpoint": webhook_url,
+                "status": status, "response": body}
+    except Exception as e:
+        return {"ok": False, "pushed": False, "count": payload["lead_count"],
+                "segment_name": sdef["name"], "endpoint": webhook_url,
+                "error": f"push failed: {e}"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -332,6 +397,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif path == "/api/segment/campaign.csv":
+            seg = parse_qs(urlparse(self.path).query).get("seg", [None])[0]
+            sdef, rows = _segment_rows(seg)
+            if not sdef:
+                return self._send(400, {"error": "unknown segment or nothing scored yet"})
+            body = segment_campaign_csv(rows, sdef["channel"]).encode("utf-8-sig")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv")
+            self.send_header("Content-Disposition", f"attachment; filename=campaign_{seg}.csv")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._send(404, {"error": "not found"})
 
@@ -349,6 +426,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_outcomes()
         if path == "/api/learn":
             return self._handle_learn()
+        if path == "/api/segment/push":
+            try:
+                body = json.loads(self._read_body() or b"{}")
+            except (ValueError, TypeError):
+                body = {}
+            res = push_to_workflow(body.get("seg"), body.get("webhook"),
+                                   lender=body.get("lender") or "default")
+            return self._send(200 if res.get("ok") else 400, res)
         return self._send(404, {"error": "not found"})
 
     def _handle_upload(self, path):

@@ -283,6 +283,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         worklist.append({
             "account_id": r.get("account_id"),
             "borrower_name": r.get("borrower_name") or "",
+            "mobile": r.get("mobile") or "",
             "rm_name": r.get("rm_name") or "",
             "review": review,
             "review_reason": review_reason,

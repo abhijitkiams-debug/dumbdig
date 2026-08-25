@@ -156,7 +156,7 @@
   .intent-l  { color:#B4531A; background:rgba(200,90,30,.14); border-color:rgba(200,90,30,.4); }
   .intent-x  { color:var(--crit); background:rgba(194,51,77,.12); border-color:rgba(194,51,77,.45); }
 
-  /* Segments — workflow-ready lead groups */
+  /* Segments: workflow-ready lead groups */
   .seg-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
   .seg-sub { margin:5px 0 0; color:var(--ink-2); font-size:13px; max-width:76ch; }
   .seg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px,1fr)); gap:18px; }
@@ -225,8 +225,7 @@
   .detail-box { background:var(--panel-2); border-top:1px dashed var(--border); padding:14px 16px 16px 44px; display:grid; grid-template-columns:1.3fr 1fr; gap:18px; }
   .detail-box h4 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
   .why-list { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
-  .why-list li { font-size:13px; color:var(--ink); padding-left:16px; position:relative; }
-  .why-list li::before { content:"→"; position:absolute; left:0; color:var(--accent); }
+  .why-list li { font-size:13px; color:var(--ink); }
   .audit { display:grid; gap:5px; font-size:12px; }
   .audit .kv { display:flex; justify-content:space-between; gap:10px; }
   .audit .kv span:first-child { color:var(--ink-3); }
@@ -311,8 +310,6 @@
   .terms { max-width:76ch; }
   .terms > summary { font-family:var(--f-sans); font-size:12px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); cursor:pointer; list-style:none; padding:4px 0; }
   .terms > summary::-webkit-details-marker { display:none; }
-  .terms > summary::before { content:"›"; display:inline-block; margin-right:8px; transition:transform .15s; color:var(--ink-3); }
-  .terms[open] > summary::before { transform:rotate(90deg); }
   .terms > summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:3px; }
   .terms-body { margin-top:10px; display:grid; gap:9px; }
   .terms-body p { margin:0; font-size:12px; line-height:1.6; color:var(--ink-3); }
@@ -380,7 +377,7 @@
     <div class="card-b">
       <p class="map-hint">We matched your file's headers to Aayudh's fields automatically. Review and adjust
         below, then score. Anything left as <b>Not mapped</b> is ignored or safely imputed. Required fields
-        are marked <span class="req-dot">●</span>.</p>
+        are marked <span class="req-dot">*</span>.</p>
       <div id="map-grid"></div>
       <div class="map-actions">
         <button class="act primary" id="btn-score-mapped">Score with this mapping</button>
@@ -412,14 +409,14 @@
     <div class="tabpanel active" id="tab-worklist">
       <section class="card" aria-label="Account worklist">
         <div class="card-h"><h2>Prioritized worklist</h2>
-          <a class="act dl" id="btn-download" href="/api/export.csv" style="display:none;">↓ Download CSV</a>
+          <a class="act dl" id="btn-download" href="/api/export.csv" style="display:none;">Download CSV</a>
           <span class="eyebrow" style="margin-left:12px;">priority-ranked</span></div>
         <div class="toolbar" id="filters">
           <button class="chip" data-f="All" aria-pressed="true">All <span class="c-n" id="f-all"></span></button>
           <button class="chip" data-f="High" aria-pressed="false">High <span class="c-n" id="f-high"></span></button>
           <button class="chip" data-f="Medium" aria-pressed="false">Medium <span class="c-n" id="f-med"></span></button>
           <button class="chip" data-f="Low" aria-pressed="false">Low <span class="c-n" id="f-low"></span></button>
-          <button class="chip chip-review" data-f="Review" aria-pressed="false" title="Accounts a human must clear before action">⚑ Needs review <span class="c-n" id="f-review"></span></button>
+          <button class="chip chip-review" data-f="Review" aria-pressed="false" title="Accounts a human must clear before action">Needs review <span class="c-n" id="f-review"></span></button>
           <button class="chip chip-ptp" data-f="PTP" aria-pressed="false" title="Accounts with an active promise-to-pay">Promise-to-pay <span class="c-n" id="f-ptp"></span></button>
           <input class="search" id="search" type="search" placeholder="account id…" aria-label="Search account id">
         </div>
@@ -440,7 +437,7 @@
           <h2 style="font-size:16px;">Lead segments</h2>
           <p class="seg-sub">Leads aggregated by priority, intent and payment probability into ready-to-run groups. Send a segment to a calling / voice-blast campaign, or push it to your workflow orchestration platform.</p>
         </div>
-        <button class="act" id="btn-workflow-cfg" title="Set your workflow orchestration endpoint">⚙ Workflow endpoint</button>
+        <button class="act" id="btn-workflow-cfg" title="Set your workflow orchestration endpoint">Workflow endpoint</button>
       </div>
       <div class="seg-grid" id="seg-grid"></div>
     </div>
@@ -578,7 +575,7 @@ function renderMapping(insp){
       const row = el("div","map-row");
       const info = el("div","map-field");
       const lab = el("div","mf-label"); lab.textContent = f.label;
-      if(f.req){ const d=el("span","req-dot"); d.textContent="●"; lab.append(d); }
+      if(f.req){ const d=el("span","req-dot"); d.textContent="*"; lab.append(d); }
       info.append(lab, el("div","mf-desc", f.desc));
       const sel = document.createElement("select");
       sel.dataset.key = f.key;
@@ -672,13 +669,12 @@ function render(data){
 
 const lenderName = () => ($("#lender").value || "default").trim() || "default";
 
-const CH_ICON = {whatsapp:"🟢", sms:"✉", email:"✉", ivr:"☎", voicebot:"🔊", agent_call:"📞", letter:"📄", field_visit:"📍", settlement:"🤝", legal:"⚖"};
 function strategyHTML(s){
   const touches = s.touches.map(t=>`
     <div class="touch">
       <div class="t-day">Day ${t.day}${t.when?`<span class="t-when">${t.when}</span>`:''}</div>
       <div class="t-body">
-        <div class="t-head"><span class="t-ch">${CH_ICON[t.channel]||"•"} ${t.channel_label}</span>
+        <div class="t-head"><span class="t-ch">${t.channel_label}</span>
           <span class="t-tone tone-${t.tone.replace(/[^a-z]/g,'')}">${t.tone}</span>
           <span class="t-script">${t.script_type.replace(/_/g," ")}</span></div>
         <div class="t-msg">${t.message}</div>
@@ -692,8 +688,8 @@ function strategyHTML(s){
         <span class="strat-cost">est. cost ${s.est_cost} · ${s.channels.length} channels</span>
       </div>
       <div class="touches">${touches}</div>
-      <div class="strat-esc">↳ if unresolved: ${s.escalation}</div>
-      ${(s.compliance&&s.compliance.length)?`<div class="strat-comp">${s.compliance.map(c=>`<div>⚖ ${c}</div>`).join("")}</div>`:''}
+      <div class="strat-esc">if unresolved: ${s.escalation}</div>
+      ${(s.compliance&&s.compliance.length)?`<div class="strat-comp">${s.compliance.map(c=>`<div>${c}</div>`).join("")}</div>`:''}
     </div>`;
 }
 
@@ -709,7 +705,7 @@ function renderReport(data){
   else if(r.encoding) add("", `${r.encoding} · ${r.delimiter||"comma"}-delimited`);
   if(r.missing_canonical_fields && r.missing_canonical_fields.length) add("warn", `<b>${r.missing_canonical_fields.length}</b> fields imputed`);
   if(r.unmapped_source_columns && r.unmapped_source_columns.length) add("", `unmapped: ${r.unmapped_source_columns.slice(0,6).join(", ")}${r.unmapped_source_columns.length>6?" …":""}`);
-  if(data.uploaded_labels_present) add("ok", `labels present → models evaluated on your data`);
+  if(data.uploaded_labels_present) add("ok", `labels present: models evaluated on your data`);
   if(r.note) add("", r.note);
 }
 
@@ -759,15 +755,15 @@ function renderWorklist(){
   rows.slice(0,600).forEach(w=>{
     const tr=el("tr","row");
     tr.innerHTML = `
-      <td><span class="caret">▶</span></td>
-      <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">⚑ review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||""}</span></td>
+      <td><span class="caret"></span></td>
+      <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||""}</span></td>
       <td><span class="seg ${w.segment}">${(w.segment||"").replace(/_/g," ")}</span></td>
       <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
       <td><span class="intent ${intentClass(w.intent_band)}" title="${(w.intent_reasons||[]).join('; ')}">${w.intent_band||''}</span></td>
       <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
       <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
       <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
-      <td><span class="action ${w.next_best_action}"><span class="ic"></span>${w.strategy?w.strategy.first_channel_label:prettyAction(w.next_best_action)}</span>${w.strategy?`<div class="strat-tag">${w.strategy.label}</div>`:''}</td>`;
+      <td><span class="action ${w.next_best_action}">${w.strategy?w.strategy.first_channel_label:prettyAction(w.next_best_action)}</span>${w.strategy?`<div class="strat-tag">${w.strategy.label}</div>`:''}</td>`;
     const det=el("tr","detail"); det.style.display="none";
     const td=el("td"); td.colSpan=9;
     const rev=w.review!=null?w.review:w.audit.human_review_required;
@@ -785,7 +781,7 @@ function renderWorklist(){
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
             <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||''}</span></div>
           </div>
-          <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required: '+(w.review_reason||'high-priority tier'):'✓ Auto-eligible action'}</div>
+          <div class="review-flag ${rev?'':'review-ok'}">${rev?'Human review required: '+(w.review_reason||'high-priority tier'):'Auto-eligible action'}</div>
         </div>
       </div>
       ${w.strategy?strategyHTML(w.strategy):''}
@@ -795,7 +791,7 @@ function renderWorklist(){
         <select class="fb-level"><option ${w.priority_level==='High'?'selected':''}>High</option><option ${w.priority_level==='Medium'?'selected':''}>Medium</option><option ${w.priority_level==='Low'?'selected':''}>Low</option></select>
         <input class="fb-note" type="text" placeholder="reason (optional)" style="width:170px;">
         <button class="fb-save">Save override</button>
-        <button class="ok fb-approve">✓ Approve</button>
+        <button class="ok fb-approve">Approve</button>
         <span class="fb-msg"></span>
       </div>`;
     det.append(td);
@@ -853,7 +849,7 @@ $("#wl-body").addEventListener("click", async (e)=>{
   try {
     const res = await fetch("/api/feedback", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
     const d = await res.json();
-    msg.textContent = res.ok ? (save?"override saved ✓":"approved ✓") : (d.error||"error");
+    msg.textContent = res.ok ? (save?"override saved":"approved") : (d.error||"error");
     if(res.ok) refreshMemory();
   } catch(err){ msg.textContent = "error"; }
 });
@@ -940,7 +936,7 @@ function renderMetrics(mm, uploadedLabels){
                                           : "heuristic, no model yet";
   // Always state, plainly, what is actually driving the payment probability.
   const src=el("div","pay-source");
-  src.innerHTML = `<span class="ps-dot ${hasMetrics?'ps-ok':'ps-heur'}"></span>Payment likelihood: <b>${paySource||''}</b>`;
+  src.innerHTML = `Payment likelihood: <b>${paySource||''}</b>`;
   met.append(src);
 
   const defs=[{key:"label_actual_payment",name:"Actual payment (APP)",sub:"will they pay?"},{key:"label_promise_to_pay",name:"Promise to pay (P2P)",sub:"will they commit?"}];
@@ -970,8 +966,8 @@ function renderSegments(segs){
     const card = el("div","seg-card");
     card.innerHTML = `
       <h3 class="seg-title">${s.name}</h3>
-      <div class="seg-meta"><span class="bolt">⚡</span> ${s.type}
-        <span class="seg-pill ready">● Ready</span>
+      <div class="seg-meta">${s.type}
+        <span class="seg-pill ready">Ready</span>
         <span class="seg-pill date">${todayStr()}</span></div>
       <p class="seg-desc">${s.subtitle}</p>
       <div class="seg-basis">${(s.basis||[]).map(b=>`<span class="seg-tag">${b}</span>`).join("")}</div>
@@ -980,8 +976,8 @@ function renderSegments(segs){
         <div class="seg-stat"><div class="s-l">Exp. recovery</div><div class="s-v">${moneyK(s.expected_recovery)}</div></div>
       </div>
       <div class="seg-actions">
-        <a class="seg-btn campaign" href="/api/segment/campaign.csv?seg=${s.id}">◎ Use in Campaign</a>
-        <button class="seg-btn workflow" data-seg="${s.id}" data-name="${s.name}">⑃ Push to Workflow</button>
+        <a class="seg-btn campaign" href="/api/segment/campaign.csv?seg=${s.id}">Use in Campaign</a>
+        <button class="seg-btn workflow" data-seg="${s.id}" data-name="${s.name}">Push to Workflow</button>
       </div>
       <div class="seg-msg" id="segmsg-${s.id}"></div>`;
     grid.append(card);
@@ -996,9 +992,9 @@ async function pushSegment(seg, btn){
     const res = await fetch("/api/segment/push", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({seg, webhook:url, lender: lenderName()})});
     const d = await res.json();
-    if(d.pushed){ msg.className="seg-msg ok"; msg.textContent=`✓ Pushed ${d.count} leads to your workflow platform (HTTP ${d.status}).`; }
+    if(d.pushed){ msg.className="seg-msg ok"; msg.textContent=`Pushed ${d.count} leads to your workflow platform (HTTP ${d.status}).`; }
     else if(d.ok){
-      // No endpoint configured — hand back the workflow package as a download.
+      // No endpoint configured; hand back the workflow package as a download.
       downloadJSON(`workflow_${seg}.json`, d.payload);
       msg.className="seg-msg"; msg.innerHTML=`Downloaded workflow package (${d.count} leads). <a href="#" id="setwf-${seg}">Set a workflow endpoint</a> to push automatically.`;
       const a=$("#setwf-"+seg); if(a) a.addEventListener("click", e=>{e.preventDefault(); configWorkflow(); });
@@ -1056,7 +1052,7 @@ function renderStrategyMix(s){
     const wrap = el("div"); wrap.style.cssText="display:flex;flex-wrap:wrap;gap:6px;";
     Object.entries(chan).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
       const t = el("span","seg"); t.style.cssText="background:var(--panel-2)";
-      t.innerHTML = `${(CH_ICON[k]||"•")} ${k.replace(/_/g," ")} <b style="font-family:var(--f-mono);color:var(--ink-3)">${v}</b>`;
+      t.innerHTML = `${k.replace(/_/g," ")} <b style="font-family:var(--f-mono);color:var(--ink-3)">${v}</b>`;
       wrap.append(t);
     });
     ch.append(wrap); box.append(ch);
@@ -1077,12 +1073,12 @@ function renderCompliance(s, wl){
   const comp=$("#compliance");
   const n = s.review_required!=null ? s.review_required : s.priority_breakdown.High;
   comp.innerHTML=`<div class="comp-stat"><span class="cs-n">${(n||0).toLocaleString()}</span><span class="cs-l">accounts flagged for <b>human review</b> before action</span>
-      <button class="act primary comp-filter" id="btn-review-filter">Show these ${(n||0).toLocaleString()} cases →</button></div>
+      <button class="act primary comp-filter" id="btn-review-filter">Show these ${(n||0).toLocaleString()} cases</button></div>
     <ul class="comp-list">
-      <li><span class="tick">✓</span> Every score is traceable to the model, inputs, and rule that produced it</li>
-      <li><span class="tick">✓</span> Actions are bounded by a compliance playbook per priority tier</li>
-      <li><span class="tick">✓</span> Legal escalation always requires a human decision</li>
-      <li><span class="tick">✓</span> Interpretable outputs support GDPR / EU AI Act profiling obligations</li>
+      <li>Every score is traceable to the model, inputs, and rule that produced it</li>
+      <li>Actions are bounded by a compliance playbook per priority tier</li>
+      <li>Legal escalation always requires a human decision</li>
+      <li>Interpretable outputs support GDPR / EU AI Act profiling obligations</li>
     </ul>`;
   const btn=$("#btn-review-filter");
   if(btn) btn.addEventListener("click", ()=>{

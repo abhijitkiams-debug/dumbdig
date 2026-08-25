@@ -276,7 +276,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         elif strat.get("human_review"):
             review, review_reason = True, "legal / willful escalation requires a human decision"
         elif level == "High":
-            review, review_reason = True, "high-priority tier — review before action"
+            review, review_reason = True, "high-priority tier, review before action"
         else:
             review, review_reason = False, ""
 
@@ -362,7 +362,7 @@ def _score(trained, segmenter, target_rows, criteria_matrix=None, n_collectors=3
         seg_counts[w["segment"]] = seg_counts.get(w["segment"], 0) + 1
         action_counts[w["next_best_action"]] = action_counts.get(w["next_best_action"], 0) + 1
         st = w.get("strategy", {})
-        strategy_counts[st.get("label", "—")] = strategy_counts.get(st.get("label", "—"), 0) + 1
+        strategy_counts[st.get("label", "Other")] = strategy_counts.get(st.get("label", "Other"), 0) + 1
         for ch in st.get("channels", []):
             channel_counts[ch] = channel_counts.get(ch, 0) + 1
 

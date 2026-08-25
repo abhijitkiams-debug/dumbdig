@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aayudh — Collections Decision Copilot</title>
+<title>Aayudh Collections Decision Copilot</title>
 <style>
   /* CredResolve brand palette: violet primary, navy-slate ink, emerald positive */
   :root {
@@ -18,36 +18,6 @@
     --f-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
-      --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
-      --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
-      --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
-      --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
-      --grn:#34D399; --grn-ink:#6EE7B7; --grn-soft:#0E2A21; --grn-border:#1C5943;
-      --pur:#A78BE0; --pur-ink:#C4B2F0; --pur-soft:#241F3A; --pur-border:#3A3160;
-      --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
-    }
-  }
-  :root[data-theme="light"] {
-    --bg:#FFFFFF; --panel:#FFFFFF; --panel-2:#F9FAFB; --raise:#F3F4F6;
-    --ink:#111827; --ink-2:#4B5563; --ink-3:#6B7280; --border:#E5E7EB; --border-2:#F1F3F5;
-    --accent:#7C3AED; --accent-ink:#6D28D9; --accent-soft:#F5F3FF;
-    --crit:#C2334D; --crit-soft:#FBE7EC; --warn:#B26A00; --warn-soft:#F7ECD9;
-    --calm:#6B7280; --calm-soft:#F1F3F5; --good:#16A34A;
-    --grn:#16A34A; --grn-ink:#15803D; --grn-soft:#F0FDF4; --grn-border:#BBF7D0;
-    --pur:#7C3AED; --pur-ink:#6D28D9; --pur-soft:#F5F3FF; --pur-border:#DDD6FE;
-    --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 14px rgba(16,24,40,.05);
-  }
-  :root[data-theme="dark"] {
-    --bg:#12111C; --panel:#1B1930; --panel-2:#17162A; --raise:#232140;
-    --ink:#ECEAF6; --ink-2:#A9AEC6; --ink-3:#7E86A2; --border:#2C2A47; --border-2:#232140;
-    --accent:#A78BE0; --accent-ink:#C4B2F0; --accent-soft:#241F3A;
-    --crit:#F0637E; --crit-soft:#2E1620; --warn:#E0A44C; --warn-soft:#2A2010;
-    --calm:#9098B4; --calm-soft:#201E33; --good:#34D399;
-    --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.3);
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--f-sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
@@ -66,9 +36,6 @@
   .badge { margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent); padding:5px 10px; border-radius:999px; }
   .badge .pulse { width:7px; height:7px; border-radius:50%; background:var(--accent); }
 
-  .lede { padding:26px 0 16px; max-width:72ch; }
-  .lede h1 { font-family:var(--f-serif); font-weight:600; letter-spacing:-.02em; font-size:29px; line-height:1.12; margin:0 0 8px; text-wrap:balance; }
-  .lede p { margin:0; color:var(--ink-2); font-size:15px; }
   .intake-bar { display:flex; align-items:center; gap:14px; padding:12px 18px; margin:18px 0 20px;
     background:var(--surface); border:1px solid var(--line); border-radius:12px; }
   .intake-bar .ib-left { display:flex; align-items:baseline; gap:12px; min-width:0; flex:1; }
@@ -359,17 +326,10 @@
 <header>
   <div class="head-inner">
     <div class="brand"><span class="logo">Aayudh<span class="dot">.</span></span><small>Collections Decision Copilot</small></div>
-    <span class="badge"><span class="pulse"></span>Running locally</span>
   </div>
 </header>
 
 <div class="wrap">
-  <section class="lede">
-    <h1>Know who will pay. Know what to do.</h1>
-    <p>Aayudh reads your entire book and gives every account a rank, an action, and a reason.
-      Thousands of decisions become one simple list. It runs entirely on your computer, and your
-      data never leaves it.</p>
-  </section>
 
   <!-- Upload -->
   <section class="card" id="upload-card" style="margin-bottom:22px;">
@@ -410,9 +370,7 @@
   </section>
 
   <!-- Collapsed intake bar (shown after scoring) -->
-  <div class="intake-bar" id="intake-bar" style="display:none;">
-    <div class="ib-left"><span class="ib-name" id="ib-name">Aayudh<span class="dot">.</span></span>
-      <span class="ib-note" id="ib-note"></span></div>
+  <div class="intake-bar" id="intake-bar" style="display:none; justify-content:flex-end;">
     <button class="act" id="btn-new-file">Score another file</button>
   </div>
 
@@ -521,7 +479,7 @@
   </section>
 
   <footer>
-    <details class="terms" open>
+    <details class="terms">
       <summary>Terms &amp; Conditions</summary>
       <div class="terms-body">
         <p><b>1. What Aayudh is.</b> Aayudh is a decision support tool. It suggests priorities and
@@ -624,7 +582,7 @@ function renderMapping(insp){
       info.append(lab, el("div","mf-desc", f.desc));
       const sel = document.createElement("select");
       sel.dataset.key = f.key;
-      sel.append(new Option("— Not mapped —", ""));
+      sel.append(new Option("Not mapped", ""));
       insp.source_columns.forEach(c=> sel.append(new Option(c, c)));
       const suggested = insp.suggested[f.key] || "";
       sel.value = suggested;
@@ -703,9 +661,7 @@ function render(data){
   $("#btn-edit-map").style.display = INSPECT ? "inline-block" : "none";
 
   // Collapse the intake so results sit at the top of the page.
-  $(".lede").style.display = "none";
   $("#upload-card").style.display = "none";
-  $("#ib-note").textContent = `${(data.summary.accounts||0).toLocaleString()} accounts scored · ${data.source||""}`;
   $("#intake-bar").style.display = "flex";
 
   selectTab("worklist");                   // always land on the worklist
@@ -804,10 +760,10 @@ function renderWorklist(){
     const tr=el("tr","row");
     tr.innerHTML = `
       <td><span class="caret">▶</span></td>
-      <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">⚑ review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||"—"}</span></td>
+      <td class="acct">${w.account_id}${w.review?`<span class="rvw-badge" title="${w.review_reason||'Human review required'}">⚑ review</span>`:''}${w.ptp_active?`<span class="ptp-badge" title="Active promise-to-pay">PTP</span>`:''}<span class="rgn">${w.borrower_name?w.borrower_name+" · ":""}${w.region||""}</span></td>
       <td><span class="seg ${w.segment}">${(w.segment||"").replace(/_/g," ")}</span></td>
       <td><span class="prio ${w.priority_level}"><span class="stripe"></span>${w.priority_level}</span></td>
-      <td><span class="intent ${intentClass(w.intent_band)}" title="${(w.intent_reasons||[]).join('; ')}">${w.intent_band||'—'}</span></td>
+      <td><span class="intent ${intentClass(w.intent_band)}" title="${(w.intent_reasons||[]).join('; ')}">${w.intent_band||''}</span></td>
       <td class="r"><div class="pbar"><div class="track"><div class="fill" style="width:${Math.round(w.prob_actual_payment*100)}%"></div></div><span class="pv">${pct(w.prob_actual_payment)}</span></div></td>
       <td class="r"><span class="money">${money(w.recoverable_amount!=null?w.recoverable_amount:w.past_due_amount)}</span></td>
       <td class="r"><span class="money exp">${money(w.expected_payment)}</span></td>
@@ -822,14 +778,14 @@ function renderWorklist(){
         <div><h4>Audit trail</h4>
           <div class="audit">
             <div class="kv"><span>Outstanding (POS)</span><span>${money(w.pos!=null?w.pos:0)}</span></div>
-            <div class="kv"><span>Days past due</span><span>${w.days_past_due!=null?w.days_past_due:"—"}</span></div>
+            <div class="kv"><span>Days past due</span><span>${w.days_past_due!=null?w.days_past_due:""}</span></div>
             <div class="kv"><span>Pay likelihood <span style="color:var(--ink-3)">(${w.audit.pay_source||''})</span></span><span>${pct(w.prob_actual_payment)}</span></div>
-            <div class="kv"><span>Intent to pay <span style="color:var(--ink-3)">(${(w.intent_reasons||[]).join('; ')})</span></span><span class="intent ${intentClass(w.intent_band)}">${w.intent_band||'—'}</span></div>
+            <div class="kv"><span>Intent to pay <span style="color:var(--ink-3)">(${(w.intent_reasons||[]).join('; ')})</span></span><span class="intent ${intentClass(w.intent_band)}">${w.intent_band||''}</span></div>
             ${Object.entries(w.audit.priority_components||{}).map(([k,v])=>`<div class="kv"><span>Signal · ${k}</span><span>${v}</span></div>`).join("")}
             <div class="kv"><span>Priority score</span><span>${w.priority_score} / 100</span></div>
-            <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||'—'}</span></div>
+            <div class="kv"><span>Confidence</span><span>${w.confidence||w.audit.confidence||''}</span></div>
           </div>
-          <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required — '+(w.review_reason||'high-priority tier'):'✓ Auto-eligible action'}</div>
+          <div class="review-flag ${rev?'':'review-ok'}">${rev?'⚑ Human review required: '+(w.review_reason||'high-priority tier'):'✓ Auto-eligible action'}</div>
         </div>
       </div>
       ${w.strategy?strategyHTML(w.strategy):''}
@@ -873,7 +829,6 @@ $("#btn-workflow-cfg").addEventListener("click", configWorkflow);
 
 $("#btn-new-file").addEventListener("click", ()=>{
   $("#intake-bar").style.display = "none";
-  $(".lede").style.display = "";
   $("#upload-card").style.display = "";
   $("#results").style.display = "none";
   $("#report-card").style.display = "none";
@@ -982,10 +937,10 @@ function renderMetrics(mm, uploadedLabels){
   const hasMetrics = mm && Object.keys(mm).length>0;
   // Eyebrow reflects EXACTLY what the numbers were measured on.
   $("#perf-src").textContent = hasMetrics ? (isSynthetic ? "synthetic sample · held-out" : "your data · held-out")
-                                          : "heuristic — no model yet";
+                                          : "heuristic, no model yet";
   // Always state, plainly, what is actually driving the payment probability.
   const src=el("div","pay-source");
-  src.innerHTML = `<span class="ps-dot ${hasMetrics?'ps-ok':'ps-heur'}"></span>Payment likelihood: <b>${paySource||'—'}</b>`;
+  src.innerHTML = `<span class="ps-dot ${hasMetrics?'ps-ok':'ps-heur'}"></span>Payment likelihood: <b>${paySource||''}</b>`;
   met.append(src);
 
   const defs=[{key:"label_actual_payment",name:"Actual payment (APP)",sub:"will they pay?"},{key:"label_promise_to_pay",name:"Promise to pay (P2P)",sub:"will they commit?"}];
@@ -1000,7 +955,7 @@ function renderMetrics(mm, uploadedLabels){
     met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'These figures validate the engine on the bundled <b>synthetic</b> sample. Upload a book with outcome labels to measure on your own data.'}));
   }
   if(!any){
-    met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'No supervised model is driving these scores yet — payment likelihood is a <b>transparent risk heuristic</b>. It becomes a validated supervised model as soon as you upload a book with outcome-label columns, or record real repayment outcomes under <b>Learning</b>. Priority, strategy and routing are fully computed regardless.'}));
+    met.append(Object.assign(el("div"),{className:"perf-note",innerHTML:'No supervised model is driving these scores yet. Payment likelihood is a <b>transparent risk heuristic</b>. It becomes a validated supervised model as soon as you upload a book with outcome-label columns, or record real repayment outcomes under <b>Learning</b>. Priority, strategy and routing are fully computed regardless.'}));
   }
 }
 
@@ -1010,7 +965,7 @@ const todayStr = () => new Date().toLocaleDateString("en-GB", {day:"2-digit", mo
 
 function renderSegments(segs){
   const grid = $("#seg-grid"); if(!grid) return; grid.innerHTML="";
-  if(!segs || !segs.length){ grid.innerHTML = '<p class="seg-sub">No segments yet — score a book first.</p>'; return; }
+  if(!segs || !segs.length){ grid.innerHTML = '<p class="seg-sub">No segments yet. Score a book first.</p>'; return; }
   segs.forEach(s=>{
     const card = el("div","seg-card");
     card.innerHTML = `
@@ -1070,7 +1025,7 @@ function renderIntent(s){
   const b = s.intent_breakdown || {};
   const total = order.reduce((a,k)=>a+(b[k]||0),0)||1;
   const note = el("p"); note.className="learn-hint"; note.style.margin="0 0 10px";
-  note.innerHTML = "Willingness to pay, from cooperation, promises and payment signals — separate from risk priority.";
+  note.innerHTML = "Willingness to pay, from cooperation, promises and payment signals, separate from risk priority.";
   box.append(note);
   order.forEach(k=>{
     const v=b[k]||0;
@@ -1114,7 +1069,7 @@ function renderAHP(data){
   data.ahp_action_ranking.forEach((a,i)=>{ const row=el("div","ahp-row"+(i===0?" top":""));
     row.innerHTML=`<span class="a-name">${prettyAction(a[0])}</span><div class="a-track"><div class="a-fill" style="width:${Math.round(a[1]/max*100)}%"></div></div><span class="a-val">${a[1].toFixed(3)}</span>`;
     ahp.append(row); });
-  const cr=el("div","cr-note"); cr.innerHTML=`Manager judgements are consistent — <b>consistency ratio ${data.ahp_consistency_ratio}</b> (≤ 0.10 is acceptable). Weights blend effectiveness, cost, and time efficiency; the priority level then constrains which actions are permitted.`;
+  const cr=el("div","cr-note"); cr.innerHTML=`Manager judgements are consistent: <b>consistency ratio ${data.ahp_consistency_ratio}</b> (≤ 0.10 is acceptable). Weights blend effectiveness, cost, and time efficiency; the priority level then constrains which actions are permitted.`;
   ahp.append(cr);
 }
 

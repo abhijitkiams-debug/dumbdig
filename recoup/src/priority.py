@@ -46,7 +46,7 @@ def _reason_label(*texts):
     if any(w in s for w in ("refus", "declin", "not interested", "unwilling", "willful", "wilful", "denied")):
         return "borrower refused / declined to pay" + (f": {raw}" if raw else "")
     if any(w in s for w in ("insuffic", "no funds", "funds insufficient")):
-        return "cheque bounced — insufficient funds"
+        return "cheque bounced, insufficient funds"
     if any(w in s for w in ("account closed", "acc closed", "closed account")):
         return "bank account closed"
     if any(w in s for w in ("stop payment", "stoppayment", "payment stopped", "withdrawal stopped")):
@@ -56,7 +56,7 @@ def _reason_label(*texts):
     if any(w in s for w in ("dispute", "not liable")):
         return "borrower disputing the debt"
     if any(w in s for w in ("death", "expired", "deceased")):
-        return "borrower deceased — needs special handling"
+        return "borrower deceased, needs special handling"
     if any(w in s for w in ("legal", "npa", "settlement", "fraud")):
         return f"adverse status: {raw or s}"
     return f"adverse reason: {raw}" if raw else "adverse payment reason"

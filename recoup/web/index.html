@@ -160,8 +160,10 @@
   .seg-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
   .seg-sub { margin:5px 0 0; color:var(--ink-2); font-size:13px; max-width:76ch; }
   .seg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px,1fr)); gap:18px; }
-  .seg-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 18px 16px; display:flex; flex-direction:column; gap:13px; transition:box-shadow .15s, border-color .15s; }
-  .seg-card:hover { box-shadow:var(--shadow); }
+  .seg-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 18px 16px; display:flex; flex-direction:column; gap:13px; transition:box-shadow .15s, border-color .15s; cursor:pointer; }
+  .seg-card:hover { box-shadow:var(--shadow); border-color:var(--pur-border); }
+  .seg-active { padding:9px 16px; font-size:12.5px; color:var(--ink-2); background:var(--accent-soft); border-bottom:1px solid var(--border-2); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .seg-active a { color:var(--accent-ink); font-weight:600; cursor:pointer; text-decoration:underline; }
   .seg-title { font-size:15.5px; font-weight:700; letter-spacing:-.01em; color:var(--ink); margin:0; }
   .seg-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); }
   .seg-meta .bolt { color:var(--accent); font-weight:700; }
@@ -420,6 +422,7 @@
           <button class="chip chip-ptp" data-f="PTP" aria-pressed="false" title="Accounts with an active promise-to-pay">Promise-to-pay <span class="c-n" id="f-ptp"></span></button>
           <input class="search" id="search" type="search" placeholder="account id…" aria-label="Search account id">
         </div>
+        <div class="seg-active" id="seg-active" style="display:none;"></div>
         <div class="trunc" id="trunc" style="display:none;"></div>
         <div class="wl-scroll">
           <table class="wl">
@@ -522,7 +525,7 @@ const INTENT_CLASS = {"Very High":"intent-vh","High":"intent-h","Medium":"intent
 const intentClass = b => INTENT_CLASS[b] || "intent-m";
 const routeColors = ["#7E6AB9","#C2334D","#3B6EA5","#0F9D76","#B26A00","#5B3F96"];
 
-let DATA = null, filter = "All", query = "";
+let DATA = null, filter = "All", query = "", segFilter = null;
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
@@ -635,7 +638,7 @@ $("#btn-sample").addEventListener("click", async ()=>{
 
 // ---- render ----
 function render(data){
-  DATA = data; filter = "All"; query = "";
+  DATA = data; filter = "All"; query = ""; segFilter = null;
   $("#search").value = "";
   document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.f==="All"?"true":"false"));
 
@@ -746,12 +749,14 @@ function renderTrunc(t){
 function renderWorklist(){
   const body=$("#wl-body"); body.innerHTML="";
   const rows = DATA.worklist.filter(w=>{
-    const m = filter==="All" ? true
+    const m = segFilter ? w.lead_segment===segFilter
+            : filter==="All" ? true
             : filter==="Review" ? !!w.review
             : filter==="PTP" ? !!w.ptp_active
             : w.priority_level===filter;
     return m && (!query || (w.account_id||"").toLowerCase().includes(query));
   });
+  renderSegActive(rows.length);
   rows.slice(0,600).forEach(w=>{
     const tr=el("tr","row");
     tr.innerHTML = `
@@ -802,6 +807,7 @@ function renderWorklist(){
 }
 
 document.querySelectorAll("#filters .chip").forEach(ch=>ch.addEventListener("click", ()=>{
+  segFilter=null;  // a priority/review filter overrides any active segment drill-down
   document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
   ch.setAttribute("aria-pressed","true"); filter=ch.dataset.f; renderWorklist();
 }));
@@ -964,6 +970,8 @@ function renderSegments(segs){
   if(!segs || !segs.length){ grid.innerHTML = '<p class="seg-sub">No segments yet. Score a book first.</p>'; return; }
   segs.forEach(s=>{
     const card = el("div","seg-card");
+    card.dataset.seg = s.id;
+    card.title = "Click to view these leads";
     card.innerHTML = `
       <h3 class="seg-title">${s.name}</h3>
       <div class="seg-meta">${s.type}
@@ -983,6 +991,35 @@ function renderSegments(segs){
     grid.append(card);
   });
   grid.querySelectorAll(".seg-btn.workflow").forEach(b=>b.addEventListener("click", ()=>pushSegment(b.dataset.seg, b)));
+  // Clicking anywhere on a card (except its action buttons) drills into its leads.
+  grid.querySelectorAll(".seg-card").forEach(card=>card.addEventListener("click", e=>{
+    if(e.target.closest(".seg-btn")) return;
+    openSegment(card.dataset.seg);
+  }));
+}
+
+function openSegment(segId){
+  segFilter = segId;
+  selectTab("worklist");
+  document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+  renderWorklist();
+  document.getElementById("tab-worklist").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function clearSegment(){
+  segFilter = null; filter = "All";
+  document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.f==="All"?"true":"false"));
+  renderWorklist();
+}
+
+function renderSegActive(shown){
+  const sa = $("#seg-active"); if(!sa) return;
+  if(!segFilter){ sa.style.display="none"; return; }
+  const seg = (DATA.segments||[]).find(x=>x.id===segFilter);
+  const total = seg ? seg.leads : shown;
+  sa.style.display = "flex";
+  sa.innerHTML = `Segment: <b>${seg?seg.name:segFilter}</b> <span>showing ${shown.toLocaleString()} of ${total.toLocaleString()} leads</span> <a id="seg-clear">Clear</a>`;
+  const c = $("#seg-clear"); if(c) c.onclick = clearSegment;
 }
 
 async function pushSegment(seg, btn){
@@ -1083,7 +1120,7 @@ function renderCompliance(s, wl){
   const btn=$("#btn-review-filter");
   if(btn) btn.addEventListener("click", ()=>{
     selectTab("worklist");
-    filter="Review";
+    segFilter=null; filter="Review";
     document.querySelectorAll("#filters .chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.f==="Review"?"true":"false"));
     renderWorklist();
     document.getElementById("tab-worklist").scrollIntoView({behavior:"smooth", block:"start"});

@@ -82,7 +82,9 @@ def build_segments(worklist):
     """Aggregate a scored worklist into ordered segment cards with payloads."""
     buckets = {d["id"]: [] for d in SEGMENT_DEFS}
     for w in worklist:
-        buckets.setdefault(_classify(w), []).append(w)
+        seg_id = _classify(w)
+        w["lead_segment"] = seg_id       # tag each lead so the UI can filter to it
+        buckets.setdefault(seg_id, []).append(w)
 
     out = []
     for d in SEGMENT_DEFS:
@@ -101,7 +103,6 @@ def build_segments(worklist):
             "outstanding": round(outstanding, 2),
             "expected_recovery": round(expected, 2),
             "priority_mix": pri_mix,
-            "account_ids": [w.get("account_id") for w in rows],
         })
     return out
 
